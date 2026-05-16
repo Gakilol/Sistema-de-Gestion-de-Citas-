@@ -7,8 +7,80 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Empleado {
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre       String
+  correo       String   @unique
+  telefono     String?
+  passwordHash String
+  especialidad String?
+  horario      Json?
+  rol          RolUsuario @default(EMPLEADO)
+  activo       Boolean  @default(true)
+  
+  citas        Cita[]   @relation("EmpleadoAsignado")
+  citasCreadas Cita[]   @relation("CreadorCita")
+  descansos    DescansoEmpleado[]
+  bloqueos     BloqueoHorario[]
+  vacaciones   VacacionesEmpleado[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Servicio {
+  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre      String
+  descripcion String?
+  duracion    Int
+  precio      Float
+  categoria   String?
+  activo      Boolean  @default(true)
+
+  citas       Cita[]
+}
+
+model Cita {
+  id               String   @id @default(dbgenerated("gen_random_uuid()"))
+  cliente_nombre   String
+  cliente_telefono String?
+  servicio_id      String
+  empleado_id      String
+  fecha            DateTime @db.Date
+  hora             String
+  duracion         Int
+  precio           Float
+  estado           EstadoCita @default(PENDIENTE)
+  notas            String?
+  metodo_pago      String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  created_by       String
+
+  servicio         Servicio @relation(fields: [servicio_id], references: [id])
+  empleado         Empleado @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
+  creador          Empleado @relation("CreadorCita", fields: [created_by], references: [id])
+  
+  pagos            Pago[]
+
+  @@index([empleado_id])
+  @@index([estado])
+  @@index([fecha])
+}
+
+model Pago {
+  id         String   @id @default(dbgenerated("gen_random_uuid()"))
+  cita_id    String
+  monto      Float
+  metodo     String
+  estado     EstadoPago @default(PENDIENTE)
+  referencia String?
+  fecha_pago DateTime?
+
+  cita       Cita     @relation(fields: [cita_id], references: [id], onDelete: Cascade)
+}
+
 enum RolUsuario {
-  CLIENTE
   EMPLEADO
   ADMIN
 }
@@ -16,111 +88,49 @@ enum RolUsuario {
 enum EstadoCita {
   PENDIENTE
   CONFIRMADA
-  CANCELADA
+  EN_PROGRESO
   COMPLETADA
-  NO_ASISTIO
+  CANCELADA
+  REPROGRAMADA
 }
 
-model Usuario {
-  id             String           @id @default(uuid())
-  nombre         String
-  email          String           @unique
-  passwordHash   String
-  telefono       String?
-  rol            RolUsuario       @default(CLIENTE)
-  activo         Boolean          @default(true)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-
-  perfilEmpleado PerfilEmpleado?
-  citasCliente   Cita[]           @relation("ClienteCita")
-  notificaciones Notificacion[]
+enum EstadoPago {
+  PENDIENTE
+  COMPLETADO
+  FALLIDO
+  REEMBOLSADO
 }
 
-model PerfilNegocio {
-  id            String   @id @default(uuid())
-  nombreNegocio String
-  direccion     String
-  telefono      String
-  email         String
-  moneda        String   @default("USD")
-  zonaHoraria   String   @default("UTC")
+model DescansoEmpleado {
+  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  empleado_id String
+  dia_semana  Int      // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  hora_inicio String   // e.g. "13:00"
+  hora_fin    String   // e.g. "14:00"
+  empleado    Empleado @relation(fields: [empleado_id], references: [id], onDelete: Cascade)
+
+  @@index([empleado_id])
 }
 
-model Servicio {
-  id              String   @id @default(uuid())
-  nombre          String
-  descripcion     String?
-  duracionMinutos Int
-  precio          Float
-  activo          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  
-  citas           Cita[]
+model BloqueoHorario {
+  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  empleado_id String
+  fecha       DateTime @db.Date
+  hora_inicio String   // e.g. "10:00"
+  hora_fin    String   // e.g. "12:00"
+  motivo      String?
+  empleado    Empleado @relation(fields: [empleado_id], references: [id], onDelete: Cascade)
+
+  @@index([empleado_id, fecha])
 }
 
-model PerfilEmpleado {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  especialidad    String?
-  colorCalendario String?
+model VacacionesEmpleado {
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  empleado_id  String
+  fecha_inicio DateTime @db.Date
+  fecha_fin    DateTime @db.Date
+  estado       String   @default("APROBADO") // APROBADO, PENDIENTE
+  empleado     Empleado @relation(fields: [empleado_id], references: [id], onDelete: Cascade)
 
-  usuario         Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  horarios        Horario[]
-  citas           Cita[]   @relation("EmpleadoCita")
-}
-
-model Horario {
-  id          String         @id @default(uuid())
-  empleadoId  String
-  diaSemana   Int            // 0 = Domingo, 1 = Lunes, etc.
-  horaInicio  String         // Ej: "09:00"
-  horaFin     String         // Ej: "18:00"
-  disponible  Boolean        @default(true)
-
-  empleado    PerfilEmpleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-}
-
-model Cita {
-  id            String         @id @default(uuid())
-  clienteId     String
-  empleadoId    String
-  servicioId    String
-  fecha         DateTime       @db.Date
-  horaInicio    String         
-  horaFin       String         
-  estado        EstadoCita     @default(PENDIENTE)
-  notasCliente  String?
-  notasInternas String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  cliente       Usuario        @relation("ClienteCita", fields: [clienteId], references: [id], onDelete: Cascade)
-  empleado      PerfilEmpleado @relation("EmpleadoCita", fields: [empleadoId], references: [id], onDelete: Cascade)
-  servicio      Servicio       @relation(fields: [servicioId], references: [id], onDelete: Restrict)
-  pagos         Pago[]
-}
-
-model Pago {
-  id          String    @id @default(uuid())
-  citaId      String
-  monto       Float
-  metodoPago  String?   
-  estadoPago  String    @default("PENDIENTE") 
-  referencia  String?
-  fechaPago   DateTime?
-
-  cita        Cita      @relation(fields: [citaId], references: [id], onDelete: Cascade)
-}
-
-model Notificacion {
-  id        String   @id @default(uuid())
-  userId    String
-  tipo      String   
-  titulo    String
-  mensaje   String
-  leida     Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  usuario   Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([empleado_id])
 }

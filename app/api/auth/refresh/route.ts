@@ -16,16 +16,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Refresh token inválido' }, { status: 401 });
     }
 
-    const usuario = await prisma.usuario.findUnique({ where: { id: payload.id } });
+    const empleado = await prisma.empleado.findUnique({ where: { id: payload.id } });
 
-    if (!usuario || !usuario.activo) {
+    if (!empleado || !empleado.activo) {
       return NextResponse.json({ error: 'Usuario no encontrado o inactivo' }, { status: 401 });
     }
 
     const newAccessToken = await signToken({
-      id: usuario.id,
-      email: usuario.email,
-      rol: usuario.rol,
+      id: empleado.id,
+      email: empleado.correo,
+      rol: empleado.rol,
     });
 
     const response = NextResponse.json({ mensaje: 'Token renovado' });
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60, // 1 hora
+      maxAge: 60 * 60,
       path: '/',
     });
 
