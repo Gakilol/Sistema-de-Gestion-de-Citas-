@@ -134,3 +134,25 @@ model VacacionesEmpleado {
 
   @@index([empleado_id])
 }
+
+model Configuracion {
+  id           String   @id @default("default")
+  negocio      Json?    // { nombre, subtitulo, telefono, whatsapp, direccion, web, moneda, zona_horaria }
+  horarios     Json?    // Default general schedule
+  whatsapp     Json?    // { numero, confirmar, recordatorio, cancelacion, msgExtra }
+  apariencia   Json?    // { tema, branding }
+  updatedAt    DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  entidad      String   // Cita, Empleado, Servicio, Configuracion
+  entidadId    String
+  accion       String   // CREAR, ACTUALIZAR, ELIMINAR, CANCELAR
+  detalles     Json?
+  realizadoPor String?
+  fecha        DateTime @default(now())
+
+  @@index([entidad, entidadId])
+  @@index([fecha])
+}
