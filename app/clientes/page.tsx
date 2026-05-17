@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Star, TrendingUp, Phone, Calendar,
-  DollarSign, Clock, ChevronRight, Scissors, X, RefreshCcw,
+  DollarSign, Clock, ChevronRight, Scissors, X, RefreshCcw, UserPlus,
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
@@ -236,12 +237,71 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
   );
 }
 
+// ─── Modal Agregar Cliente ─────────────────────────────────────────────────
+function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({ nombre: '', telefono: '' });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success('Cliente registrado exitosamente');
+      onCreated();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al registrar cliente');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold text-foreground">Agregar Cliente</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
+            <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono (opcional)</label>
+            <Input value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} placeholder="8888-0000" />
+          </div>
+          <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
+            El cliente quedará registrado como pendiente. Puede programarle una cita luego desde la sección de Citas.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={saving} className="glow-gold">
+              {saving ? 'Guardando...' : 'Registrar Cliente'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function Clientes() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [showAgregar, setShowAgregar] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchClientes = useCallback(async (q = '') => {
@@ -280,9 +340,14 @@ export default function Clientes() {
               <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
               <p className="text-sm text-muted-foreground mt-0.5">Historial y estadísticas de tus clientes</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => fetchClientes(busqueda)} className="gap-1.5 self-start sm:self-auto">
-              <RefreshCcw className="w-3.5 h-3.5" /> Actualizar
-            </Button>
+            <div className="flex gap-2 self-start sm:self-auto">
+              <Button variant="outline" size="sm" onClick={() => fetchClientes(busqueda)} className="gap-1.5">
+                <RefreshCcw className="w-3.5 h-3.5" /> Actualizar
+              </Button>
+              <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
+                <UserPlus className="w-3.5 h-3.5" /> Agregar Cliente
+              </Button>
+            </div>
           </div>
 
           {/* ── KPI mini ─────────────────────────────────────────── */}
@@ -351,6 +416,14 @@ export default function Clientes() {
         <HistorialModal
           cliente={clienteSeleccionado}
           onClose={() => setClienteSeleccionado(null)}
+        />
+      )}
+
+      {/* Modal agregar cliente */}
+      {showAgregar && (
+        <AgregarClienteModal
+          onClose={() => setShowAgregar(false)}
+          onCreated={() => fetchClientes(busqueda)}
         />
       )}
     </div>

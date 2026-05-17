@@ -24,11 +24,34 @@ const ESTADO_LABEL: Record<string,string> = {
   COMPLETADA:'Completada', CANCELADA:'Cancelada', REPROGRAMADA:'Reprogramada',
 };
 
-function fmtUSD(n:number) {
+// ─── Divisas ──────────────────────────────────────────────────────────────
+const MONEDA_SIMBOLO: Record<string, string> = { USD: '$', NIO: 'C$', CRC: '₡' };
+
+function useDivisa() {
+  const [moneda, setMoneda]       = useState('USD');
+  const [tipoCambio, setTipoCambio] = useState(1);
+
+  useEffect(() => {
+    fetch('/api/divisa').then(r => r.json()).then(d => {
+      setMoneda(d.moneda ?? 'USD');
+      setTipoCambio(d.moneda === 'USD' ? 1 : (d.tipoCambio ?? 36.5));
+    });
+  }, []);
+
+  return { moneda, tipoCambio, simbolo: MONEDA_SIMBOLO[moneda] ?? '$' };
+}
+
+function fmtMonto(n: number, moneda: string, tipoCambio: number) {
+  const convertido = moneda === 'USD' ? n : n * tipoCambio;
+  const simbolo = MONEDA_SIMBOLO[moneda] ?? '$';
+  return `${simbolo} ${convertido.toFixed(2)}`;
+}
+
+function fmtUSD(n: number) {
   return new Intl.NumberFormat('es-NI',{style:'currency',currency:'USD'}).format(n);
 }
 
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label, moneda, tipoCambio }: any) {
   if (!active||!payload?.length) return null;
   return (
     <div className="glass rounded-xl px-3 py-2 text-xs shadow-xl border border-border/50">
@@ -37,7 +60,7 @@ function ChartTooltip({ active, payload, label }: any) {
         <div key={i} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{background:p.color}}/>
           <span className="text-muted-foreground">{p.name}:</span>
-          <span className="font-medium">{p.name==='Ingresos'?fmtUSD(p.value):p.value}</span>
+          <span className="font-medium">{p.name==='Ingresos'? fmtMonto(p.value, moneda, tipoCambio) :p.value}</span>
         </div>
       ))}
     </div>
@@ -63,6 +86,7 @@ export default function Reportes() {
   const [loading, setLoading]   = useState(false);
   const [preset, setPreset]     = useState('30d');
   const [[desde, hasta], setRango] = useState<[string,string]>(getPreset('30d'));
+  const { moneda, tipoCambio, simbolo } = useDivisa();
 
   const fetchData = useCallback(async (tipo:string, d:string, h:string) => {
     setLoading(true);
@@ -81,25 +105,92 @@ export default function Reportes() {
     setPreset(p); setRango(rango);
   };
 
-  const handleExportCSV = () => {
+  // ─── Exportar PDF ──────────────────────────────────────────────────────────
+  const handleExportPDF = async () => {
     if (!data) return;
-    let rows: string[][] = [];
-    let headers: string[] = [];
 
-    if (tab==='ingresos' && data.data) {
-      headers = ['Fecha','Ingresos (USD)'];
-      rows = data.data.map((r:any)=>[r.fecha, r.ingresos.toFixed(2)]);
-    } else if (tab==='empleados' && data.data) {
-      headers = ['Empleado','Especialidad','Citas','Ingresos (USD)'];
-      rows = data.data.map((r:any)=>[r.nombre,r.especialidad,r.citas,r.ingresos.toFixed(2)]);
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+
+    const doc = new jsPDF();
+    const fechaGenerado = new Date().toLocaleDateString('es-NI', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    // Encabezado
+    doc.setFontSize(18);
+    doc.setTextColor(40, 40, 40);
+    doc.text('HAIR STYLE - Reporte', 14, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Período: ${desde} al ${hasta}`, 14, 26);
+    doc.text(`Generado: ${fechaGenerado}`, 14, 32);
+    doc.text(`Moneda: ${moneda}${moneda !== 'USD' ? ` (1 USD = ${tipoCambio} ${moneda})` : ''}`, 14, 38);
+    doc.line(14, 42, 196, 42);
+
+    if (tab === 'ingresos' && data.data) {
+      doc.setFontSize(13); doc.setTextColor(40,40,40);
+      doc.text('Resumen de Ingresos', 14, 50);
+      doc.setFontSize(11);
+      doc.text(`Total: ${fmtMonto(data.resumen?.total ?? 0, moneda, tipoCambio)}`, 14, 58);
+      doc.text(`Citas completadas: ${data.resumen?.citas ?? 0}`, 14, 65);
+
+      autoTable(doc, {
+        startY: 72,
+        head: [['Fecha', `Ingresos (${moneda})`]],
+        body: data.data.map((r:any) => [r.fecha, fmtMonto(r.ingresos, moneda, tipoCambio)]),
+        theme: 'grid',
+        headStyles: { fillColor: [212, 160, 23], textColor: 255 },
+        alternateRowStyles: { fillColor: [250, 248, 240] },
+      });
+    } else if (tab === 'empleados' && data.data) {
+      doc.setFontSize(13); doc.setTextColor(40,40,40);
+      doc.text('Productividad del Personal', 14, 50);
+
+      autoTable(doc, {
+        startY: 58,
+        head: [['#', 'Empleado', 'Especialidad', 'Citas', `Ingresos (${moneda})`]],
+        body: data.data.map((r:any, i:number) => [
+          i + 1, r.nombre, r.especialidad, r.citas, fmtMonto(r.ingresos, moneda, tipoCambio),
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [212, 160, 23], textColor: 255 },
+        alternateRowStyles: { fillColor: [250, 248, 240] },
+      });
+    } else if (tab === 'citas') {
+      doc.setFontSize(13); doc.setTextColor(40,40,40);
+      doc.text('Resumen de Citas', 14, 50);
+
+      if (data.porEstado?.length > 0) {
+        autoTable(doc, {
+          startY: 58,
+          head: [['Estado', 'Cantidad']],
+          body: data.porEstado.map((r:any) => [ESTADO_LABEL[r.estado] ?? r.estado, r.cantidad]),
+          theme: 'grid',
+          headStyles: { fillColor: [212, 160, 23], textColor: 255 },
+        });
+      }
+
+      if (data.porEmpleado?.length > 0) {
+        const finalY = (doc as any).lastAutoTable?.finalY ?? 100;
+        doc.setFontSize(12); doc.setTextColor(40,40,40);
+        doc.text('Por Empleado', 14, finalY + 10);
+        autoTable(doc, {
+          startY: finalY + 16,
+          head: [['Empleado', 'Citas', `Ingresos (${moneda})`]],
+          body: data.porEmpleado.map((r:any) => [r.nombre, r.citas, fmtMonto(r.ingresos, moneda, tipoCambio)]),
+          theme: 'grid',
+          headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+        });
+      }
     }
 
-    if (!rows.length) return;
-    const csv = [headers, ...rows].map(r=>r.join(',')).join('\n');
-    const blob = new Blob([csv],{type:'text/csv'});
-    const url  = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=`reporte-${tab}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8); doc.setTextColor(160, 160, 160);
+      doc.text(`Página ${i} de ${totalPages} - HAIR STYLE Salon & Barber`, 14, doc.internal.pageSize.height - 8);
+    }
+
+    doc.save(`reporte-${tab}-${desde}-${hasta}.pdf`);
   };
 
   return (
@@ -114,9 +205,16 @@ export default function Reportes() {
               <h1 className="text-2xl font-bold text-foreground">Reportes</h1>
               <p className="text-sm text-muted-foreground">Análisis y estadísticas del negocio</p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5">
-              <Download className="w-3.5 h-3.5"/> Exportar CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              {moneda !== 'USD' && (
+                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-lg font-medium">
+                  {moneda} · 1 USD = {tipoCambio} {moneda}
+                </span>
+              )}
+              <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1.5">
+                <Download className="w-3.5 h-3.5"/> Exportar PDF
+              </Button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -164,7 +262,8 @@ export default function Reportes() {
                   <div className="grid grid-cols-2 gap-4">
                     <Card className="p-5 border-border/50 card-accent-gold">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Ingresos Totales</p>
-                      <p className="text-3xl font-bold text-foreground">{fmtUSD(data.resumen?.total??0)}</p>
+                      <p className="text-3xl font-bold text-foreground">{fmtMonto(data.resumen?.total??0, moneda, tipoCambio)}</p>
+                      {moneda !== 'USD' && <p className="text-xs text-muted-foreground mt-1">{fmtUSD(data.resumen?.total??0)} USD original</p>}
                     </Card>
                     <Card className="p-5 border-border/50 card-accent-emerald">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Citas Completadas</p>
@@ -184,8 +283,8 @@ export default function Reportes() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false}/>
                           <XAxis dataKey="fecha" tick={{fontSize:10,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false}/>
-                          <YAxis tick={{fontSize:10,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`}/>
-                          <Tooltip content={<ChartTooltip/>}/>
+                          <YAxis tick={{fontSize:10,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false} tickFormatter={v=>`${simbolo}${moneda==='USD'?v:(v*tipoCambio).toFixed(0)}`}/>
+                          <Tooltip content={<ChartTooltip moneda={moneda} tipoCambio={tipoCambio}/>}/>
                           <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#d4a017" strokeWidth={2} fill="url(#gI)" dot={{r:3,fill:'#d4a017',strokeWidth:0}} activeDot={{r:5}}/>
                         </AreaChart>
                       </ResponsiveContainer>
@@ -221,7 +320,7 @@ export default function Reportes() {
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false}/>
                           <XAxis type="number" tick={{fontSize:10,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false}/>
                           <YAxis type="category" dataKey="nombre" tick={{fontSize:10,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false} width={90}/>
-                          <Tooltip content={<ChartTooltip/>}/>
+                          <Tooltip content={<ChartTooltip moneda={moneda} tipoCambio={tipoCambio}/>}/>
                           <Bar dataKey="cantidad" name="Citas" fill="#3b82f6" radius={[0,4,4,0]} maxBarSize={20}/>
                         </BarChart>
                       </ResponsiveContainer>
@@ -236,7 +335,7 @@ export default function Reportes() {
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false}/>
                           <XAxis dataKey="nombre" tick={{fontSize:11,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false}/>
                           <YAxis tick={{fontSize:11,fill:'hsl(var(--muted-foreground))'}} axisLine={false} tickLine={false}/>
-                          <Tooltip content={<ChartTooltip/>}/>
+                          <Tooltip content={<ChartTooltip moneda={moneda} tipoCambio={tipoCambio}/>}/>
                           <Bar dataKey="citas" name="Citas" fill="#d4a017" radius={[4,4,0,0]} maxBarSize={50}/>
                           <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4,4,0,0]} maxBarSize={50}/>
                           <Legend wrapperStyle={{fontSize:11}}/>
@@ -256,7 +355,7 @@ export default function Reportes() {
                   <table className="w-full text-sm">
                     <thead className="bg-secondary/70">
                       <tr>
-                        {['#','Empleado','Especialidad','Citas','Ingresos generados'].map(h=>(
+                        {['#','Empleado','Especialidad','Citas',`Ingresos (${moneda})`].map(h=>(
                           <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                         ))}
                       </tr>
@@ -270,7 +369,10 @@ export default function Reportes() {
                           <td className="px-5 py-3.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">{e.citas}</span>
                           </td>
-                          <td className="px-5 py-3.5 font-semibold text-emerald-500 dark:text-emerald-400">{fmtUSD(e.ingresos)}</td>
+                          <td className="px-5 py-3.5 font-semibold text-emerald-500 dark:text-emerald-400">
+                            {fmtMonto(e.ingresos, moneda, tipoCambio)}
+                            {moneda !== 'USD' && <span className="text-xs text-muted-foreground ml-1">({fmtUSD(e.ingresos)})</span>}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

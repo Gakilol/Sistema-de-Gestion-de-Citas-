@@ -15,8 +15,7 @@ export interface CitaWA {
   notas?: string | null;
 }
 
-const SALON_NAME = 'HAIR STYLE Salón & Barber';
-const SALON_EMOJI = '✂️';
+const SALON_NAME = 'HAIR STYLE Salon & Barber';
 
 function fmtFecha(d: string | Date): string {
   return new Date(d).toLocaleDateString('es-NI', {
@@ -34,23 +33,23 @@ function fmtPrecio(p: number): string {
 // ─── Confirmación de cita ───────────────────────────────────────────────────
 export function mensajeConfirmacion(cita: CitaWA): string {
   const lines = [
-    `${SALON_EMOJI} *${SALON_NAME}*`,
+    `*${SALON_NAME}*`,
     ``,
-    `¡Hola ${cita.cliente_nombre}! ✨`,
-    `Tu cita ha sido *confirmada*. Aquí están los detalles:`,
+    `Hola ${cita.cliente_nombre},`,
+    `Su cita ha sido *confirmada*. Aqui estan los detalles:`,
     ``,
-    `📋 *Servicio:* ${cita.servicio}`,
-    `👤 *Estilista:* ${cita.empleado}`,
-    `📅 *Fecha:* ${fmtFecha(cita.fecha)}`,
-    `🕐 *Hora:* ${cita.hora}`,
-    cita.duracion ? `⏱ *Duración:* ${cita.duracion} minutos` : null,
-    cita.precio    ? `💰 *Precio:* ${fmtPrecio(cita.precio)}` : null,
-    cita.notas     ? `📝 *Notas:* ${cita.notas}` : null,
+    `*Servicio:* ${cita.servicio}`,
+    `*Estilista:* ${cita.empleado}`,
+    `*Fecha:* ${fmtFecha(cita.fecha)}`,
+    `*Hora:* ${cita.hora}`,
+    cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
+    cita.precio    ? `*Precio:* ${fmtPrecio(cita.precio)}` : null,
+    cita.notas     ? `*Notas:* ${cita.notas}` : null,
     ``,
-    `Por favor llega *10 minutos antes* de tu cita. 🙏`,
-    `Si necesitas reprogramar o cancelar, contáctanos con anticipación.`,
+    `Por favor llegue 10 minutos antes de su cita.`,
+    `Si necesita reprogramar o cancelar, contactenos con anticipacion.`,
     ``,
-    `¡Te esperamos! 💈`,
+    `Le esperamos.`,
   ];
   return lines.filter((l) => l !== null).join('\n');
 }
@@ -58,17 +57,17 @@ export function mensajeConfirmacion(cita: CitaWA): string {
 // ─── Recordatorio ───────────────────────────────────────────────────────────
 export function mensajeRecordatorio(cita: CitaWA): string {
   const lines = [
-    `${SALON_EMOJI} *${SALON_NAME}*`,
+    `*${SALON_NAME}*`,
     ``,
-    `¡Hola ${cita.cliente_nombre}! 👋`,
-    `Te recordamos que tienes una cita *mañana*:`,
+    `Hola ${cita.cliente_nombre},`,
+    `Le recordamos que tiene una cita *manana*:`,
     ``,
-    `📋 *Servicio:* ${cita.servicio}`,
-    `👤 *Estilista:* ${cita.empleado}`,
-    `📅 *Fecha:* ${fmtFecha(cita.fecha)}`,
-    `🕐 *Hora:* ${cita.hora}`,
+    `*Servicio:* ${cita.servicio}`,
+    `*Estilista:* ${cita.empleado}`,
+    `*Fecha:* ${fmtFecha(cita.fecha)}`,
+    `*Hora:* ${cita.hora}`,
     ``,
-    `¡Te esperamos! 💈`,
+    `Le esperamos.`,
   ];
   return lines.filter(Boolean).join('\n');
 }
@@ -76,30 +75,30 @@ export function mensajeRecordatorio(cita: CitaWA): string {
 // ─── Cancelación ────────────────────────────────────────────────────────────
 export function mensajeCancelacion(cita: CitaWA): string {
   return [
-    `${SALON_EMOJI} *${SALON_NAME}*`,
+    `*${SALON_NAME}*`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Tu cita del *${fmtFecha(cita.fecha)}* a las *${cita.hora}* ha sido cancelada.`,
+    `Su cita del *${fmtFecha(cita.fecha)}* a las *${cita.hora}* ha sido cancelada.`,
     ``,
-    `Si deseas reagendar, no dudes en contactarnos. 😊`,
-    `¡Hasta pronto! 💈`,
+    `Si desea reagendar, no dude en contactarnos.`,
+    `Hasta pronto.`,
   ].join('\n');
 }
 
 // ─── Reprogramación ─────────────────────────────────────────────────────────
 export function mensajeReprogramacion(cita: CitaWA): string {
   return [
-    `${SALON_EMOJI} *${SALON_NAME}*`,
+    `*${SALON_NAME}*`,
     ``,
-    `¡Hola ${cita.cliente_nombre}! 📅`,
-    `Tu cita ha sido *reprogramada*:`,
+    `Hola ${cita.cliente_nombre},`,
+    `Su cita ha sido *reprogramada*:`,
     ``,
-    `📋 *Servicio:* ${cita.servicio}`,
-    `👤 *Estilista:* ${cita.empleado}`,
-    `📅 *Nueva fecha:* ${fmtFecha(cita.fecha)}`,
-    `🕐 *Nueva hora:* ${cita.hora}`,
+    `*Servicio:* ${cita.servicio}`,
+    `*Estilista:* ${cita.empleado}`,
+    `*Nueva fecha:* ${fmtFecha(cita.fecha)}`,
+    `*Nueva hora:* ${cita.hora}`,
     ``,
-    `¡Te esperamos! 💈`,
+    `Le esperamos.`,
   ].join('\n');
 }
 

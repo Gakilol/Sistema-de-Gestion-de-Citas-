@@ -110,3 +110,59 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+// ─── POST /api/clientes
+// Registra un cliente directamente asociándolo a una cita mínima.
+// Requiere: nombre, telefono (opcional). El sistema usa el primer servicio/empleado activo.
+export async function POST(req: NextRequest) {
+  try {
+    const userRole = req.headers.get('x-user-role');
+    if (!userRole) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { nombre, telefono } = body;
+
+    if (!nombre || nombre.trim().length < 2) {
+      return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
+    }
+
+    // Obtener el primer servicio y empleado activos para la cita
+    const [servicio, empleado] = await Promise.all([
+      prisma.servicio.findFirst({ where: { activo: true }, orderBy: { nombre: 'asc' } }),
+      prisma.empleado.findFirst({ where: { activo: true }, orderBy: { nombre: 'asc' } }),
+    ]);
+
+    if (!servicio || !empleado) {
+      return NextResponse.json({ error: 'Debe existir al menos un servicio y un empleado activos para registrar un cliente' }, { status: 400 });
+    }
+
+    // Obtener userId del header si existe
+    const userId = req.headers.get('x-user-id') ?? empleado.id;
+
+    // Crear cita mínima con estado PENDIENTE y fecha hoy
+    const hoy = new Date();
+    hoy.setUTCHours(0, 0, 0, 0);
+
+    const cita = await prisma.cita.create({
+      data: {
+        cliente_nombre:   nombre.trim(),
+        cliente_telefono: telefono?.trim() || null,
+        servicio_id:      servicio.id,
+        empleado_id:      empleado.id,
+        fecha:            hoy,
+        hora:             '09:00',
+        duracion:         servicio.duracion,
+        precio:           servicio.precio,
+        estado:           'PENDIENTE',
+        created_by:       userId,
+        notas:            'Cliente registrado manualmente',
+      },
+    });
+
+    return NextResponse.json({ cita, mensaje: 'Cliente registrado exitosamente' }, { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

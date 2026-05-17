@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Store, Clock, Bell, Palette, Save, CheckCircle2,
-  Phone, MapPin, MessageCircle, Globe,
+  Phone, MapPin, MessageCircle, Globe, RefreshCcw, DollarSign,
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { id: 'negocio',     label: 'Negocio',      icon: Store },
   { id: 'horarios',    label: 'Horarios',      icon: Clock },
+  { id: 'divisa',      label: 'Divisa',        icon: DollarSign },
   { id: 'whatsapp',    label: 'WhatsApp',      icon: MessageCircle },
   { id: 'apariencia',  label: 'Apariencia',    icon: Palette },
 ];
@@ -65,6 +66,32 @@ export default function Configuracion() {
     cancelacion: true,
     msgExtra: '',
   });
+
+  // ── Divisa ──────────────────────────────────────────────────────────────
+  const [divisa, setDivisa] = useState({ moneda: 'USD', tipoCambio: 36.5 });
+  const [divisaSaving, setDivisaSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/divisa').then(r => r.json()).then(d => {
+      if (d.moneda) setDivisa({ moneda: d.moneda, tipoCambio: d.tipoCambio ?? 36.5 });
+    });
+  }, []);
+
+  const handleSaveDivisa = async () => {
+    setDivisaSaving(true);
+    try {
+      const res = await fetch('/api/divisa', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(divisa),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      toast.success('Tipo de cambio guardado');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al guardar');
+    } finally { setDivisaSaving(false); }
+  };
+  // ────────────────────────────────────────────────────────────────────────
 
   const handleSave = () => {
     setSaved(true);
@@ -221,6 +248,64 @@ export default function Configuracion() {
                     </div>
                   );
                 })}
+              </div>
+            </Card>
+          )}
+
+          {/* ── Tab: Divisa ──────────────────────────────────── */}
+          {tab === 'divisa' && (
+            <Card className="p-6 border-border/50 space-y-5">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-4 h-4 text-primary"/>
+                <h2 className="font-semibold text-foreground">Tipo de Cambio de Divisa</h2>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Configura la moneda del sistema y el tipo de cambio. Los reportes y precios se mostrarán convertidos según la moneda seleccionada.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Moneda del sistema</label>
+                  <select value={divisa.moneda} onChange={e => setDivisa({ ...divisa, moneda: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <option value="USD">USD — Dolar americano ($)</option>
+                    <option value="NIO">NIO — Cordoba nicaragüense (C$)</option>
+                    <option value="CRC">CRC — Colon costarricense (₡)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Tipo de cambio (por 1 USD)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={divisa.tipoCambio}
+                    onChange={e => setDivisa({ ...divisa, tipoCambio: parseFloat(e.target.value) || 0 })}
+                    placeholder="36.50"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Ej: 36.50 significa 1 USD = 36.50 NIO</p>
+                </div>
+              </div>
+
+              {/* Vista previa de conversión */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-semibold text-foreground mb-2">Vista previa de conversión</p>
+                {[10, 25, 50, 100].map(usd => (
+                  <div key={usd} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">USD ${usd}.00</span>
+                    <span className="font-semibold text-primary">
+                      {divisa.moneda === 'USD' ? `$ ${usd.toFixed(2)}`
+                        : divisa.moneda === 'NIO' ? `C$ ${(usd * divisa.tipoCambio).toFixed(2)}`
+                        : `₡ ${(usd * divisa.tipoCambio).toFixed(2)}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveDivisa} disabled={divisaSaving} className="gap-1.5 glow-gold">
+                  {divisaSaving ? <RefreshCcw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                  {divisaSaving ? 'Guardando...' : 'Guardar tipo de cambio'}
+                </Button>
               </div>
             </Card>
           )}
