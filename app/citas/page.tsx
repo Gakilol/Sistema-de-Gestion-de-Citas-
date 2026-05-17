@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppCancelacion } from '@/lib/whatsapp';
 
 const emptyForm = {
-  cliente_nombre: '', cliente_telefono: '', servicio_id: '',
+  cliente_id: '', cliente_nombre: '', cliente_telefono: '', servicio_id: '',
   empleado_id: '', fecha: '', hora: '', notas: '', metodo_pago: '',
 };
 
@@ -40,6 +40,7 @@ export default function Citas() {
   const [citas, setCitas]         = useState<any[]>([]);
   const [servicios, setServicios] = useState<any[]>([]);
   const [empleados, setEmpleados] = useState<any[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
@@ -68,9 +69,9 @@ export default function Citas() {
   };
 
   const fetchCatalogos = async () => {
-    const [sR,eR] = await Promise.all([fetch('/api/servicios'),fetch('/api/empleados')]);
-    const sD = await sR.json(); const eD = await eR.json();
-    setServicios(sD.servicios||[]); setEmpleados(eD.empleados||[]);
+    const [sR,eR,cR] = await Promise.all([fetch('/api/servicios'),fetch('/api/empleados'),fetch('/api/clientes')]);
+    const sD = await sR.json(); const eD = await eR.json(); const cD = await cR.json();
+    setServicios(sD.servicios||[]); setEmpleados(eD.empleados||[]); setClientesList(cD.clientes||[]);
   };
 
   useEffect(()=>{ fetchCitas(); fetchCatalogos(); },[]);
@@ -95,7 +96,7 @@ export default function Citas() {
 
   const openEdit = (c:any) => {
     setForm({
-      cliente_nombre:c.cliente_nombre, cliente_telefono:c.cliente_telefono||'',
+      cliente_id:c.cliente_id||'', cliente_nombre:c.cliente_nombre, cliente_telefono:c.cliente_telefono||'',
       servicio_id:c.servicio_id, empleado_id:c.empleado_id,
       fecha:new Date(c.fecha).toISOString().split('T')[0], hora:c.hora,
       notas:c.notas||'', metodo_pago:c.metodo_pago||'',
@@ -268,7 +269,26 @@ export default function Citas() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre del cliente *</label>
-                  <Input value={form.cliente_nombre} onChange={e=>setForm({...form,cliente_nombre:e.target.value})} required placeholder="Juan Pérez"/>
+                  <Input 
+                    list="clientes-list"
+                    value={form.cliente_nombre} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      const match = clientesList.find(c => c.nombre.toLowerCase() === val.toLowerCase());
+                      if (match) {
+                        setForm({ ...form, cliente_nombre: match.nombre, cliente_telefono: match.telefono || '', cliente_id: match.id });
+                      } else {
+                        setForm({ ...form, cliente_nombre: val, cliente_id: '' });
+                      }
+                    }} 
+                    required 
+                    placeholder="Escriba o seleccione..."
+                  />
+                  <datalist id="clientes-list">
+                    {clientesList.map(c => (
+                      <option key={c.id} value={c.nombre}>{c.telefono ? `${c.nombre} (${c.telefono})` : c.nombre}</option>
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono</label>

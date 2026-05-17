@@ -42,6 +42,7 @@ model Servicio {
 
 model Cita {
   id               String   @id @default(dbgenerated("gen_random_uuid()"))
+  cliente_id       String?
   cliente_nombre   String
   cliente_telefono String?
   servicio_id      String
@@ -57,6 +58,7 @@ model Cita {
   updated_at       DateTime @updatedAt
   created_by       String
 
+  cliente          Cliente? @relation(fields: [cliente_id], references: [id])
   servicio         Servicio @relation(fields: [servicio_id], references: [id])
   empleado         Empleado @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
   creador          Empleado @relation("CreadorCita", fields: [created_by], references: [id])
@@ -156,3 +158,14 @@ model AuditLog {
   @@index([entidad, entidadId])
   @@index([fecha])
 }
+
+model Cliente {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre    String
+  telefono  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  citas     Cita[]
+}
+

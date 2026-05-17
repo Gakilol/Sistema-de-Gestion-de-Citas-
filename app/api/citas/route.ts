@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
     }
 
-    const { cliente_nombre, cliente_telefono, servicio_id, empleado_id, fecha, hora, duracion, precio, notas, metodo_pago } = body;
+    const { cliente_id, cliente_nombre, cliente_telefono, servicio_id, empleado_id, fecha, hora, duracion, precio, notas, metodo_pago } = body;
 
     // VALIDACIÓN DE DISPONIBILIDAD
     const { calcularDisponibilidad } = await import('../../../src/lib/disponibilidad');
@@ -59,10 +59,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'La hora seleccionada ya no está disponible: ' + bloqueSolicitado.motivo }, { status: 400 });
     }
 
+    // GESTIÓN DE CLIENTE
+    let idClienteFinal = cliente_id;
+    if (!idClienteFinal && cliente_nombre) {
+      // Intentar buscar si existe o crear uno nuevo
+      const existe = await prisma.cliente.findFirst({
+        where: { 
+          nombre: cliente_nombre.trim(),
+          ...(cliente_telefono ? { telefono: cliente_telefono.trim() } : {})
+        }
+      });
+      if (existe) {
+        idClienteFinal = existe.id;
+      } else {
+        const nuevoC = await prisma.cliente.create({
+          data: {
+            nombre: cliente_nombre.trim(),
+            telefono: cliente_telefono?.trim() || null,
+          }
+        });
+        idClienteFinal = nuevoC.id;
+      }
+    }
+
     const cita = await prisma.cita.create({
       data: {
-        cliente_nombre,
-        cliente_telefono,
+        cliente_id: idClienteFinal,
+        cliente_nombre: cliente_nombre.trim(),
+        cliente_telefono: cliente_telefono?.trim() || null,
         servicio_id,
         empleado_id,
         fecha: new Date(fecha),

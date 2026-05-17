@@ -67,14 +67,30 @@ export default function Configuracion() {
     msgExtra: '',
   });
 
+  const [apariencia, setApariencia] = useState({
+    tema: 'system',
+    branding: true,
+  });
+
   // ── Divisa ──────────────────────────────────────────────────────────────
   const [divisa, setDivisa] = useState({ moneda: 'USD', tipoCambio: 36.5 });
   const [divisaSaving, setDivisaSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/divisa').then(r => r.json()).then(d => {
-      if (d.moneda) setDivisa({ moneda: d.moneda, tipoCambio: d.tipoCambio ?? 36.5 });
-    });
+    // Cargar la configuración general
+    fetch('/api/configuracion')
+      .then(r => r.json())
+      .then(d => {
+        if (d.config) {
+          if (d.config.negocio && Object.keys(d.config.negocio).length > 0) setNegocio(d.config.negocio);
+          if (d.config.horarios && Object.keys(d.config.horarios).length > 0) setHorarios(d.config.horarios);
+          if (d.config.whatsapp && Object.keys(d.config.whatsapp).length > 0) setWaConfig(d.config.whatsapp);
+          if (d.config.apariencia && Object.keys(d.config.apariencia).length > 0) setApariencia(d.config.apariencia);
+          if (d.config.negocio?.moneda) setDivisa(prev => ({ ...prev, moneda: d.config.negocio.moneda, tipoCambio: d.config.negocio.tipoCambio ?? 36.5 }));
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSaveDivisa = async () => {
@@ -87,16 +103,37 @@ export default function Configuracion() {
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       toast.success('Tipo de cambio guardado');
+      setNegocio(prev => ({ ...prev, moneda: divisa.moneda }));
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar');
     } finally { setDivisaSaving(false); }
   };
   // ────────────────────────────────────────────────────────────────────────
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaved(true);
-    toast.success('Configuración guardada');
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      const payload = {
+        negocio,
+        horarios,
+        whatsapp: waConfig,
+        apariencia,
+      };
+      const res = await fetch('/api/configuracion', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+      toast.success('Configuración guardada');
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al guardar');
+      setSaved(false);
+    }
   };
 
   const toggleDia = (dia: string) => {

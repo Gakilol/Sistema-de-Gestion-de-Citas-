@@ -1,106 +1,87 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '../../../src/lib/db';
 
+import { NextResponse, NextRequest } from 'next/server';
+import { prisma } from '../../../src/lib/db';
+
 // ─── GET /api/clientes
-// Agrupa citas por (cliente_nombre, cliente_telefono) y calcula métricas
+// Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas
 export async function GET(req: NextRequest) {
   try {
     const busqueda = req.nextUrl.searchParams.get('q') ?? '';
 
-    const citas = await prisma.cita.findMany({
-      select: {
-        id: true,
-        cliente_nombre: true,
-        cliente_telefono: true,
-        servicio_id: true,
-        empleado_id: true,
-        fecha: true,
-        hora: true,
-        precio: true,
-        estado: true,
-        created_at: true,
-        servicio: { select: { nombre: true } },
-        empleado: { select: { nombre: true } },
+    // Buscar clientes en la base de datos
+    let whereClause = {};
+    if (busqueda) {
+      whereClause = {
+        OR: [
+          { nombre: { contains: busqueda, mode: 'insensitive' } },
+          { telefono: { contains: busqueda, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    const clientesData = await prisma.cliente.findMany({
+      where: whereClause,
+      include: {
+        citas: {
+          select: {
+            id: true,
+            fecha: true,
+            hora: true,
+            precio: true,
+            estado: true,
+            servicio: { select: { nombre: true } },
+            empleado: { select: { nombre: true } },
+          },
+          orderBy: { fecha: 'desc' },
+        },
       },
-      orderBy: { fecha: 'desc' },
     });
 
-    // Agrupar por clave única: nombre normalizado + teléfono
-    const mapa = new Map<
-      string,
-      {
-        id: string;
-        nombre: string;
-        telefono: string | null;
-        totalCitas: number;
-        citasCompletadas: number;
-        gastoTotal: number;
-        ultimaCita: Date;
-        primeraCita: Date;
-        serviciosFrecuentes: Record<string, number>;
-        historial: typeof citas;
-      }
-    >();
+    // Mapear y calcular métricas para cada cliente
+    const clientes = clientesData.map((c) => {
+      let citasCompletadas = 0;
+      let gastoTotal = 0;
+      let ultimaCita = c.createdAt;
+      let primeraCita = c.createdAt;
+      const serviciosFrecuentes: Record<string, number> = {};
 
-    for (const c of citas) {
-      const clave =
-        c.cliente_nombre.trim().toLowerCase() +
-        '|' +
-        (c.cliente_telefono?.replace(/\D/g, '') ?? '');
-
-      if (!mapa.has(clave)) {
-        mapa.set(clave, {
-          id: c.id,
-          nombre: c.cliente_nombre.trim(),
-          telefono: c.cliente_telefono ?? null,
-          totalCitas: 0,
-          citasCompletadas: 0,
-          gastoTotal: 0,
-          ultimaCita: c.fecha,
-          primeraCita: c.fecha,
-          serviciosFrecuentes: {},
-          historial: [],
-        });
+      if (c.citas.length > 0) {
+        primeraCita = c.citas[c.citas.length - 1].fecha; // la más antigua, ya que están ordenadas desc
+        ultimaCita = c.citas[0].fecha; // la más reciente
       }
 
-      const entry = mapa.get(clave)!;
-      entry.totalCitas++;
-      if (c.estado === 'COMPLETADA') {
-        entry.citasCompletadas++;
-        entry.gastoTotal += c.precio;
+      for (const cita of c.citas) {
+        if (cita.estado === 'COMPLETADA') {
+          citasCompletadas++;
+          gastoTotal += cita.precio;
+        }
+        if (cita.fecha > ultimaCita) ultimaCita = cita.fecha;
+        if (cita.fecha < primeraCita) primeraCita = cita.fecha;
+        
+        const sn = cita.servicio?.nombre;
+        if (sn) {
+          serviciosFrecuentes[sn] = (serviciosFrecuentes[sn] ?? 0) + 1;
+        }
       }
-      if (c.fecha > entry.ultimaCita) entry.ultimaCita = c.fecha;
-      if (c.fecha < entry.primeraCita) entry.primeraCita = c.fecha;
-      const sn = c.servicio.nombre;
-      entry.serviciosFrecuentes[sn] = (entry.serviciosFrecuentes[sn] ?? 0) + 1;
-      entry.historial.push(c);
-    }
 
-    // Convertir a array y calcular servicioFavorito
-    let clientes = Array.from(mapa.values()).map((c) => ({
-      id: c.id,
-      nombre: c.nombre,
-      telefono: c.telefono,
-      totalCitas: c.totalCitas,
-      citasCompletadas: c.citasCompletadas,
-      gastoTotal: c.gastoTotal,
-      ultimaCita: c.ultimaCita,
-      primeraCita: c.primeraCita,
-      esRecurrente: c.totalCitas > 1,
-      servicioFavorito:
-        Object.entries(c.serviciosFrecuentes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
-      historial: c.historial.slice(0, 10),
-    }));
+      const servicioFavorito = Object.entries(serviciosFrecuentes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-    // Filtro de búsqueda
-    if (busqueda) {
-      const q = busqueda.toLowerCase();
-      clientes = clientes.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(q) ||
-          (c.telefono && c.telefono.includes(busqueda))
-      );
-    }
+      return {
+        id: c.id,
+        nombre: c.nombre,
+        telefono: c.telefono,
+        totalCitas: c.citas.length,
+        citasCompletadas,
+        gastoTotal,
+        ultimaCita,
+        primeraCita,
+        esRecurrente: c.citas.length > 1,
+        servicioFavorito,
+        historial: c.citas.slice(0, 10),
+      };
+    });
 
     // Ordenar: más citas primero
     clientes.sort((a, b) => b.totalCitas - a.totalCitas);
@@ -112,8 +93,7 @@ export async function GET(req: NextRequest) {
 }
 
 // ─── POST /api/clientes
-// Registra un cliente directamente asociándolo a una cita mínima.
-// Requiere: nombre, telefono (opcional). El sistema usa el primer servicio/empleado activo.
+// Registra un cliente de forma independiente en la tabla Cliente.
 export async function POST(req: NextRequest) {
   try {
     const userRole = req.headers.get('x-user-role');
@@ -128,40 +108,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
     }
 
-    // Obtener el primer servicio y empleado activos para la cita
-    const [servicio, empleado] = await Promise.all([
-      prisma.servicio.findFirst({ where: { activo: true }, orderBy: { nombre: 'asc' } }),
-      prisma.empleado.findFirst({ where: { activo: true }, orderBy: { nombre: 'asc' } }),
-    ]);
-
-    if (!servicio || !empleado) {
-      return NextResponse.json({ error: 'Debe existir al menos un servicio y un empleado activos para registrar un cliente' }, { status: 400 });
-    }
-
-    // Obtener userId del header si existe
-    const userId = req.headers.get('x-user-id') ?? empleado.id;
-
-    // Crear cita mínima con estado PENDIENTE y fecha hoy
-    const hoy = new Date();
-    hoy.setUTCHours(0, 0, 0, 0);
-
-    const cita = await prisma.cita.create({
+    const nuevoCliente = await prisma.cliente.create({
       data: {
-        cliente_nombre:   nombre.trim(),
-        cliente_telefono: telefono?.trim() || null,
-        servicio_id:      servicio.id,
-        empleado_id:      empleado.id,
-        fecha:            hoy,
-        hora:             '09:00',
-        duracion:         servicio.duracion,
-        precio:           servicio.precio,
-        estado:           'PENDIENTE',
-        created_by:       userId,
-        notas:            'Cliente registrado manualmente',
+        nombre: nombre.trim(),
+        telefono: telefono?.trim() || null,
       },
     });
 
-    return NextResponse.json({ cita, mensaje: 'Cliente registrado exitosamente' }, { status: 201 });
+    return NextResponse.json({ cliente: nuevoCliente, mensaje: 'Cliente registrado exitosamente' }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

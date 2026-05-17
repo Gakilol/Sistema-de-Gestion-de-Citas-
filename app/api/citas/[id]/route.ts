@@ -5,7 +5,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
-    const { estado, notas, empleado_id, fecha, hora, servicio_id, precio, duracion, cliente_nombre, cliente_telefono, metodo_pago } = body;
+    const { estado, notas, empleado_id, fecha, hora, servicio_id, precio, duracion, cliente_id, cliente_nombre, cliente_telefono, metodo_pago } = body;
 
     const dataToUpdate: any = {};
     if (estado) dataToUpdate.estado = estado;
@@ -16,8 +16,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (servicio_id) dataToUpdate.servicio_id = servicio_id;
     if (precio !== undefined) dataToUpdate.precio = Number(precio);
     if (duracion !== undefined) dataToUpdate.duracion = Number(duracion);
-    if (cliente_nombre) dataToUpdate.cliente_nombre = cliente_nombre;
-    if (cliente_telefono !== undefined) dataToUpdate.cliente_telefono = cliente_telefono;
+    
+    // GESTIÓN DE CLIENTE EN EDICIÓN
+    let idClienteFinal = cliente_id;
+    if (cliente_nombre && !idClienteFinal) {
+      const existe = await prisma.cliente.findFirst({
+        where: { 
+          nombre: cliente_nombre.trim(),
+          ...(cliente_telefono ? { telefono: cliente_telefono.trim() } : {})
+        }
+      });
+      if (existe) {
+        idClienteFinal = existe.id;
+      } else {
+        const nuevoC = await prisma.cliente.create({
+          data: {
+            nombre: cliente_nombre.trim(),
+            telefono: cliente_telefono?.trim() || null,
+          }
+        });
+        idClienteFinal = nuevoC.id;
+      }
+    }
+    
+    if (idClienteFinal) dataToUpdate.cliente_id = idClienteFinal;
+    if (cliente_nombre) dataToUpdate.cliente_nombre = cliente_nombre.trim();
+    if (cliente_telefono !== undefined) dataToUpdate.cliente_telefono = cliente_telefono?.trim() || null;
+    
     if (metodo_pago !== undefined) dataToUpdate.metodo_pago = metodo_pago;
 
     const cita = await prisma.cita.update({
