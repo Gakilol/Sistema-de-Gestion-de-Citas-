@@ -1,9 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '../../../src/lib/db';
 
-import { NextResponse, NextRequest } from 'next/server';
-import { prisma } from '../../../src/lib/db';
-
 // ─── GET /api/clientes
 // Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas
 export async function GET(req: NextRequest) {

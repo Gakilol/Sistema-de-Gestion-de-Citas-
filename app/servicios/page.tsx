@@ -21,8 +21,6 @@ const CAT_COLORS: Record<string,string> = {
   Otros:'bg-secondary text-muted-foreground',
 };
 
-};
-
 export default function Servicios() {
   const { formatCurrency } = useCurrency();
   const [servicios, setServicios]   = useState<any[]>([]);
