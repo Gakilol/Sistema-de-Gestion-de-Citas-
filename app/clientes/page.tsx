@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/currency-context';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface Cliente {
@@ -29,9 +30,6 @@ interface Cliente {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function fmtUSD(n: number) {
-  return new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD' }).format(n);
-}
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-NI', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -90,6 +88,7 @@ function Skeleton() {
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
 function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
@@ -124,7 +123,7 @@ function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () =>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Visitas</p>
           </div>
           <div className="text-center border-x border-border/50">
-            <p className="text-lg font-bold text-emerald-500">{fmtUSD(cliente.gastoTotal)}</p>
+            <p className="text-lg font-bold text-emerald-500">{formatCurrency(cliente.gastoTotal)}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Gastado</p>
           </div>
           <div className="text-center">
@@ -185,6 +184,7 @@ function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () =>
 
 // ─── Cliente Card ─────────────────────────────────────────────────────────────
 function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => void }) {
+  const { formatCurrency } = useCurrency();
   return (
     <div
       className="rounded-xl border border-border/50 bg-card p-5 hover-lift cursor-pointer group"
@@ -215,7 +215,7 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
           <p className="text-[10px] text-muted-foreground">Visitas</p>
         </div>
         <div className="bg-secondary/50 rounded-lg p-2.5 text-center">
-          <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400">{fmtUSD(cliente.gastoTotal)}</p>
+          <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400">{formatCurrency(cliente.gastoTotal)}</p>
           <p className="text-[10px] text-muted-foreground">Gastado</p>
         </div>
       </div>
@@ -302,6 +302,7 @@ export default function Clientes() {
   const [busqueda, setBusqueda] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [showAgregar, setShowAgregar] = useState(false);
+  const { formatCurrency } = useCurrency();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchClientes = useCallback(async (q = '') => {
@@ -362,7 +363,7 @@ export default function Clientes() {
             </Card>
             <Card className="p-4 border-border/50 text-center">
               <p className="text-xl font-bold text-emerald-500">
-                {new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD', notation: 'compact' }).format(gastoTotal)}
+                {formatCurrency(gastoTotal)}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Facturado</p>
             </Card>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, X, Search, Filter, MessageCircle, Phone } from 'lucide-react';
+import { Plus, Edit, X, Search, Filter, MessageCircle, Phone, UserPlus, CheckCircle2 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/currency-context';
 import { urlWhatsAppConfirmacion, urlWhatsAppCancelacion } from '@/lib/whatsapp';
 
 const emptyForm = {
@@ -27,9 +28,6 @@ const ESTADO_BADGE: Record<string,string> = {
   CANCELADA:'badge-cancelada', REPROGRAMADA:'badge-reprogramada',
 };
 
-function fmtUSD(n: number) {
-  return new Intl.NumberFormat('es-NI',{style:'currency',currency:'USD'}).format(n);
-}
 function fmtDate(d: string|Date) {
   return new Date(d).toLocaleDateString('es-NI',{day:'2-digit',month:'short',year:'numeric'});
 }
@@ -51,6 +49,11 @@ export default function Citas() {
   const [filtroEmpleado, setFiltroEmpleado] = useState('');
   const [page, setPage]           = useState(1);
   const debounceRef               = useRef<ReturnType<typeof setTimeout>|null>(null);
+  
+  const { formatCurrency, moneda, tipoCambio } = useCurrency();
+  const [showClienteModal, setShowClienteModal] = useState(false);
+  const [newCliente, setNewCliente] = useState({ nombre: '', telefono: '' });
+  const [creatingCliente, setCreatingCliente] = useState(false);
 
   const fetchCitas = async (q='',estado='',empleado='') => {
     setIsLoading(true);
@@ -129,6 +132,24 @@ export default function Citas() {
       if (!res.ok) { fetchCitas(busqueda,filtroEstado,filtroEmpleado); return; }
       toast.success(`Estado → ${ESTADO_LABEL[estado]}`);
     } catch { fetchCitas(busqueda,filtroEstado,filtroEmpleado); }
+  };
+
+  const handleCreateCliente = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCliente.nombre.trim()) { toast.error('Nombre obligatorio'); return; }
+    setCreatingCliente(true);
+    try {
+      const res = await fetch('/api/clientes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCliente) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      const data = await res.json();
+      const cli = data.cliente;
+      toast.success('Cliente creado');
+      setClientesList(prev => [...prev, cli]);
+      setForm(prev => ({ ...prev, cliente_id: cli.id, cliente_nombre: cli.nombre, cliente_telefono: cli.telefono || '' }));
+      setShowClienteModal(false);
+      setNewCliente({ nombre: '', telefono: '' });
+    } catch(err: any) { toast.error(err.message || 'Error al crear'); }
+    finally { setCreatingCliente(false); }
   };
 
   // Paginación
@@ -213,7 +234,7 @@ export default function Citas() {
                           <p className="font-medium">{fmtDate(cita.fecha)}</p>
                           <p className="text-xs text-muted-foreground">{cita.hora} · {cita.servicio?.duracion||cita.duracion}min</p>
                         </td>
-                        <td className="px-4 py-3.5 font-semibold text-primary">{fmtUSD(cita.precio)}</td>
+                        <td className="px-4 py-3.5 font-semibold text-primary">{formatCurrency(cita.precio)}</td>
                         <td className="px-4 py-3.5">
                           <select value={cita.estado} onChange={e=>changeEstado(cita.id,e.target.value)}
                             className={cn('text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}>
@@ -268,22 +289,35 @@ export default function Citas() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre del cliente *</label>
-                  <Input 
-                    list="clientes-list"
-                    value={form.cliente_nombre} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      const match = clientesList.find(c => c.nombre.toLowerCase() === val.toLowerCase());
-                      if (match) {
-                        setForm({ ...form, cliente_nombre: match.nombre, cliente_telefono: match.telefono || '', cliente_id: match.id });
-                      } else {
-                        setForm({ ...form, cliente_nombre: val, cliente_id: '' });
-                      }
-                    }} 
-                    required 
-                    placeholder="Escriba o seleccione..."
-                  />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nombre del cliente *</label>
+                    <button type="button" onClick={() => setShowClienteModal(true)} className="text-[10px] flex items-center gap-1 font-bold text-primary hover:underline">
+                      <UserPlus className="w-3 h-3" /> Nuevo
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input 
+                      list="clientes-list"
+                      value={form.cliente_nombre} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        const match = clientesList.find(c => c.nombre.toLowerCase() === val.toLowerCase());
+                        if (match) {
+                          setForm({ ...form, cliente_nombre: match.nombre, cliente_telefono: match.telefono || '', cliente_id: match.id });
+                        } else {
+                          setForm({ ...form, cliente_nombre: val, cliente_id: '' });
+                        }
+                      }} 
+                      required 
+                      placeholder="Escriba o seleccione..."
+                      className={cn(form.cliente_id && 'pr-8 border-emerald-500/50')}
+                    />
+                    {form.cliente_id && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-500" title="Cliente vinculado a la base de datos">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
                   <datalist id="clientes-list">
                     {clientesList.map(c => (
                       <option key={c.id} value={c.nombre}>{c.telefono ? `${c.nombre} (${c.telefono})` : c.nombre}</option>
@@ -292,7 +326,13 @@ export default function Citas() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono</label>
-                  <Input value={form.cliente_telefono} onChange={e=>setForm({...form,cliente_telefono:e.target.value})} placeholder="8888-0000"/>
+                  <Input 
+                    value={form.cliente_telefono} 
+                    onChange={e=>setForm({...form,cliente_telefono:e.target.value})} 
+                    placeholder="8888-0000"
+                    readOnly={!!form.cliente_id}
+                    className={cn(form.cliente_id && 'bg-secondary/30 text-muted-foreground cursor-not-allowed focus-visible:ring-0 focus-visible:ring-offset-0')}
+                  />
                 </div>
               </div>
               <div>
@@ -301,7 +341,7 @@ export default function Citas() {
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
                   <option value="">Seleccionar servicio...</option>
                   {servicios.filter(s=>s.activo).map(s=>(
-                    <option key={s.id} value={s.id}>{s.nombre} — {fmtUSD(s.precio)} ({s.duracion}min)</option>
+                    <option key={s.id} value={s.id}>{s.nombre} — {formatCurrency(s.precio)} ({s.duracion}min)</option>
                   ))}
                 </select>
               </div>
@@ -330,7 +370,7 @@ export default function Citas() {
               {selectedServicio&&(
                 <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm">
                   <p><span className="text-muted-foreground">Duración:</span> <strong>{selectedServicio.duracion} min</strong></p>
-                  <p><span className="text-muted-foreground">Precio:</span> <strong className="text-primary">{fmtUSD(selectedServicio.precio)}</strong></p>
+                  <p><span className="text-muted-foreground">Precio:</span> <strong className="text-primary">{formatCurrency(selectedServicio.precio)}</strong></p>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -353,6 +393,35 @@ export default function Citas() {
                 <Button type="button" variant="outline" onClick={()=>setShowModal(false)}>Cancelar</Button>
                 <Button type="submit" disabled={saving} className="glow-gold">
                   {saving?'Guardando...':(editingId?'Actualizar':'Crear Cita')}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+      {/* Modal Crear Cliente Inline */}
+      {showClienteModal && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <Card className="w-full max-w-sm p-6 relative border-border/50 shadow-2xl">
+            <button onClick={()=>setShowClienteModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5"/>
+            </button>
+            <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-primary"/> Crear Cliente
+            </h2>
+            <form onSubmit={handleCreateCliente} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
+                <Input value={newCliente.nombre} onChange={e=>setNewCliente({...newCliente, nombre: e.target.value})} required placeholder="Ej: Juan Pérez"/>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono</label>
+                <Input value={newCliente.telefono} onChange={e=>setNewCliente({...newCliente, telefono: e.target.value})} placeholder="8888-0000"/>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={()=>setShowClienteModal(false)}>Cancelar</Button>
+                <Button type="submit" disabled={creatingCliente} className="glow-gold">
+                  {creatingCliente ? 'Guardando...' : 'Guardar y Seleccionar'}
                 </Button>
               </div>
             </form>

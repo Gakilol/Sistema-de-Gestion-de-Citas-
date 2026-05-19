@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/currency-context';
 
 const emptyForm = { nombre:'',descripcion:'',duracion:'',precio:'',categoria:'' };
 const CATEGORIAS = ['Cortes','Tintes','Barba','Tratamientos','Peinados','Otros'];
@@ -20,9 +21,10 @@ const CAT_COLORS: Record<string,string> = {
   Otros:'bg-secondary text-muted-foreground',
 };
 
-function fmtUSD(n:number){ return new Intl.NumberFormat('es-NI',{style:'currency',currency:'USD'}).format(n); }
+};
 
 export default function Servicios() {
+  const { formatCurrency } = useCurrency();
   const [servicios, setServicios]   = useState<any[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [showModal, setShowModal]   = useState(false);
@@ -136,7 +138,7 @@ export default function Servicios() {
                       </div>
                     </div>
                     <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 text-center">
-                      <p className="text-sm font-bold text-primary">{fmtUSD(serv.precio)}</p>
+                      <p className="text-sm font-bold text-primary">{formatCurrency(serv.precio)}</p>
                     </div>
                   </div>
                   {serv.categoria&&(

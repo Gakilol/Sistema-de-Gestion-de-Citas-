@@ -103,7 +103,7 @@ export default function Configuracion() {
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       toast.success('Tipo de cambio guardado');
-      setNegocio(prev => ({ ...prev, moneda: divisa.moneda }));
+      setNegocio(prev => ({ ...prev, moneda: divisa.moneda, tipoCambio: divisa.tipoCambio }));
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar');
     } finally { setDivisaSaving(false); }
@@ -114,7 +114,10 @@ export default function Configuracion() {
     setSaved(true);
     try {
       const payload = {
-        negocio,
+        negocio: {
+          ...negocio,
+          tipoCambio: divisa.tipoCambio,
+        },
         horarios,
         whatsapp: waConfig,
         apariencia,
