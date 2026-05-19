@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { prisma } from '../../../src/lib/db';
+import { prisma } from '@/lib/db';
 
 // ─── GET /api/divisa  → obtiene configuración de tipo de cambio
 export async function GET() {

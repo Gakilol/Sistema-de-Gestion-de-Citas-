@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { prisma } from '../../../src/lib/db';
+import { prisma } from '@/lib/db';
 import { EstadoCita } from '@prisma/client';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 

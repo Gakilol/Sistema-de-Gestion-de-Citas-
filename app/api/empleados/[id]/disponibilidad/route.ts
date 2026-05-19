@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { calcularDisponibilidad } from '../../../../../src/lib/disponibilidad';
+import { calcularDisponibilidad } from '@/lib/disponibilidad';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

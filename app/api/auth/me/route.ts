@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-import { prisma } from '../../../../src/lib/db';
+import { prisma } from '@/lib/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-muy-seguro-para-jwt-saas';
 

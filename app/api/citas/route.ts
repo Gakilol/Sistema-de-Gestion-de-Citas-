@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { prisma } from '../../../src/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const { cliente_id, cliente_nombre, cliente_telefono, servicio_id, empleado_id, fecha, hora, duracion, precio, notas, metodo_pago } = body;
 
     // VALIDACIÓN DE DISPONIBILIDAD
-    const { calcularDisponibilidad } = await import('../../../src/lib/disponibilidad');
+    const { calcularDisponibilidad } = await import('@/lib/disponibilidad');
     const disponibilidad = await calcularDisponibilidad(empleado_id, fecha.split('T')[0], servicio_id);
     
     if (!disponibilidad.disponible) {
