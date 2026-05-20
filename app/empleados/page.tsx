@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, X, UserRound, Trash2 } from 'lucide-react';
+import { Plus, Edit, X, UserRound, Trash2, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ function Avatar({ nombre }: { nombre: string }) {
 
 export default function Empleados() {
   const { user } = useAuth();
+  const router = useRouter();
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -33,7 +35,7 @@ export default function Empleados() {
   const [saving, setSaving]       = useState(false);
 
   const handleEliminarEmpleado = async (emp: any) => {
-    if (!confirm(`¿Estás seguro de que deseas desactivar al empleado/administrador "${emp.nombre}"?`)) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente al empleado/administrador "${emp.nombre}"? Esto eliminará también todas sus citas y horarios asociados.`)) {
       return;
     }
     try {
@@ -42,12 +44,12 @@ export default function Empleados() {
       });
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error || 'Error al desactivar empleado');
+        throw new Error(d.error || 'Error al eliminar empleado');
       }
-      toast.success('Empleado desactivado exitosamente');
+      toast.success('Empleado eliminado exitosamente');
       fetchEmpleados();
     } catch (err: any) {
-      toast.error(err.message || 'Error al desactivar empleado');
+      toast.error(err.message || 'Error al eliminar empleado');
     }
   };
 
@@ -159,11 +161,14 @@ export default function Empleados() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)} title="Editar empleado">
                             <Edit className="w-3.5 h-3.5"/>
                           </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" onClick={()=>router.push(`/empleados/${emp.id}/horarios`)} title="Configurar horarios">
+                            <Clock className="w-3.5 h-3.5"/>
+                          </Button>
                           {user?.rol === 'ADMIN' && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={()=>handleEliminarEmpleado(emp)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={()=>handleEliminarEmpleado(emp)} title="Eliminar empleado">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </Button>
                           )}

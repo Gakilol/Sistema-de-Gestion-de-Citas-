@@ -32,7 +32,7 @@ export default function Servicios() {
   const [tabCat, setTabCat]         = useState('Todos');
 
   const handleEliminarServicio = async (serv: any) => {
-    if (!confirm(`¿Estás seguro de que deseas desactivar el servicio "${serv.nombre}"? Ya no estará disponible para nuevas citas.`)) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el servicio "${serv.nombre}"? Esto también eliminará todas las citas asociadas a él.`)) {
       return;
     }
     try {
@@ -41,12 +41,12 @@ export default function Servicios() {
       });
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error || 'Error al desactivar el servicio');
+        throw new Error(d.error || 'Error al eliminar el servicio');
       }
-      toast.success('Servicio desactivado exitosamente');
+      toast.success('Servicio eliminado exitosamente');
       fetchServicios();
     } catch (err: any) {
-      toast.error(err.message || 'Error al desactivar el servicio');
+      toast.error(err.message || 'Error al eliminar el servicio');
     }
   };
 

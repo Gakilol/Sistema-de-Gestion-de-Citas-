@@ -67,15 +67,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
     if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden desactivar empleados' }, { status: 403 });
+      return NextResponse.json({ error: 'Solo los administradores pueden eliminar empleados' }, { status: 403 });
     }
 
-    await prisma.empleado.update({
-      where: { id },
-      data: { activo: false }
+    // 1. Eliminar citas asociadas (ya sean asignadas al empleado o creadas por él)
+    await prisma.cita.deleteMany({
+      where: {
+        OR: [
+          { empleado_id: id },
+          { created_by: id }
+        ]
+      }
     });
 
-    return NextResponse.json({ mensaje: 'Empleado desactivado' }, { status: 200 });
+    // 2. Eliminar físicamente al empleado (descansos, bloqueos y vacaciones se borran en cascada)
+    await prisma.empleado.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ mensaje: 'Empleado eliminado exitosamente' }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

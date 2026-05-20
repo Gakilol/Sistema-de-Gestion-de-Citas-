@@ -38,6 +38,16 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password || 'Temporal123!', 10);
 
+    const defaultHorario = {
+      lunes: [{ inicio: '08:00', fin: '17:00' }],
+      martes: [{ inicio: '08:00', fin: '17:00' }],
+      miercoles: [{ inicio: '08:00', fin: '17:00' }],
+      jueves: [{ inicio: '08:00', fin: '17:00' }],
+      viernes: [{ inicio: '08:00', fin: '17:00' }],
+      sabado: [],
+      domingo: [],
+    };
+
     const empleado = await prisma.empleado.create({
       data: {
         nombre,
@@ -45,7 +55,7 @@ export async function POST(req: NextRequest) {
         telefono,
         passwordHash,
         especialidad,
-        horario,
+        horario: horario || defaultHorario,
         rol: rol || 'EMPLEADO',
       },
       select: { id: true, nombre: true, correo: true, rol: true }

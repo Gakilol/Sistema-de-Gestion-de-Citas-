@@ -35,15 +35,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
     if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden desactivar servicios' }, { status: 403 });
+      return NextResponse.json({ error: 'Solo los administradores pueden eliminar servicios' }, { status: 403 });
     }
 
-    await prisma.servicio.update({
-      where: { id },
-      data: { activo: false }
+    // 1. Eliminar citas asociadas a este servicio
+    await prisma.cita.deleteMany({
+      where: { servicio_id: id }
     });
 
-    return NextResponse.json({ mensaje: 'Servicio desactivado' }, { status: 200 });
+    // 2. Eliminar físicamente el servicio
+    await prisma.servicio.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ mensaje: 'Servicio eliminado exitosamente' }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
