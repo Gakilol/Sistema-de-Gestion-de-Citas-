@@ -55,8 +55,19 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
   const diaIndex = fechaDate.getUTCDay();
   const diaNombre = DIAS_SEMANA[diaIndex];
 
-  const horarioEmpleado: any = empleado.horario || {};
-  const horarioDia: string[] = horarioEmpleado[diaNombre];
+  const defaultHorario: any = {
+    lunes: [{ inicio: '08:00', fin: '17:00' }],
+    martes: [{ inicio: '08:00', fin: '17:00' }],
+    miercoles: [{ inicio: '08:00', fin: '17:00' }],
+    jueves: [{ inicio: '08:00', fin: '17:00' }],
+    viernes: [{ inicio: '08:00', fin: '17:00' }],
+    sabado: [],
+    domingo: [],
+  };
+
+  const tieneHorarioConfigurado = empleado.horario && typeof empleado.horario === 'object' && Object.keys(empleado.horario).length > 0;
+  const horarioEmpleado: any = tieneHorarioConfigurado ? empleado.horario : defaultHorario;
+  const horarioDia: any[] = horarioEmpleado[diaNombre] || [];
 
   if (!horarioDia || horarioDia.length === 0) {
     return { disponible: false, motivo: 'Día no laboral', bloques: [] };
@@ -74,7 +85,18 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
   const bloqueIntervalo = 15;
 
   for (const turno of horarioDia) {
-    const [inicio, fin] = turno.split('-');
+    let inicio = '';
+    let fin = '';
+
+    if (typeof turno === 'string') {
+      const parts = turno.split('-');
+      inicio = parts[0] || '';
+      fin = parts[1] || '';
+    } else if (turno && typeof turno === 'object') {
+      inicio = turno.inicio || turno.start || '';
+      fin = turno.fin || turno.end || '';
+    }
+
     if (!inicio || !fin) continue;
 
     let currentMinutes = timeToMinutes(inicio);
