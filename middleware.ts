@@ -4,37 +4,49 @@ import { jwtVerify } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-muy-seguro-para-jwt-saas';
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;
   const path = req.nextUrl.pathname;
+  const method = req.method;
 
-  // Rutas públicas que no necesitan autenticación
-  if (
-    path.startsWith('/api/auth') || 
+  // Rutas y APIs públicas excluidas de protección por token
+  const isPublicPath = 
+    path === '/' ||
     path === '/login' ||
+    path.startsWith('/api/auth') ||
+    path.startsWith('/api/public') || // Endpoint público exclusivo para reservas de clientes
+    (path === '/api/servicios' && method === 'GET') ||
+    (path === '/api/empleados' && method === 'GET') ||
+    (path.includes('/disponibilidad') && method === 'GET') ||
     path.startsWith('/_next') || 
     path.startsWith('/favicon.ico') ||
     path.startsWith('/logo') ||
     path.startsWith('/icon') ||
     path.startsWith('/apple-icon') ||
-    path === '/icon.svg'
-  ) {
+    path === '/icon.svg';
+
+  if (isPublicPath) {
+    // Si hay un token válido e intentan ingresar al /login, los enviamos directo al dashboard
+    if (token && path === '/login') {
+      try {
+        await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      } catch (e) {
+        // Si el token es inválido, dejamos que continúe al login y limpiamos la cookie
+        const response = NextResponse.next();
+        response.cookies.delete('access_token');
+        return response;
+      }
+    }
     return NextResponse.next();
   }
 
+  // Rutas privadas: Si no hay token
   if (!token) {
-    // Si es una ruta de API
     if (path.startsWith('/api/')) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    
-    // Redirigir al login
     return NextResponse.redirect(new URL('/login', req.url));
-  }
-
-  // Si hay token y visita página de login, redirigir al dashboard
-  if (token && path === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   try {
@@ -43,11 +55,13 @@ export async function proxy(req: NextRequest) {
 
     // Solo ADMIN o EMPLEADO tienen acceso, si no, lo rechazamos
     if (userRole !== 'ADMIN' && userRole !== 'EMPLEADO') {
+      if (path.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Rol no autorizado' }, { status: 403 });
+      }
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // Inyectar datos del usuario en los headers para que las rutas de API los lean
-    // Esto es seguro porque el middleware ya verificó el JWT
+    // Inyectar datos del usuario en los headers para que las rutas de API internas los lean de forma segura
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set('x-user-id', payload.id as string);
     requestHeaders.set('x-user-role', userRole);
@@ -59,7 +73,7 @@ export async function proxy(req: NextRequest) {
       },
     });
   } catch (error) {
-    // Si el token expiró o es inválido, forzar logout visual
+    // Token inválido o expirado
     if (path.startsWith('/api/')) {
       return NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 });
     }
@@ -70,6 +84,7 @@ export async function proxy(req: NextRequest) {
   }
 }
 
+// Configuración de rutas que intercepta Next.js
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
