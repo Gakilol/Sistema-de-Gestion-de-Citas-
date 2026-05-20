@@ -55,23 +55,25 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
   const diaIndex = fechaDate.getUTCDay();
   const diaNombre = DIAS_SEMANA[diaIndex];
 
-  const defaultHorario: any = {
-    lunes: [{ inicio: '08:00', fin: '17:00' }],
-    martes: [{ inicio: '08:00', fin: '17:00' }],
-    miercoles: [{ inicio: '08:00', fin: '17:00' }],
-    jueves: [{ inicio: '08:00', fin: '17:00' }],
-    viernes: [{ inicio: '08:00', fin: '17:00' }],
-    sabado: [],
-    domingo: [],
+  const DEFAULT_HORARIOS_GLOBALES: any = {
+    lunes:     { activo: true,  inicio: '08:00', fin: '18:00' },
+    martes:    { activo: true,  inicio: '08:00', fin: '18:00' },
+    miercoles: { activo: true,  inicio: '08:00', fin: '18:00' },
+    jueves:    { activo: true,  inicio: '08:00', fin: '18:00' },
+    viernes:   { activo: true,  inicio: '08:00', fin: '18:00' },
+    sabado:    { activo: true,  inicio: '08:00', fin: '14:00' },
+    domingo:   { activo: false, inicio: '09:00', fin: '13:00' },
   };
 
-  const tieneHorarioConfigurado = empleado.horario && typeof empleado.horario === 'object' && Object.keys(empleado.horario).length > 0;
-  const horarioEmpleado: any = tieneHorarioConfigurado ? empleado.horario : defaultHorario;
-  const horarioDia: any[] = horarioEmpleado[diaNombre] || [];
+  const config = await prisma.configuracion.findUnique({ where: { id: 'default' } });
+  const horariosGlobales = (config?.horarios as any) || DEFAULT_HORARIOS_GLOBALES;
+  const configDia = horariosGlobales[diaNombre] || DEFAULT_HORARIOS_GLOBALES[diaNombre];
 
-  if (!horarioDia || horarioDia.length === 0) {
+  if (!configDia || !configDia.activo) {
     return { disponible: false, motivo: 'Día no laboral', bloques: [] };
   }
+
+  const horarioDia: any[] = [{ inicio: configDia.inicio, fin: configDia.fin }];
 
   const citas = await prisma.cita.findMany({
     where: {
