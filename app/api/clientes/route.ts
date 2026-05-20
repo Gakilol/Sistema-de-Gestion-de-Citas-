@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
             id: true,
             fecha: true,
             hora: true,
-            precio: true,
             estado: true,
             servicio: { select: { nombre: true } },
             empleado: { select: { nombre: true } },
@@ -39,7 +38,6 @@ export async function GET(req: NextRequest) {
     // Mapear y calcular métricas para cada cliente
     const clientes = clientesData.map((c) => {
       let citasCompletadas = 0;
-      let gastoTotal = 0;
       let ultimaCita = c.createdAt;
       let primeraCita = c.createdAt;
       const serviciosFrecuentes: Record<string, number> = {};
@@ -52,7 +50,6 @@ export async function GET(req: NextRequest) {
       for (const cita of c.citas) {
         if (cita.estado === 'COMPLETADA') {
           citasCompletadas++;
-          gastoTotal += cita.precio;
         }
         if (cita.fecha > ultimaCita) ultimaCita = cita.fecha;
         if (cita.fecha < primeraCita) primeraCita = cita.fecha;
@@ -71,7 +68,6 @@ export async function GET(req: NextRequest) {
         telefono: c.telefono,
         totalCitas: c.citas.length,
         citasCompletadas,
-        gastoTotal,
         ultimaCita,
         primeraCita,
         esRecurrente: c.citas.length > 1,

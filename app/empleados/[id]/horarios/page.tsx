@@ -11,13 +11,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const DIAS = [
-  { key: 'lunes',     label: 'Lun', labelFull: 'Lunes' },
-  { key: 'martes',    label: 'Mar', labelFull: 'Martes' },
-  { key: 'miercoles', label: 'Mié', labelFull: 'Miércoles' },
-  { key: 'jueves',    label: 'Jue', labelFull: 'Jueves' },
-  { key: 'viernes',   label: 'Vie', labelFull: 'Viernes' },
-  { key: 'sabado',    label: 'Sáb', labelFull: 'Sábado' },
-  { key: 'domingo',   label: 'Dom', labelFull: 'Domingo' },
+  { key: 'lunes',     label: 'Lun', labelFull: 'Lunes', val: 1 },
+  { key: 'martes',    label: 'Mar', labelFull: 'Martes', val: 2 },
+  { key: 'miercoles', label: 'Mié', labelFull: 'Miércoles', val: 3 },
+  { key: 'jueves',    label: 'Jue', labelFull: 'Jueves', val: 4 },
+  { key: 'viernes',   label: 'Vie', labelFull: 'Viernes', val: 5 },
+  { key: 'sabado',    label: 'Sáb', labelFull: 'Sábado', val: 6 },
+  { key: 'domingo',   label: 'Dom', labelFull: 'Domingo', val: 0 },
 ];
 
 interface Turno { inicio: string; fin: string }
@@ -46,6 +46,9 @@ export default function HorariosEmpleado() {
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [saved, setSaved]           = useState(false);
+  const [savedDescansos, setSavedDescansos] = useState(false);
+  const [savedBloqueos, setSavedBloqueos]   = useState(false);
+  const [savedVacaciones, setSavedVacaciones] = useState(false);
   const [tab, setTab]               = useState<'horario'|'descansos'|'bloqueos'|'vacaciones'>('horario');
 
   const [horario, setHorario]       = useState<HorarioSemana>(defaultHorario);
@@ -112,6 +115,63 @@ export default function HorariosEmpleado() {
     }
   };
 
+  const saveDescansos = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/empleados/${id}/descansos`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descansos }),
+      });
+      if (!res.ok) throw new Error();
+      setSavedDescansos(true);
+      toast.success('Descansos guardados');
+      setTimeout(() => setSavedDescansos(false), 2500);
+    } catch {
+      toast.error('Error al guardar descansos');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBloqueos = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/empleados/${id}/bloqueos`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bloqueos }),
+      });
+      if (!res.ok) throw new Error();
+      setSavedBloqueos(true);
+      toast.success('Bloqueos guardados');
+      setTimeout(() => setSavedBloqueos(false), 2500);
+    } catch {
+      toast.error('Error al guardar bloqueos');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveVacaciones = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/empleados/${id}/vacaciones`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacaciones }),
+      });
+      if (!res.ok) throw new Error();
+      setSavedVacaciones(true);
+      toast.success('Vacaciones guardadas');
+      setTimeout(() => setSavedVacaciones(false), 2500);
+    } catch {
+      toast.error('Error al guardar vacaciones');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen bg-background">
@@ -145,6 +205,24 @@ export default function HorariosEmpleado() {
               <Button onClick={saveHorario} disabled={saving} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
                 {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
                 {saved ? 'Guardado' : 'Guardar'}
+              </Button>
+            )}
+            {tab === 'descansos' && (
+              <Button onClick={saveDescansos} disabled={saving} className={cn('gap-1.5', savedDescansos ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
+                {savedDescansos ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                {savedDescansos ? 'Guardado' : 'Guardar'}
+              </Button>
+            )}
+            {tab === 'bloqueos' && (
+              <Button onClick={saveBloqueos} disabled={saving} className={cn('gap-1.5', savedBloqueos ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
+                {savedBloqueos ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                {savedBloqueos ? 'Guardado' : 'Guardar'}
+              </Button>
+            )}
+            {tab === 'vacaciones' && (
+              <Button onClick={saveVacaciones} disabled={saving} className={cn('gap-1.5', savedVacaciones ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
+                {savedVacaciones ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                {savedVacaciones ? 'Guardado' : 'Guardar'}
               </Button>
             )}
           </div>
@@ -230,7 +308,7 @@ export default function HorariosEmpleado() {
                   <select value={d.dia_semana}
                     onChange={e => setDescansos(ds => ds.map((x,j)=>j===i?{...x,dia_semana:Number(e.target.value)}:x))}
                     className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
-                    {DIAS.map((dia,idx) => <option key={dia.key} value={idx+1}>{dia.labelFull}</option>)}
+                    {DIAS.map((dia) => <option key={dia.key} value={dia.val}>{dia.labelFull}</option>)}
                   </select>
                   <Input type="time" value={d.hora_inicio}
                     onChange={e=>setDescansos(ds=>ds.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))}

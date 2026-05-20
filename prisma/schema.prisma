@@ -33,7 +33,6 @@ model Servicio {
   nombre      String
   descripcion String?
   duracion    Int
-  precio      Float
   categoria   String?
   activo      Boolean  @default(true)
 
@@ -50,10 +49,8 @@ model Cita {
   fecha            DateTime @db.Date
   hora             String
   duracion         Int
-  precio           Float
   estado           EstadoCita @default(PENDIENTE)
   notas            String?
-  metodo_pago      String?
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
   created_by       String
@@ -62,24 +59,10 @@ model Cita {
   servicio         Servicio @relation(fields: [servicio_id], references: [id])
   empleado         Empleado @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
   creador          Empleado @relation("CreadorCita", fields: [created_by], references: [id])
-  
-  pagos            Pago[]
 
   @@index([empleado_id])
   @@index([estado])
   @@index([fecha])
-}
-
-model Pago {
-  id         String   @id @default(dbgenerated("gen_random_uuid()"))
-  cita_id    String
-  monto      Float
-  metodo     String
-  estado     EstadoPago @default(PENDIENTE)
-  referencia String?
-  fecha_pago DateTime?
-
-  cita       Cita     @relation(fields: [cita_id], references: [id], onDelete: Cascade)
 }
 
 enum RolUsuario {
@@ -94,13 +77,6 @@ enum EstadoCita {
   COMPLETADA
   CANCELADA
   REPROGRAMADA
-}
-
-enum EstadoPago {
-  PENDIENTE
-  COMPLETADO
-  FALLIDO
-  REEMBOLSADO
 }
 
 model DescansoEmpleado {

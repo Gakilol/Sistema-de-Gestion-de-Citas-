@@ -1,6 +1,6 @@
-import { prisma } from '../lib/db';
-import { verifyPassword } from '../auth/hash';
-import { signToken, signRefreshToken } from '../auth/jwt';
+import { prisma } from '@/lib/db';
+import { verifyPassword } from '@/lib/hash';
+import { signToken, signRefreshToken } from '@/lib/jwt';
 import { LoginSchema } from '../validadores';
 import { z } from 'zod';
 

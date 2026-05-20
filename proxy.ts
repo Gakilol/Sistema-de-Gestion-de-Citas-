@@ -14,7 +14,10 @@ export async function proxy(req: NextRequest) {
     path === '/login' ||
     path.startsWith('/_next') || 
     path.startsWith('/favicon.ico') ||
-    path.startsWith('/logo')
+    path.startsWith('/logo') ||
+    path.startsWith('/icon') ||
+    path.startsWith('/apple-icon') ||
+    path === '/icon.svg'
   ) {
     return NextResponse.next();
   }
@@ -44,6 +47,7 @@ export async function proxy(req: NextRequest) {
     }
 
     // Inyectar datos del usuario en los headers para que las rutas de API los lean
+    // Esto es seguro porque el middleware ya verificó el JWT
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set('x-user-id', payload.id as string);
     requestHeaders.set('x-user-role', userRole);

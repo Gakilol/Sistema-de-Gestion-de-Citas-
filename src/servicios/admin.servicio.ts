@@ -1,4 +1,4 @@
-import { prisma } from '../lib/db';
+import { prisma } from '@/lib/db';
 import { EstadoCita } from '@prisma/client';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 
@@ -18,9 +18,8 @@ export class AdminServicio {
       citasHoy,
       citasPendientes,
       empleadosActivos,
-      ingresosTotal,
-      ingresosMes,
-      ingresosHoy,
+      citasCompletadasMes,
+      citasCompletadasHoy,
       upcomingAppointments,
       serviciosPopularesRaw,
       actividadReciente,
@@ -42,26 +41,19 @@ export class AdminServicio {
       }),
       // Empleados activos
       prisma.empleado.count({ where: { activo: true } }),
-      // Ingresos totales (completadas)
-      prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA },
-        _sum: { precio: true },
-      }),
-      // Ingresos este mes
-      prisma.cita.aggregate({
+      // Completadas este mes
+      prisma.cita.count({
         where: {
           estado: EstadoCita.COMPLETADA,
           fecha: { gte: inicioMes, lte: finMes },
         },
-        _sum: { precio: true },
       }),
-      // Ingresos hoy
-      prisma.cita.aggregate({
+      // Completadas hoy
+      prisma.cita.count({
         where: {
           estado: EstadoCita.COMPLETADA,
           fecha: { gte: hoy, lte: finHoy },
         },
-        _sum: { precio: true },
       }),
       // Próximas citas (5)
       prisma.cita.findMany({
@@ -106,7 +98,6 @@ export class AdminServicio {
         by: ['empleado_id'],
         where: { fecha: { gte: inicioMes, lte: finMes } },
         _count: { id: true },
-        _sum: { precio: true },
         orderBy: { _count: { id: 'desc' } },
         take: 5,
       }),
@@ -134,11 +125,10 @@ export class AdminServicio {
     const productividad = productividadEmpleados.map((e) => ({
       nombre: empMap[e.empleado_id] ?? 'Empleado',
       citas: e._count.id,
-      ingresos: e._sum.precio ?? 0,
     }));
 
-    // ── Ingresos últimos 7 días (gráfica) ────────────────────────────
-    const ingresosChart = await AdminServicio.getIngresosUltimos7Dias();
+    // ── Citas últimos 7 días (gráfica) ────────────────────────────
+    const citasChart = await AdminServicio.getCitasUltimos7Dias();
 
     // ── Tasa de completadas ───────────────────────────────────────────
     const tasaCompletadas = totalCitas > 0
@@ -152,14 +142,12 @@ export class AdminServicio {
         citasHoy,
         citasPendientes,
         empleadosActivos,
-        totalRevenue: ingresosTotal._sum.precio ?? 0,
-        ingresosMes: ingresosMes._sum.precio ?? 0,
-        ingresosHoy: ingresosHoy._sum.precio ?? 0,
+        citasCompletadasMes,
+        citasCompletadasHoy,
         tasaCompletadas,
         // Legado
         totalAppointments: totalCitas,
         completedAppointments: citasCompletadas,
-        totalRevenue_legacy: ingresosTotal._sum.precio ?? 0,
       },
       upcomingAppointments,
       citasHoy: citasHoyDetalle,
@@ -173,15 +161,14 @@ export class AdminServicio {
         estado: c.estado,
         fecha: c.fecha,
         hora: c.hora,
-        precio: c.precio,
         created_at: c.created_at,
       })),
-      ingresosChart,
+      citasChart,
     };
   }
 
-  // ─── Ingresos últimos 7 días ────────────────────────────────────────
-  static async getIngresosUltimos7Dias() {
+  // ─── Citas últimos 7 días ────────────────────────────────────────
+  static async getCitasUltimos7Dias() {
     const dias = Array.from({ length: 7 }, (_, i) => {
       const d = subDays(new Date(), 6 - i);
       return { inicio: startOfDay(d), fin: endOfDay(d), label: format(d, 'EEE', { locale: undefined }) };
@@ -194,13 +181,11 @@ export class AdminServicio {
             estado: EstadoCita.COMPLETADA,
             fecha: { gte: inicio, lte: fin },
           },
-          _sum: { precio: true },
           _count: { id: true },
         });
         return {
           fecha: format(inicio, 'dd/MM'),
           dia: label,
-          ingresos: agg._sum.precio ?? 0,
           citas: agg._count.id ?? 0,
         };
       })

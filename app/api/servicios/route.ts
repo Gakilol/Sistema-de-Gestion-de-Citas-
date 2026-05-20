@@ -28,14 +28,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, precio, categoria } = body;
+    const { nombre, descripcion, duracion, categoria } = body;
 
     const servicio = await prisma.servicio.create({
       data: {
         nombre,
         descripcion,
         duracion: Number(duracion),
-        precio: Number(precio),
         categoria,
       },
     });

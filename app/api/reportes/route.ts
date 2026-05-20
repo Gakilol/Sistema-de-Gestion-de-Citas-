@@ -5,33 +5,12 @@ import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, for
 
 export async function GET(req: NextRequest) {
   try {
-    const tipo  = req.nextUrl.searchParams.get('tipo') ?? 'ingresos';
+    const tipo  = req.nextUrl.searchParams.get('tipo') ?? 'citas';
     const desde = req.nextUrl.searchParams.get('desde');
     const hasta = req.nextUrl.searchParams.get('hasta');
 
     const fechaDesde = desde ? startOfDay(new Date(desde)) : startOfMonth(subMonths(new Date(), 2));
     const fechaHasta = hasta ? endOfDay(new Date(hasta))   : endOfDay(new Date());
-
-    // ── Ingresos por día ─────────────────────────────────────────────
-    if (tipo === 'ingresos') {
-      const citas = await prisma.cita.findMany({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: fechaDesde, lte: fechaHasta } },
-        select: { fecha: true, precio: true },
-        orderBy: { fecha: 'asc' },
-      });
-
-      // Agrupar por día
-      const mapaFechas: Record<string, number> = {};
-      citas.forEach(c => {
-        const key = format(c.fecha, 'dd/MM/yyyy');
-        mapaFechas[key] = (mapaFechas[key] ?? 0) + c.precio;
-      });
-      const data = Object.entries(mapaFechas).map(([fecha, ingresos]) => ({ fecha, ingresos }));
-
-      // Resumen
-      const total = citas.reduce((s, c) => s + c.precio, 0);
-      return NextResponse.json({ data, resumen: { total, citas: citas.length } });
-    }
 
     // ── Citas por estado ─────────────────────────────────────────────
     if (tipo === 'citas') {
@@ -45,7 +24,6 @@ export async function GET(req: NextRequest) {
           by: ['empleado_id'],
           where: { fecha: { gte: fechaDesde, lte: fechaHasta } },
           _count: { id: true },
-          _sum: { precio: true },
           orderBy: { _count: { id: 'desc' } },
         }),
         prisma.cita.groupBy({
@@ -69,7 +47,7 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json({
         porEstado:   byEstado.map(e  => ({ estado: e.estado,   cantidad: e._count.id })),
-        porEmpleado: byEmpleado.map(e => ({ nombre: empMap[e.empleado_id]??'—', citas: e._count.id, ingresos: e._sum.precio??0 })),
+        porEmpleado: byEmpleado.map(e => ({ nombre: empMap[e.empleado_id]??'—', citas: e._count.id })),
         porServicio: byServicio.map(s => ({ nombre: servMap[s.servicio_id]??'—', cantidad: s._count.id })),
       });
     }
@@ -80,8 +58,7 @@ export async function GET(req: NextRequest) {
         by: ['empleado_id'],
         where: { fecha: { gte: fechaDesde, lte: fechaHasta } },
         _count: { id: true },
-        _sum: { precio: true },
-        orderBy: { _sum: { precio: 'desc' } },
+        orderBy: { _count: { id: 'desc' } },
       });
       const ids  = data.map(d => d.empleado_id);
       const emps = await prisma.empleado.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, especialidad: true } });
@@ -91,7 +68,6 @@ export async function GET(req: NextRequest) {
           nombre:      empMap[d.empleado_id]?.nombre ?? '—',
           especialidad:empMap[d.empleado_id]?.especialidad ?? '—',
           citas:       d._count.id,
-          ingresos:    d._sum.precio ?? 0,
         })),
       });
     }

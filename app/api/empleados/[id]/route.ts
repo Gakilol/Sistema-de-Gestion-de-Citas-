@@ -2,6 +2,33 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const empleado = await prisma.empleado.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        nombre: true,
+        correo: true,
+        telefono: true,
+        especialidad: true,
+        horario: true,
+        rol: true,
+        activo: true,
+      }
+    });
+
+    if (!empleado) {
+      return NextResponse.json({ error: 'Empleado no encontrado' }, { status: 404 });
+    }
+
+    return NextResponse.json({ empleado }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;

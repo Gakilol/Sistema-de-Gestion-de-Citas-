@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Calendar, TrendingUp, DollarSign, Users, CheckCircle2,
+  Calendar, TrendingUp, Users, CheckCircle2,
   Clock, ArrowUpRight, ArrowDownRight, RefreshCcw, Loader2,
   Scissors, ChevronRight, Activity,
 } from 'lucide-react';
@@ -25,17 +25,16 @@ interface DashboardData {
     citasHoy: number;
     citasPendientes: number;
     empleadosActivos: number;
-    totalRevenue: number;
-    ingresosMes: number;
-    ingresosHoy: number;
+    citasCompletadasMes: number;
+    citasCompletadasHoy: number;
     tasaCompletadas: number;
   };
   upcomingAppointments: any[];
   citasHoy: any[];
   serviciosPopulares: { nombre: string; cantidad: number }[];
-  productividadEmpleados: { nombre: string; citas: number; ingresos: number }[];
+  productividadEmpleados: { nombre: string; citas: number }[];
   actividadReciente: any[];
-  ingresosChart: { fecha: string; dia: string; ingresos: number; citas: number }[];
+  citasChart: { fecha: string; dia: string; citas: number }[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -58,9 +57,7 @@ const ESTADO_LABEL: Record<string, string> = {
 
 const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
 
-function fmtUSD(n: number) {
-  return new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
-}
+// Eliminado format USD
 
 function fmtDate(d: string | Date) {
   return new Date(d).toLocaleDateString('es-NI', { day: '2-digit', month: 'short' });
@@ -139,7 +136,7 @@ function ChartTooltip({ active, payload, label }: any) {
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
           <span className="text-muted-foreground">{p.name}:</span>
           <span className="font-medium text-foreground">
-            {p.name === 'Ingresos' ? fmtUSD(p.value) : p.value}
+            {p.value}
           </span>
         </div>
       ))}
@@ -201,7 +198,7 @@ export default function Dashboard() {
   const populares = data?.serviciosPopulares ?? [];
   const productividad = data?.productividadEmpleados ?? [];
   const actividad = data?.actividadReciente ?? [];
-  const chartData = data?.ingresosChart ?? [];
+  const chartData = data?.citasChart ?? [];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -242,18 +239,18 @@ export default function Dashboard() {
               accent="gold"
             />
             <KpiCard
-              title="Completadas"
-              value={String(stats?.citasCompletadas ?? 0)}
+              title="Completadas Hoy"
+              value={String(stats?.citasCompletadasHoy ?? 0)}
               sub={`${stats?.tasaCompletadas ?? 0}% tasa éxito`}
               icon={CheckCircle2}
               accent="emerald"
             />
             {isAdmin && (
               <KpiCard
-                title="Ingresos Hoy"
-                value={fmtUSD(stats?.ingresosHoy ?? 0)}
-                sub={`Mes: ${fmtUSD(stats?.ingresosMes ?? 0)}`}
-                icon={DollarSign}
+                title="Completadas Mes"
+                value={String(stats?.citasCompletadasMes ?? 0)}
+                sub="Citas finalizadas este mes"
+                icon={Calendar}
                 accent="blue"
               />
             )}
@@ -269,12 +266,12 @@ export default function Dashboard() {
           {/* ── Gráficas ────────────────────────────────────────── */}
           {isAdmin && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Área: ingresos 7 días */}
+              {/* Área: citas 7 días */}
               <Card className="lg:col-span-2 p-5 border-border/50">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground">Ingresos — Últimos 7 días</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">Citas completadas y monto generado</p>
+                    <h2 className="text-sm font-semibold text-foreground">Citas Completadas — Últimos 7 días</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Volumen diario de citas finalizadas</p>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary rounded-lg px-2.5 py-1">
                     <Activity className="w-3 h-3" />
@@ -288,17 +285,12 @@ export default function Dashboard() {
                         <stop offset="5%"  stopColor="#d4a017" stopOpacity={0.3} />
                         <stop offset="95%" stopColor="#d4a017" stopOpacity={0} />
                       </linearGradient>
-                      <linearGradient id="gradBlue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                    <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#d4a017" strokeWidth={2} fill="url(#gradGold)" dot={{ r: 3, fill: '#d4a017', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                    <Area type="monotone" dataKey="citas"    name="Citas"    stroke="#3b82f6" strokeWidth={2} fill="url(#gradBlue)" dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                    <Area type="monotone" dataKey="citas"    name="Citas"    stroke="#d4a017" strokeWidth={2} fill="url(#gradGold)" dot={{ r: 3, fill: '#d4a017', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </Card>
@@ -356,7 +348,7 @@ export default function Dashboard() {
             <Card className="p-5 border-border/50">
               <div className="mb-4">
                 <h2 className="text-sm font-semibold text-foreground">Productividad por Empleado — Este mes</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Citas atendidas e ingresos generados</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Citas atendidas en el mes actual</p>
               </div>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={productividad} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -365,7 +357,6 @@ export default function Dashboard() {
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="citas"    name="Citas"    fill="#d4a017" radius={[4,4,0,0]} maxBarSize={40} />
-                  <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4,4,0,0]} maxBarSize={40} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>

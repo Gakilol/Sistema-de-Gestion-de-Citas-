@@ -4,7 +4,6 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from 'next-themes'
 import { AuthProvider } from '@/components/providers/auth-provider'
-import { CurrencyProvider } from '@/components/providers/currency-context'
 import './globals.css'
 
 const inter = Inter({
@@ -44,11 +43,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
-          <CurrencyProvider>
             <AuthProvider>
               {children}
             </AuthProvider>
-          </CurrencyProvider>
           <Toaster
             position="top-right"
             richColors

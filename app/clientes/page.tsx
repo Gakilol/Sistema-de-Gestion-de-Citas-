@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Users, Search, Star, TrendingUp, Phone, Calendar,
-  DollarSign, Clock, ChevronRight, Scissors, X, RefreshCcw, UserPlus,
+  Users, Search, Star, Phone, Calendar,
+  Scissors, X, RefreshCcw, UserPlus, ChevronRight
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { useCurrency } from '@/components/providers/currency-context';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface Cliente {
@@ -21,7 +20,6 @@ interface Cliente {
   telefono: string | null;
   totalCitas: number;
   citasCompletadas: number;
-  gastoTotal: number;
   ultimaCita: string;
   primeraCita: string;
   esRecurrente: boolean;
@@ -88,7 +86,6 @@ function Skeleton() {
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
 function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
-  const { formatCurrency } = useCurrency();
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
@@ -117,14 +114,10 @@ function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () =>
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3 p-4 border-b border-border/50">
-          <div className="text-center">
+        <div className="grid grid-cols-2 gap-3 p-4 border-b border-border/50">
+          <div className="text-center border-r border-border/50">
             <p className="text-lg font-bold text-foreground">{cliente.totalCitas}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Visitas</p>
-          </div>
-          <div className="text-center border-x border-border/50">
-            <p className="text-lg font-bold text-emerald-500">{formatCurrency(cliente.gastoTotal)}</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Gastado</p>
           </div>
           <div className="text-center">
             <p className="text-lg font-bold text-foreground">{cliente.citasCompletadas}</p>
@@ -184,7 +177,6 @@ function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () =>
 
 // ─── Cliente Card ─────────────────────────────────────────────────────────────
 function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => void }) {
-  const { formatCurrency } = useCurrency();
   return (
     <div
       className="rounded-xl border border-border/50 bg-card p-5 hover-lift cursor-pointer group"
@@ -215,8 +207,8 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
           <p className="text-[10px] text-muted-foreground">Visitas</p>
         </div>
         <div className="bg-secondary/50 rounded-lg p-2.5 text-center">
-          <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400">{formatCurrency(cliente.gastoTotal)}</p>
-          <p className="text-[10px] text-muted-foreground">Gastado</p>
+          <p className="text-lg font-bold text-foreground">{cliente.citasCompletadas}</p>
+          <p className="text-[10px] text-muted-foreground">Completadas</p>
         </div>
       </div>
 
@@ -302,7 +294,6 @@ export default function Clientes() {
   const [busqueda, setBusqueda] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [showAgregar, setShowAgregar] = useState(false);
-  const { formatCurrency } = useCurrency();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchClientes = useCallback(async (q = '') => {
@@ -326,7 +317,7 @@ export default function Clientes() {
   };
 
   const recurrentes = clientes.filter((c) => c.esRecurrente).length;
-  const gastoTotal  = clientes.reduce((a, c) => a + c.gastoTotal, 0);
+  const totalCitasCompletadas = clientes.reduce((a, c) => a + c.citasCompletadas, 0);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -362,10 +353,8 @@ export default function Clientes() {
               <p className="text-xs text-muted-foreground mt-0.5">Recurrentes</p>
             </Card>
             <Card className="p-4 border-border/50 text-center">
-              <p className="text-xl font-bold text-emerald-500">
-                {formatCurrency(gastoTotal)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Facturado</p>
+              <p className="text-xl font-bold text-emerald-500">{totalCitasCompletadas}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Servicios prestados</p>
             </Card>
           </div>
 

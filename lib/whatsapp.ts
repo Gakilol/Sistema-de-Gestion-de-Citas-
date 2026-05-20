@@ -10,7 +10,6 @@ export interface CitaWA {
   fecha: string | Date;
   hora: string;
   duracion?: number;
-  precio?: number;
   estado?: string;
   notas?: string | null;
 }
@@ -26,10 +25,6 @@ function fmtFecha(d: string | Date): string {
   });
 }
 
-function fmtPrecio(p: number): string {
-  return new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD' }).format(p);
-}
-
 // ─── Confirmación de cita ───────────────────────────────────────────────────
 export function mensajeConfirmacion(cita: CitaWA): string {
   const lines = [
@@ -43,7 +38,6 @@ export function mensajeConfirmacion(cita: CitaWA): string {
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
     `*Hora:* ${cita.hora}`,
     cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
-    cita.precio    ? `*Precio:* ${fmtPrecio(cita.precio)}` : null,
     cita.notas     ? `*Notas:* ${cita.notas}` : null,
     ``,
     `Por favor llegue 10 minutos antes de su cita.`,

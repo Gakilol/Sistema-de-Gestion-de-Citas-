@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, X, UserRound, Toggle } from 'lucide-react';
+import { Plus, Edit, X, UserRound } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

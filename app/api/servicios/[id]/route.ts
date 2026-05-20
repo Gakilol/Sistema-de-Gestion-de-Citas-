@@ -10,13 +10,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, precio, categoria, activo } = body;
+    const { nombre, descripcion, duracion, categoria, activo } = body;
 
     const dataToUpdate: any = {};
     if (nombre) dataToUpdate.nombre = nombre;
     if (descripcion !== undefined) dataToUpdate.descripcion = descripcion;
     if (duracion !== undefined) dataToUpdate.duracion = Number(duracion);
-    if (precio !== undefined) dataToUpdate.precio = Number(precio);
     if (categoria !== undefined) dataToUpdate.categoria = categoria;
     if (activo !== undefined) dataToUpdate.activo = activo;
 

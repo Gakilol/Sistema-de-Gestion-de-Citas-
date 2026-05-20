@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
     }
 
-    const { cliente_id, cliente_nombre, cliente_telefono, servicio_id, empleado_id, fecha, hora, duracion, precio, notas, metodo_pago } = body;
+    const { cliente_id, cliente_nombre, cliente_telefono, servicio_id, empleado_id, fecha, hora, duracion, notas } = body;
 
     // VALIDACIÓN DE DISPONIBILIDAD
     const { calcularDisponibilidad } = await import('@/lib/disponibilidad');
@@ -92,9 +92,7 @@ export async function POST(req: NextRequest) {
         fecha: new Date(fecha),
         hora,
         duracion: Number(duracion),
-        precio: Number(precio),
         notas,
-        metodo_pago,
         created_by: userId,
       },
     });

@@ -10,7 +10,6 @@ export const CrearServicioSchema = z.object({
   descripcion: z.string().optional(),
   categoria: z.string().optional(),
   duracion: z.number().min(5, 'La duración debe ser mayor a 5 minutos'),
-  precio: z.number().min(0, 'El precio no puede ser negativo'),
 });
 
 export const CrearCitaSchema = z.object({
@@ -21,5 +20,4 @@ export const CrearCitaSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)'),
   hora: z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido (HH:MM)'),
   notas: z.string().optional(),
-  metodo_pago: z.string().optional(),
 });

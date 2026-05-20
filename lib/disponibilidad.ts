@@ -1,10 +1,25 @@
 import { prisma } from './db';
-import { addMinutes, format, isBefore, parse } from 'date-fns';
 
 const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
+function parseYYYYMMDD(fechaYYYYMMDD: string): Date {
+  const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: string, servicioId?: string | null) {
-  const fechaDate = new Date(fechaYYYYMMDD + 'T00:00:00');
+  const fechaDate = parseYYYYMMDD(fechaYYYYMMDD);
 
   const empleado = await prisma.empleado.findUnique({
     where: { id: empleadoId },
@@ -37,7 +52,7 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
     return { disponible: false, motivo: 'De vacaciones', bloques: [] };
   }
 
-  const diaIndex = fechaDate.getDay();
+  const diaIndex = fechaDate.getUTCDay();
   const diaNombre = DIAS_SEMANA[diaIndex];
 
   const horarioEmpleado: any = empleado.horario || {};
@@ -62,16 +77,16 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
     const [inicio, fin] = turno.split('-');
     if (!inicio || !fin) continue;
 
-    let currentTime = parse(inicio, 'HH:mm', fechaDate);
-    const endTime = parse(fin, 'HH:mm', fechaDate);
+    let currentMinutes = timeToMinutes(inicio);
+    const endMinutes = timeToMinutes(fin);
 
-    while (isBefore(currentTime, endTime)) {
-      const horaString = format(currentTime, 'HH:mm');
-      const endTimeConServicio = addMinutes(currentTime, duracionServicio);
+    while (currentMinutes < endMinutes) {
+      const horaString = minutesToTime(currentMinutes);
+      const nextMinutes = currentMinutes + duracionServicio;
 
-      if (endTimeConServicio > endTime) {
+      if (nextMinutes > endMinutes) {
         bloques.push({ hora: horaString, disponible: false, motivo: 'Tiempo insuficiente' });
-        currentTime = addMinutes(currentTime, bloqueIntervalo);
+        currentMinutes += bloqueIntervalo;
         continue;
       }
 
@@ -79,9 +94,9 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
       let motivo = '';
 
       for (const cita of citas) {
-        const citaInicio = parse(cita.hora, 'HH:mm', fechaDate);
-        const citaFin = addMinutes(citaInicio, cita.duracion);
-        if (currentTime < citaFin && endTimeConServicio > citaInicio) {
+        const citaInicio = timeToMinutes(cita.hora);
+        const citaFin = citaInicio + cita.duracion;
+        if (currentMinutes < citaFin && nextMinutes > citaInicio) {
           hayConflicto = true;
           motivo = 'Cita reservada';
           break;
@@ -91,9 +106,9 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
       if (!hayConflicto) {
         const descansosDia = empleado.descansos.filter(d => d.dia_semana === diaIndex);
         for (const descanso of descansosDia) {
-          const descInicio = parse(descanso.hora_inicio, 'HH:mm', fechaDate);
-          const descFin = parse(descanso.hora_fin, 'HH:mm', fechaDate);
-          if (currentTime < descFin && endTimeConServicio > descInicio) {
+          const descInicio = timeToMinutes(descanso.hora_inicio);
+          const descFin = timeToMinutes(descanso.hora_fin);
+          if (currentMinutes < descFin && nextMinutes > descInicio) {
             hayConflicto = true;
             motivo = 'Descanso';
             break;
@@ -103,9 +118,9 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
 
       if (!hayConflicto) {
         for (const bloqueo of empleado.bloqueos) {
-          const blqInicio = parse(bloqueo.hora_inicio, 'HH:mm', fechaDate);
-          const blqFin = parse(bloqueo.hora_fin, 'HH:mm', fechaDate);
-          if (currentTime < blqFin && endTimeConServicio > blqInicio) {
+          const blqInicio = timeToMinutes(bloqueo.hora_inicio);
+          const blqFin = timeToMinutes(bloqueo.hora_fin);
+          if (currentMinutes < blqFin && nextMinutes > blqInicio) {
             hayConflicto = true;
             motivo = bloqueo.motivo || 'Bloqueado';
             break;
@@ -119,7 +134,7 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
         motivo: hayConflicto ? motivo : 'Disponible'
       });
 
-      currentTime = addMinutes(currentTime, bloqueIntervalo);
+      currentMinutes += bloqueIntervalo;
     }
   }
 
