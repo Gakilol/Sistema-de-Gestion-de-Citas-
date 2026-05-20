@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Star, Phone, Calendar,
-  Scissors, X, RefreshCcw, UserPlus, ChevronRight
+  Scissors, X, RefreshCcw, UserPlus, ChevronRight, Trash2
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
+import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +86,7 @@ function Skeleton() {
 }
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
-function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
+function HistorialModal({ cliente, onClose, onDelete, isAdmin }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; isAdmin: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
@@ -147,8 +148,8 @@ function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () =>
           ))}
         </div>
 
-        {/* Footer con WhatsApp */}
-        <div className="p-4 border-t border-border/50">
+        {/* Footer con WhatsApp y Eliminación */}
+        <div className="p-4 border-t border-border/50 flex flex-col gap-2">
           {cliente.telefono ? (
             <a
               href={urlWhatsAppConfirmacion({
@@ -168,6 +169,18 @@ function HistorialModal({ cliente, onClose }: { cliente: Cliente; onClose: () =>
             </a>
           ) : (
             <p className="text-xs text-center text-muted-foreground">Sin número de teléfono registrado</p>
+          )}
+
+          {isAdmin && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => onDelete(cliente.id)}
+              className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white rounded-xl py-2.5 text-sm font-semibold transition-all mt-1"
+            >
+              <Trash2 className="w-4 h-4" />
+              Eliminar Cliente
+            </Button>
           )}
         </div>
       </div>
@@ -289,6 +302,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
 
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function Clientes() {
+  const { user } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
@@ -314,6 +328,24 @@ export default function Clientes() {
     setBusqueda(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchClientes(val), 350);
+  };
+
+  const handleEliminarCliente = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este cliente? Se desvinculará de sus citas históricas sin perder el registro de las mismas.')) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/clientes/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar cliente');
+      toast.success('Cliente eliminado exitosamente');
+      setClienteSeleccionado(null);
+      fetchClientes(busqueda);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar cliente');
+    }
   };
 
   const recurrentes = clientes.filter((c) => c.esRecurrente).length;
@@ -406,6 +438,8 @@ export default function Clientes() {
         <HistorialModal
           cliente={clienteSeleccionado}
           onClose={() => setClienteSeleccionado(null)}
+          onDelete={handleEliminarCliente}
+          isAdmin={user?.rol === 'ADMIN'}
         />
       )}
 

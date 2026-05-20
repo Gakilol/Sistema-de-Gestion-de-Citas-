@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, X, UserRound } from 'lucide-react';
+import { Plus, Edit, X, UserRound, Trash2 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -23,12 +24,32 @@ function Avatar({ nombre }: { nombre: string }) {
 }
 
 export default function Empleados() {
+  const { user } = useAuth();
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
   const [form, setForm]           = useState(emptyForm);
   const [saving, setSaving]       = useState(false);
+
+  const handleEliminarEmpleado = async (emp: any) => {
+    if (!confirm(`¿Estás seguro de que deseas desactivar al empleado/administrador "${emp.nombre}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/empleados/${emp.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Error al desactivar empleado');
+      }
+      toast.success('Empleado desactivado exitosamente');
+      fetchEmpleados();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al desactivar empleado');
+    }
+  };
 
   const fetchEmpleados = async () => {
     try {
@@ -137,9 +158,16 @@ export default function Empleados() {
                         </button>
                       </td>
                       <td className="px-5 py-3.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={()=>openEdit(emp)}>
-                          <Edit className="w-3.5 h-3.5"/>
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)}>
+                            <Edit className="w-3.5 h-3.5"/>
+                          </Button>
+                          {user?.rol === 'ADMIN' && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={()=>handleEliminarEmpleado(emp)}>
+                              <Trash2 className="w-3.5 h-3.5"/>
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

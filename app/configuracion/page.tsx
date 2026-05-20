@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Store, Clock, Bell, Palette, Save, CheckCircle2,
-  Phone, MapPin, MessageCircle, Globe, RefreshCcw, DollarSign,
+  Phone, MapPin, MessageCircle, Globe, RefreshCcw,
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { id: 'negocio',     label: 'Negocio',      icon: Store },
   { id: 'horarios',    label: 'Horarios',      icon: Clock },
-  { id: 'divisa',      label: 'Divisa',        icon: DollarSign },
   { id: 'whatsapp',    label: 'WhatsApp',      icon: MessageCircle },
   { id: 'apariencia',  label: 'Apariencia',    icon: Palette },
 ];
@@ -219,25 +218,14 @@ export default function Configuracion() {
                 </label>
                 <Input value={negocio.web} onChange={e => setNegocio({ ...negocio, web: e.target.value })} placeholder="https://hairstyle.com"/>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Moneda</label>
-                  <select value={negocio.moneda} onChange={e => setNegocio({ ...negocio, moneda: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                    <option value="USD">USD — Dólar americano ($)</option>
-                    <option value="NIO">NIO — Córdoba nicaragüense (C$)</option>
-                    <option value="CRC">CRC — Colón costarricense (₡)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Zona horaria</label>
-                  <select value={negocio.zona_horaria} onChange={e => setNegocio({ ...negocio, zona_horaria: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                    <option value="America/Managua">Managua, Nicaragua (UTC-6)</option>
-                    <option value="America/Costa_Rica">San José, Costa Rica (UTC-6)</option>
-                    <option value="America/Mexico_City">Ciudad de México (UTC-6)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Zona horaria</label>
+                <select value={negocio.zona_horaria} onChange={e => setNegocio({ ...negocio, zona_horaria: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                  <option value="America/Managua">Managua, Nicaragua (UTC-6)</option>
+                  <option value="America/Costa_Rica">San José, Costa Rica (UTC-6)</option>
+                  <option value="America/Mexico_City">Ciudad de México (UTC-6)</option>
+                </select>
               </div>
             </Card>
           )}
@@ -292,63 +280,7 @@ export default function Configuracion() {
             </Card>
           )}
 
-          {/* ── Tab: Divisa ──────────────────────────────────── */}
-          {tab === 'divisa' && (
-            <Card className="p-6 border-border/50 space-y-5">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-primary"/>
-                <h2 className="font-semibold text-foreground">Tipo de Cambio de Divisa</h2>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Configura la moneda del sistema y el tipo de cambio. Los reportes y precios se mostrarán convertidos según la moneda seleccionada.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Moneda del sistema</label>
-                  <select value={divisa.moneda} onChange={e => setDivisa({ ...divisa, moneda: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                    <option value="USD">USD — Dolar americano ($)</option>
-                    <option value="NIO">NIO — Cordoba nicaragüense (C$)</option>
-                    <option value="CRC">CRC — Colon costarricense (₡)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Tipo de cambio (por 1 USD)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={divisa.tipoCambio}
-                    onChange={e => setDivisa({ ...divisa, tipoCambio: parseFloat(e.target.value) || 0 })}
-                    placeholder="36.50"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Ej: 36.50 significa 1 USD = 36.50 NIO</p>
-                </div>
-              </div>
 
-              {/* Vista previa de conversión */}
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-semibold text-foreground mb-2">Vista previa de conversión</p>
-                {[10, 25, 50, 100].map(usd => (
-                  <div key={usd} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">USD ${usd}.00</span>
-                    <span className="font-semibold text-primary">
-                      {divisa.moneda === 'USD' ? `$ ${usd.toFixed(2)}`
-                        : divisa.moneda === 'NIO' ? `C$ ${(usd * divisa.tipoCambio).toFixed(2)}`
-                        : `₡ ${(usd * divisa.tipoCambio).toFixed(2)}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSaveDivisa} disabled={divisaSaving} className="gap-1.5 glow-gold">
-                  {divisaSaving ? <RefreshCcw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
-                  {divisaSaving ? 'Guardando...' : 'Guardar tipo de cambio'}
-                </Button>
-              </div>
-            </Card>
-          )}
 
           {/* ── Tab: WhatsApp ──────────────────────────────────── */}
           {tab === 'whatsapp' && (

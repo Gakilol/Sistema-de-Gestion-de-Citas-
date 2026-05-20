@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, X, Scissors, Clock } from 'lucide-react';
+import { Plus, Edit, X, Scissors, Clock, Trash2 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,7 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 export default function Servicios() {
+  const { user } = useAuth();
   const [servicios, setServicios]   = useState<any[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [showModal, setShowModal]   = useState(false);
@@ -28,6 +30,25 @@ export default function Servicios() {
   const [form, setForm]             = useState(emptyForm);
   const [saving, setSaving]         = useState(false);
   const [tabCat, setTabCat]         = useState('Todos');
+
+  const handleEliminarServicio = async (serv: any) => {
+    if (!confirm(`¿Estás seguro de que deseas desactivar el servicio "${serv.nombre}"? Ya no estará disponible para nuevas citas.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/servicios/${serv.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Error al desactivar el servicio');
+      }
+      toast.success('Servicio desactivado exitosamente');
+      fetchServicios();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al desactivar el servicio');
+    }
+  };
 
   const fetchServicios = async () => {
     try {
@@ -194,9 +215,21 @@ export default function Servicios() {
                         {serv.categoria}
                       </span>
                     )}
-                    <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1.5" onClick={() => openEdit(serv)}>
-                      <Edit className="w-3 h-3" /> Editar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1 h-8 text-xs gap-1.5" onClick={() => openEdit(serv)}>
+                        <Edit className="w-3 h-3" /> Editar
+                      </Button>
+                      {user?.rol === 'ADMIN' && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 w-8 px-0 flex items-center justify-center bg-red-950/20 hover:bg-red-900/35 border border-red-500/30 text-red-500 hover:text-red-400"
+                          onClick={() => handleEliminarServicio(serv)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

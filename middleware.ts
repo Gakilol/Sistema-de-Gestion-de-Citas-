@@ -11,13 +11,8 @@ export async function middleware(req: NextRequest) {
 
   // Rutas y APIs públicas excluidas de protección por token
   const isPublicPath = 
-    path === '/' ||
     path === '/login' ||
     path.startsWith('/api/auth') ||
-    path.startsWith('/api/public') || // Endpoint público exclusivo para reservas de clientes
-    (path === '/api/servicios' && method === 'GET') ||
-    (path === '/api/empleados' && method === 'GET') ||
-    (path.includes('/disponibilidad') && method === 'GET') ||
     path.startsWith('/_next') || 
     path.startsWith('/favicon.ico') ||
     path.startsWith('/logo') ||
