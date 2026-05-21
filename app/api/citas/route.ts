@@ -13,6 +13,14 @@ export async function GET(req: NextRequest) {
       include: {
         empleado: { select: { nombre: true } },
         servicio: { select: { nombre: true } },
+        citaServicios: {
+          include: {
+            servicio: {
+              select: { id: true, nombre: true, duracion: true }
+            }
+          },
+          orderBy: { orden: 'asc' }
+        }
       },
       orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
     });
@@ -21,7 +29,8 @@ export async function GET(req: NextRequest) {
       ? citas.filter(c =>
           c.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
           (c.cliente_telefono && c.cliente_telefono.includes(busqueda)) ||
-          c.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase())
+          c.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+          c.citaServicios.some(cs => cs.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()))
         )
       : citas;
 
@@ -40,11 +49,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
     }
 
-    const { cliente_id, cliente_nombre, cliente_telefono, servicio_id, empleado_id, fecha, hora, duracion, notas } = body;
+    const { 
+      cliente_id, 
+      cliente_nombre, 
+      cliente_telefono, 
+      servicio_id, 
+      servicio_ids, // new array of services
+      empleado_id, 
+      fecha, 
+      hora, 
+      notas 
+    } = body;
+
+    // Resolver IDs de servicios
+    const ids = Array.isArray(servicio_ids) && servicio_ids.length > 0 ? servicio_ids : [servicio_id];
+    
+    // Obtener los detalles de los servicios para sumar duración
+    const serviciosDb = await prisma.servicio.findMany({
+      where: { id: { in: ids } }
+    });
+
+    // Ordenar para respetar la selección
+    const serviciosDbOrdenados = ids
+      .map(id => serviciosDb.find(s => s.id === id))
+      .filter((s): s is NonNullable<typeof s> => !!s);
+
+    if (serviciosDbOrdenados.length === 0) {
+      return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
+    }
+
+    const duracionCalculada = serviciosDbOrdenados.reduce((sum, s) => sum + s.duracion, 0);
+    const primerServicioId = serviciosDbOrdenados[0].id;
 
     // VALIDACIÓN DE DISPONIBILIDAD
     const { calcularDisponibilidad } = await import('@/lib/disponibilidad');
-    const disponibilidad = await calcularDisponibilidad(empleado_id, fecha.split('T')[0], servicio_id);
+    const disponibilidad = await calcularDisponibilidad(empleado_id, fecha.split('T')[0], primerServicioId, duracionCalculada);
     
     if (!disponibilidad.disponible) {
       return NextResponse.json({ error: 'El empleado no está disponible este día: ' + disponibilidad.motivo }, { status: 400 });
@@ -62,7 +101,6 @@ export async function POST(req: NextRequest) {
     // GESTIÓN DE CLIENTE
     let idClienteFinal = cliente_id;
     if (!idClienteFinal && cliente_nombre) {
-      // Intentar buscar si existe o crear uno nuevo
       const existe = await prisma.cliente.findFirst({
         where: { 
           nombre: cliente_nombre.trim(),
@@ -82,22 +120,38 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const cita = await prisma.cita.create({
-      data: {
-        cliente_id: idClienteFinal,
-        cliente_nombre: cliente_nombre.trim(),
-        cliente_telefono: cliente_telefono?.trim() || null,
-        servicio_id,
-        empleado_id,
-        fecha: new Date(fecha),
-        hora,
-        duracion: Number(duracion),
-        notas,
-        created_by: userId,
-      },
+    // Transacción para guardar la cita y sus relaciones
+    const cita = await prisma.$transaction(async (tx) => {
+      const c = await tx.cita.create({
+        data: {
+          cliente_id: idClienteFinal,
+          cliente_nombre: cliente_nombre.trim(),
+          cliente_telefono: cliente_telefono?.trim() || null,
+          servicio_id: primerServicioId,
+          empleado_id,
+          fecha: new Date(fecha),
+          hora,
+          duracion: duracionCalculada,
+          notas,
+          created_by: userId,
+        },
+      });
+
+      const citaServiciosData = serviciosDbOrdenados.map((s, index) => ({
+        cita_id: c.id,
+        servicio_id: s.id,
+        duracion: s.duracion,
+        orden: index,
+      }));
+
+      await tx.citaServicio.createMany({
+        data: citaServiciosData
+      });
+
+      return c;
     });
 
-    return NextResponse.json({ cita, mensaje: 'Cita creada exitosamente' }, { status: 201 });
+    return NextResponse.json({ cita, mensaje: 'Cita creada exitosamente con sus servicios' }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

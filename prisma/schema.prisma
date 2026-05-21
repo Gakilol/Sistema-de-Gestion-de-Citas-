@@ -29,14 +29,17 @@ model Empleado {
 }
 
 model Servicio {
-  id          String   @id @default(dbgenerated("gen_random_uuid()"))
-  nombre      String
-  descripcion String?
-  duracion    Int
-  categoria   String?
-  activo      Boolean  @default(true)
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre       String
+  descripcion  String?
+  duracion     Int
+  categoria    String?
+  categoria_id String?
+  activo       Boolean  @default(true)
 
-  citas       Cita[]
+  citas         Cita[]
+  categoriaRel  Categoria?     @relation(fields: [categoria_id], references: [id], onDelete: SetNull)
+  citaServicios CitaServicio[]
 }
 
 model Cita {
@@ -59,6 +62,7 @@ model Cita {
   servicio         Servicio @relation(fields: [servicio_id], references: [id])
   empleado         Empleado @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
   creador          Empleado @relation("CreadorCita", fields: [created_by], references: [id])
+  citaServicios    CitaServicio[]
 
   @@index([empleado_id])
   @@index([estado])
@@ -143,5 +147,31 @@ model Cliente {
   updatedAt DateTime @updatedAt
   
   citas     Cita[]
+}
+
+model Categoria {
+  id        String     @id @default(dbgenerated("gen_random_uuid()"))
+  nombre    String     @unique
+  color     String?    @default("#6366f1")
+  activo    Boolean    @default(true)
+  orden     Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  servicios Servicio[]
+}
+
+model CitaServicio {
+  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  cita_id     String
+  servicio_id String
+  duracion    Int
+  orden       Int      @default(0)
+
+  cita        Cita     @relation(fields: [cita_id], references: [id], onDelete: Cascade)
+  servicio    Servicio @relation(fields: [servicio_id], references: [id], onDelete: Restrict)
+
+  @@unique([cita_id, servicio_id])
+  @@index([cita_id])
 }
 

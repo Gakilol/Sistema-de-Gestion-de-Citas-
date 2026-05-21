@@ -21,6 +21,7 @@ import {
   Clock,
   Menu,
   X,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -154,6 +155,12 @@ const menuGroups: MenuGroup[] = [
         title: 'Servicios',
         href: '/servicios',
         icon: Scissors,
+        roles: ['ADMIN'],
+      },
+      {
+        title: 'Categorías',
+        href: '/categorias',
+        icon: Tag,
         roles: ['ADMIN'],
       },
       {
@@ -323,6 +330,7 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/citas': 'Citas',
     '/clientes': 'Clientes',
     '/servicios': 'Servicios',
+    '/categorias': 'Categorías',
     '/empleados': 'Personal',
     '/reportes': 'Reportes',
     '/configuracion': 'Configuración',

@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
           { categoria: { contains: busqueda, mode: 'insensitive' } },
         ] : undefined,
       },
+      include: {
+        categoriaRel: true
+      },
       orderBy: { nombre: 'asc' },
     });
     return NextResponse.json({ servicios }, { status: 200 });
@@ -28,14 +31,23 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, categoria } = body;
+    const { nombre, descripcion, duracion, categoria_id } = body;
+
+    let legacyCategoria = body.categoria || null;
+    if (categoria_id) {
+      const cat = await prisma.categoria.findUnique({ where: { id: categoria_id } });
+      if (cat) {
+        legacyCategoria = cat.nombre;
+      }
+    }
 
     const servicio = await prisma.servicio.create({
       data: {
         nombre,
         descripcion,
         duracion: Number(duracion),
-        categoria,
+        categoria: legacyCategoria,
+        categoria_id: categoria_id || null,
       },
     });
 

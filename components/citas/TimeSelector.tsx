@@ -11,12 +11,13 @@ interface TimeBlock {
 interface TimeSelectorProps {
   empleadoId: string;
   fecha: string;
-  servicioId: string;
+  servicioId?: string;
+  duracionTotal?: number;
   selectedTime: string;
   onTimeSelect: (time: string) => void;
 }
 
-export function TimeSelector({ empleadoId, fecha, servicioId, selectedTime, onTimeSelect }: TimeSelectorProps) {
+export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, selectedTime, onTimeSelect }: TimeSelectorProps) {
   const [loading, setLoading] = useState(false);
   const [bloques, setBloques] = useState<TimeBlock[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, selectedTime, onTi
       try {
         const query = new URLSearchParams({ fecha });
         if (servicioId) query.append('servicio_id', servicioId);
+        if (duracionTotal) query.append('duracion_total', duracionTotal.toString());
         
         const res = await fetch(`/api/empleados/${empleadoId}/disponibilidad?${query.toString()}`);
         const data = await res.json();
@@ -56,7 +58,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, selectedTime, onTi
     };
 
     fetchDisponibilidad();
-  }, [empleadoId, fecha, servicioId]);
+  }, [empleadoId, fecha, servicioId, duracionTotal]);
 
   if (!empleadoId || !fecha) {
     return (

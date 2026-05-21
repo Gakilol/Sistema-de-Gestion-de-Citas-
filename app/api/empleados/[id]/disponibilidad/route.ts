@@ -7,12 +7,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const searchParams = req.nextUrl.searchParams;
     const fechaParam = searchParams.get('fecha'); // YYYY-MM-DD
     const servicioId = searchParams.get('servicio_id');
+    const duracionTotalParam = searchParams.get('duracion_total');
+    const duracionTotal = duracionTotalParam ? Number(duracionTotalParam) : null;
 
     if (!fechaParam) {
       return NextResponse.json({ error: 'Falta el parámetro fecha' }, { status: 400 });
     }
 
-    const resultado = await calcularDisponibilidad(id, fechaParam, servicioId);
+    const resultado = await calcularDisponibilidad(id, fechaParam, servicioId, duracionTotal);
 
     return NextResponse.json(resultado, { status: 200 });
   } catch (error: any) {

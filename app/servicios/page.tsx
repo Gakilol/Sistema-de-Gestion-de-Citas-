@@ -10,16 +10,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const emptyForm = { nombre: '', descripcion: '', duracion: '', categoria: '' };
-const CATEGORIAS = ['Cortes', 'Tintes', 'Barba', 'Tratamientos', 'Peinados', 'Otros'];
-const CAT_COLORS: Record<string, string> = {
-  Cortes: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  Tintes: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
-  Barba: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-  Tratamientos: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-  Peinados: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
-  Otros: 'bg-secondary text-muted-foreground',
-};
+const emptyForm = { nombre: '', descripcion: '', duracion: '', categoria_id: '' };
 
 export default function Servicios() {
   const { user } = useAuth();
@@ -27,9 +18,10 @@ export default function Servicios() {
   const [isLoading, setIsLoading]   = useState(true);
   const [showModal, setShowModal]   = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
-  const [form, setForm]             = useState(emptyForm);
+  const [form, setForm]             = useState<any>(emptyForm);
   const [saving, setSaving]         = useState(false);
   const [tabCat, setTabCat]         = useState('Todos');
+  const [categorias, setCategorias] = useState<any[]>([]);
 
   const handleEliminarServicio = async (serv: any) => {
     if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el servicio "${serv.nombre}"? Esto también eliminará todas las citas asociadas a él.`)) {
@@ -62,8 +54,19 @@ export default function Servicios() {
     }
   };
 
+  const fetchCategorias = async () => {
+    try {
+      const res = await fetch('/api/categorias');
+      const data = await res.json();
+      if (res.ok) setCategorias(data.categorias || []);
+    } catch {
+      toast.error('Error al cargar categorías');
+    }
+  };
+
   useEffect(() => {
     fetchServicios();
+    fetchCategorias();
   }, []);
 
   const openCreate = () => {
@@ -77,7 +80,7 @@ export default function Servicios() {
       nombre: s.nombre,
       descripcion: s.descripcion || '',
       duracion: String(s.duracion),
-      categoria: s.categoria || '',
+      categoria_id: s.categoria_id || '',
     });
     setEditingId(s.id);
     setShowModal(true);
@@ -105,7 +108,7 @@ export default function Servicios() {
       nombre: form.nombre,
       descripcion: form.descripcion,
       duracion: Number(form.duracion),
-      categoria: form.categoria,
+      categoria_id: form.categoria_id || null,
     };
     try {
       const url = editingId ? `/api/servicios/${editingId}` : '/api/servicios';
@@ -129,8 +132,10 @@ export default function Servicios() {
     }
   };
 
-  const cats = ['Todos', ...Array.from(new Set(servicios.map(s => s.categoria || 'Otros').filter(Boolean)))];
-  const filtered = tabCat === 'Todos' ? servicios : servicios.filter(s => (s.categoria || 'Otros') === tabCat);
+  const cats = ['Todos', ...categorias.map(c => c.nombre)];
+  const filtered = tabCat === 'Todos' 
+    ? servicios 
+    : servicios.filter(s => s.categoriaRel?.nombre === tabCat);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -210,9 +215,16 @@ export default function Servicios() {
                   </div>
 
                   <div>
-                    {serv.categoria && (
-                      <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block mb-3', CAT_COLORS[serv.categoria] || CAT_COLORS.Otros)}>
-                        {serv.categoria}
+                    {serv.categoriaRel && (
+                      <span 
+                        style={{
+                          backgroundColor: serv.categoriaRel.color ? `${serv.categoriaRel.color}15` : '#6366f115',
+                          color: serv.categoriaRel.color || '#6366f1',
+                          borderColor: serv.categoriaRel.color ? `${serv.categoriaRel.color}30` : '#6366f130'
+                        }}
+                        className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full border inline-block mb-3"
+                      >
+                        {serv.categoriaRel.nombre}
                       </span>
                     )}
                     <div className="flex gap-2">
@@ -260,12 +272,12 @@ export default function Servicios() {
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Categoría</label>
                   <select
-                    value={form.categoria}
-                    onChange={e => setForm({ ...form, categoria: e.target.value })}
+                    value={form.categoria_id}
+                    onChange={e => setForm({ ...form, categoria_id: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
                     <option value="">Sin categoría</option>
-                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                    {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
                 </div>
               </div>

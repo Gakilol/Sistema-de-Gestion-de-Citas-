@@ -11,16 +11,17 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
 
-const emptyForm = {
+const getEmptyForm = () => ({
   cliente_id: '',
   cliente_nombre: '',
   cliente_telefono: '',
   servicio_id: '',
+  servicio_ids: [] as string[],
   empleado_id: '',
   fecha: '',
   hora: '',
   notas: '',
-};
+});
 
 const ESTADOS = ['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA', 'REPROGRAMADA'];
 const ESTADO_LABEL: Record<string, string> = {
@@ -54,7 +55,7 @@ export default function Citas() {
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm]           = useState(emptyForm);
+  const [form, setForm]           = useState<any>(getEmptyForm());
   const [saving, setSaving]       = useState(false);
   const [busqueda, setBusqueda]   = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
@@ -113,8 +114,6 @@ export default function Citas() {
     fetchCitas(busqueda, estado, empleado);
   };
 
-  const selectedServicio = servicios.find(s => s.id === form.servicio_id);
-
   const openCreate = () => {
     const activeServs = servicios.filter(s => s.activo);
     const activeEmps = empleados.filter(e => e.activo);
@@ -122,46 +121,52 @@ export default function Citas() {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
-    setForm(emptyForm);
+    setForm(getEmptyForm());
     setEditingId(null);
     setShowModal(true);
   };
 
   const openEdit = (c: any) => {
+    const ids = Array.isArray(c.citaServicios) && c.citaServicios.length > 0 
+      ? c.citaServicios.map((cs: any) => cs.servicio_id)
+      : (c.servicio_id ? [c.servicio_id] : []);
+
     setForm({
       cliente_id: c.cliente_id || '',
       cliente_nombre: c.cliente_nombre,
       cliente_telefono: c.cliente_telefono || '',
-      servicio_id: c.servicio_id,
+      servicio_id: c.servicio_id || '',
+      servicio_ids: ids,
       empleado_id: c.empleado_id,
       fecha: new Date(c.fecha).toISOString().split('T')[0],
       hora: c.hora,
-      notes: c.notas || '', // Map notas in state
-    } as any);
-    // Explicitly handle mapping differences
-    setForm(prev => ({ ...prev, notas: c.notas || '' }));
+      notas: c.notas || '',
+    });
     setEditingId(c.id);
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.servicio_ids || form.servicio_ids.length === 0) {
+      toast.error('Selecciona al menos un servicio');
+      return;
+    }
     if (!form.hora) {
       toast.error('Selecciona una hora');
       return;
     }
     setSaving(true);
-    const serv = servicios.find(s => s.id === form.servicio_id);
     const payload = {
       cliente_id: form.cliente_id || null,
       cliente_nombre: form.cliente_nombre,
       cliente_telefono: form.cliente_telefono || null,
-      servicio_id: form.servicio_id,
+      servicio_id: form.servicio_ids[0],
+      servicio_ids: form.servicio_ids,
       empleado_id: form.empleado_id,
       fecha: form.fecha,
       hora: form.hora,
       notas: form.notas || null,
-      duracion: serv?.duracion || 30,
     };
     try {
       const url  = editingId ? `/api/citas/${editingId}` : '/api/citas';
@@ -332,11 +337,27 @@ export default function Citas() {
                           <p className="font-medium text-foreground">{cita.cliente_nombre}</p>
                           {cita.cliente_telefono && <p className="text-xs text-muted-foreground">{cita.cliente_telefono}</p>}
                         </td>
-                        <td className="px-4 py-3.5 text-muted-foreground">{cita.servicio?.nombre || '-'}</td>
+                        <td className="px-4 py-3.5 text-muted-foreground">
+                          {cita.citaServicios && cita.citaServicios.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 max-w-[220px]">
+                              {cita.citaServicios.map((cs: any) => (
+                                <span 
+                                  key={cs.id} 
+                                  className="text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium" 
+                                  title={cs.servicio?.nombre}
+                                >
+                                  {cs.servicio?.nombre}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            cita.servicio?.nombre || '-'
+                          )}
+                        </td>
                         <td className="px-4 py-3.5 text-muted-foreground">{cita.empleado?.nombre || '-'}</td>
                         <td className="px-4 py-3.5">
                           <p className="font-medium">{fmtDate(cita.fecha)}</p>
-                          <p className="text-xs text-muted-foreground">{cita.hora} · {cita.servicio?.duracion || cita.duracion}min</p>
+                          <p className="text-xs text-muted-foreground">{cita.hora} · {cita.duracion} min</p>
                         </td>
                         <td className="px-4 py-3.5">
                           <select
@@ -442,19 +463,81 @@ export default function Citas() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Servicio *</label>
-                <select
-                  value={form.servicio_id}
-                  onChange={e => setForm({ ...form, servicio_id: e.target.value, hora: '' })}
-                  required
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Seleccionar servicio...</option>
-                  {/* Permitimos el servicio actual si estamos editando, e incluimos solo servicios ACTIVOS para nuevas citas */}
-                  {servicios.filter(s => s.activo || s.id === form.servicio_id).map(s => (
-                    <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min)</option>
-                  ))}
-                </select>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Servicio(s) *</label>
+                <div className="space-y-2">
+                  <select
+                    value=""
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      if (form.servicio_ids.includes(val)) {
+                        toast.error('Este servicio ya está agregado');
+                        return;
+                      }
+                      setForm((prev: any) => ({
+                        ...prev,
+                        servicio_ids: [...prev.servicio_ids, val],
+                        hora: '' // Reset selected time
+                      }));
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">+ Agregar servicio...</option>
+                    {servicios
+                      .filter(s => s.activo || form.servicio_ids.includes(s.id))
+                      .filter(s => !form.servicio_ids.includes(s.id))
+                      .map(s => (
+                        <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min)</option>
+                      ))}
+                  </select>
+
+                  {form.servicio_ids.length > 0 && (
+                    <div className="border border-border/60 rounded-lg p-2.5 space-y-1.5 bg-secondary/15">
+                      {form.servicio_ids.map((id: string, index: number) => {
+                        const s = servicios.find(srv => srv.id === id);
+                        if (!s) return null;
+                        return (
+                          <div key={id} className="flex items-center justify-between bg-card border border-border/40 px-2.5 py-1.5 rounded-md text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold bg-primary/10 text-primary w-5 h-5 flex items-center justify-center rounded-full">
+                                {index + 1}
+                              </span>
+                              <span className="font-medium text-foreground">{s.nombre}</span>
+                              <span className="text-xs text-muted-foreground">({s.duracion} min)</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForm((prev: any) => ({
+                                  ...prev,
+                                  servicio_ids: prev.servicio_ids.filter((sid: string) => sid !== id),
+                                  hora: '' // Reset selected time
+                                }));
+                              }}
+                              className="text-muted-foreground hover:text-red-500 p-0.5 rounded transition-colors"
+                              title="Quitar servicio"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      
+                      {(() => {
+                        const totalDur = form.servicio_ids.reduce((sum: number, id: string) => {
+                          const s = servicios.find(srv => srv.id === id);
+                          return sum + (s?.duracion || 0);
+                        }, 0);
+                        return (
+                          <div className="flex items-center justify-between pt-1.5 border-t border-border/50 px-1 text-xs font-semibold text-foreground">
+                            <span>Total: {form.servicio_ids.length} servicio(s)</span>
+                            <span className="text-primary font-bold">{totalDur} minutos</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Empleado *</label>
@@ -481,21 +564,34 @@ export default function Citas() {
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
-              {form.fecha && form.empleado_id && form.servicio_id && (
+              {form.fecha && form.empleado_id && form.servicio_ids.length > 0 && (
                 <div className="bg-secondary/30 border border-border/50 rounded-xl p-4">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-3">Selecciona la Hora *</label>
                   <TimeSelector
                     empleadoId={form.empleado_id}
                     fecha={form.fecha}
-                    servicioId={form.servicio_id}
+                    servicioId={form.servicio_ids[0]}
+                    duracionTotal={form.servicio_ids.reduce((sum: number, id: string) => {
+                      const s = servicios.find(srv => srv.id === id);
+                      return sum + (s?.duracion || 0);
+                    }, 0)}
                     selectedTime={form.hora}
                     onTimeSelect={h => setForm({ ...form, hora: h })}
                   />
                 </div>
               )}
-              {selectedServicio && (
+              {form.servicio_ids.length > 0 && (
                 <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm">
-                  <p><span className="text-muted-foreground">Duración estimada:</span> <strong>{selectedServicio.duracion} min</strong></p>
+                  <p>
+                    <span className="text-muted-foreground">Duración total estimada:</span>{' '}
+                    <strong>
+                      {form.servicio_ids.reduce((sum: number, id: string) => {
+                        const s = servicios.find(srv => srv.id === id);
+                        return sum + (s?.duracion || 0);
+                      }, 0)}{' '}
+                      minutos
+                    </strong>
+                  </p>
                 </div>
               )}
               <div>

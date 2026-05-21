@@ -18,7 +18,12 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: string, servicioId?: string | null) {
+export async function calcularDisponibilidad(
+  empleadoId: string, 
+  fechaYYYYMMDD: string, 
+  servicioId?: string | null,
+  duracionTotal?: number | null
+) {
   const fechaDate = parseYYYYMMDD(fechaYYYYMMDD);
 
   const empleado = await prisma.empleado.findUnique({
@@ -43,7 +48,9 @@ export async function calcularDisponibilidad(empleadoId: string, fechaYYYYMMDD: 
   if (!empleado) throw new Error('Empleado no encontrado');
 
   let duracionServicio = 30;
-  if (servicioId) {
+  if (duracionTotal !== undefined && duracionTotal !== null) {
+    duracionServicio = duracionTotal;
+  } else if (servicioId) {
     const servicio = await prisma.servicio.findUnique({ where: { id: servicioId } });
     if (servicio) duracionServicio = servicio.duracion;
   }
