@@ -48,6 +48,53 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       finalServicioIds = [servicio_id];
     }
 
+    // ─── VALIDACIÓN DE DISPONIBILIDAD AL EDITAR (Backend = fuente de verdad) ───
+    // Si cambian hora, fecha, empleado o servicios, re-validar disponibilidad
+    const cambiaHorario = hora || fecha || empleado_id || (Array.isArray(finalServicioIds) && finalServicioIds.length > 0);
+    
+    if (cambiaHorario) {
+      const citaActual = await prisma.cita.findUnique({ where: { id } });
+      if (!citaActual) {
+        return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
+      }
+
+      const empleadoFinal = empleado_id || citaActual.empleado_id;
+      const fechaFinal = fecha ? fecha.split('T')[0] : new Date(citaActual.fecha).toISOString().split('T')[0];
+      const horaFinal = hora || citaActual.hora;
+
+      // Calcular duración final
+      let duracionFinal = citaActual.duracion;
+      if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
+        const serviciosDb = await prisma.servicio.findMany({
+          where: { id: { in: finalServicioIds } }
+        });
+        duracionFinal = serviciosDb.reduce((sum, s) => sum + s.duracion, 0);
+      }
+
+      const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
+      const disponibilidad = await calcularDisponibilidad(
+        empleadoFinal, fechaFinal, null, duracionFinal, horaFinal, id // excludeCitaId = id de la cita actual
+      );
+
+      if (!disponibilidad.disponible) {
+        return NextResponse.json({ error: 'El empleado no está disponible este día: ' + disponibilidad.motivo }, { status: 400 });
+      }
+
+      if (disponibilidad.jornada) {
+        const validacion = validarHoraExacta(
+          horaFinal,
+          duracionFinal,
+          disponibilidad.jornada.inicio,
+          disponibilidad.jornada.fin,
+          disponibilidad.intervalosOcupados
+        );
+
+        if (!validacion.valida) {
+          return NextResponse.json({ error: 'Hora no disponible: ' + validacion.motivo }, { status: 400 });
+        }
+      }
+    }
+
     const cita = await prisma.$transaction(async (tx) => {
       if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
         const serviciosDb = await tx.servicio.findMany({

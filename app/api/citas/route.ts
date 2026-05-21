@@ -81,21 +81,29 @@ export async function POST(req: NextRequest) {
     const duracionCalculada = serviciosDbOrdenados.reduce((sum, s) => sum + s.duracion, 0);
     const primerServicioId = serviciosDbOrdenados[0].id;
 
-    // VALIDACIÓN DE DISPONIBILIDAD
-    const { calcularDisponibilidad } = await import('@/lib/disponibilidad');
-    const disponibilidad = await calcularDisponibilidad(empleado_id, fecha.split('T')[0], primerServicioId, duracionCalculada);
+    // VALIDACIÓN DE DISPONIBILIDAD — Backend es la fuente de verdad absoluta
+    const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
+    const disponibilidad = await calcularDisponibilidad(empleado_id, fecha.split('T')[0], primerServicioId, duracionCalculada, hora);
     
     if (!disponibilidad.disponible) {
       return NextResponse.json({ error: 'El empleado no está disponible este día: ' + disponibilidad.motivo }, { status: 400 });
     }
 
-    const bloqueSolicitado = disponibilidad.bloques.find((b: any) => b.hora === hora);
-    if (!bloqueSolicitado) {
-      return NextResponse.json({ error: 'La hora solicitada no está dentro del horario laboral' }, { status: 400 });
+    // Validación directa por rangos reales (no depende de bloques de 15 min)
+    if (!disponibilidad.jornada) {
+      return NextResponse.json({ error: 'No se pudo determinar la jornada laboral' }, { status: 400 });
     }
 
-    if (!bloqueSolicitado.disponible) {
-      return NextResponse.json({ error: 'La hora seleccionada ya no está disponible: ' + bloqueSolicitado.motivo }, { status: 400 });
+    const validacion = validarHoraExacta(
+      hora,
+      duracionCalculada,
+      disponibilidad.jornada.inicio,
+      disponibilidad.jornada.fin,
+      disponibilidad.intervalosOcupados
+    );
+
+    if (!validacion.valida) {
+      return NextResponse.json({ error: 'Hora no disponible: ' + validacion.motivo }, { status: 400 });
     }
 
     // GESTIÓN DE CLIENTE

@@ -9,12 +9,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const servicioId = searchParams.get('servicio_id');
     const duracionTotalParam = searchParams.get('duracion_total');
     const duracionTotal = duracionTotalParam ? Number(duracionTotalParam) : null;
+    const horaRequerida = searchParams.get('hora_requerida');
+    const excludeCitaId = searchParams.get('exclude_cita_id');
 
     if (!fechaParam) {
       return NextResponse.json({ error: 'Falta el parámetro fecha' }, { status: 400 });
     }
 
-    const resultado = await calcularDisponibilidad(id, fechaParam, servicioId, duracionTotal);
+    const resultado = await calcularDisponibilidad(id, fechaParam, servicioId, duracionTotal, horaRequerida, excludeCitaId);
 
     return NextResponse.json(resultado, { status: 200 });
   } catch (error: any) {
