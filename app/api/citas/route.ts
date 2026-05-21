@@ -1,8 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { syncCitaEstados } from '@/lib/automatizacion';
 
 export async function GET(req: NextRequest) {
   try {
+    // Sincronizar estados de citas de forma automática y JIT
+    await syncCitaEstados();
+
     const estado = req.nextUrl.searchParams.get('estado') || '';
     const busqueda = req.nextUrl.searchParams.get('q') || '';
 

@@ -1,10 +1,14 @@
 import { prisma } from '@/lib/db';
 import { EstadoCita } from '@prisma/client';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
+import { syncCitaEstados } from '@/lib/automatizacion';
 
 export class AdminServicio {
   // ─── Dashboard completo ────────────────────────────────────────────────
   static async getDashboardStats(periodo: 'hoy' | 'semana' | 'mes' = 'mes') {
+    // Sincronizar estados de citas de forma automática y JIT antes de computar métricas
+    await syncCitaEstados();
+
     const now = new Date();
     const hoy = startOfDay(now);
     const finHoy = endOfDay(now);

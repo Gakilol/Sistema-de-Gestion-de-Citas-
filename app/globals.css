@@ -267,14 +267,14 @@
     border: 1px solid hsl(43 85% 50% / 0.3);
   }
   .badge-confirmada {
-    background: hsl(217 91% 60% / 0.12);
-    color: hsl(217 91% 48%);
-    border: 1px solid hsl(217 91% 60% / 0.25);
+    background: hsl(245 80% 65% / 0.12);
+    color: hsl(245 80% 55%);
+    border: 1px solid hsl(245 80% 65% / 0.25);
   }
   .dark .badge-confirmada {
-    background: hsl(217 91% 60% / 0.15);
-    color: hsl(217 91% 70%);
-    border: 1px solid hsl(217 91% 60% / 0.3);
+    background: hsl(245 80% 65% / 0.15);
+    color: hsl(245 80% 75%);
+    border: 1px solid hsl(245 80% 65% / 0.3);
   }
   .badge-completada {
     background: hsl(142 70% 45% / 0.12);
@@ -297,14 +297,14 @@
     border: 1px solid hsl(0 84% 55% / 0.3);
   }
   .badge-en_progreso {
-    background: hsl(280 65% 60% / 0.12);
-    color: hsl(280 65% 50%);
-    border: 1px solid hsl(280 65% 60% / 0.25);
+    background: hsl(217 91% 60% / 0.12);
+    color: hsl(217 91% 48%);
+    border: 1px solid hsl(217 91% 60% / 0.25);
   }
   .dark .badge-en_progreso {
-    background: hsl(280 65% 60% / 0.15);
-    color: hsl(280 65% 68%);
-    border: 1px solid hsl(280 65% 60% / 0.3);
+    background: hsl(217 91% 60% / 0.15);
+    color: hsl(217 91% 70%);
+    border: 1px solid hsl(217 91% 60% / 0.3);
   }
   .badge-reprogramada {
     background: hsl(30 90% 55% / 0.12);

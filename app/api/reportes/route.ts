@@ -2,9 +2,13 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { EstadoCita } from '@prisma/client';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { syncCitaEstados } from '@/lib/automatizacion';
 
 export async function GET(req: NextRequest) {
   try {
+    // Sincronizar estados de citas de forma JIT para reportes precisos
+    await syncCitaEstados();
+
     const tipo  = req.nextUrl.searchParams.get('tipo') ?? 'citas';
     const desde = req.nextUrl.searchParams.get('desde');
     const hasta = req.nextUrl.searchParams.get('hasta');
