@@ -12,11 +12,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const horaRequerida = searchParams.get('hora_requerida');
     const excludeCitaId = searchParams.get('exclude_cita_id');
 
-    if (!fechaParam) {
+        if (!fechaParam) {
       return NextResponse.json({ error: 'Falta el parámetro fecha' }, { status: 400 });
     }
 
-    const resultado = await calcularDisponibilidad(id, fechaParam, servicioId, duracionTotal, horaRequerida, excludeCitaId);
+    const userRole = req.headers.get('x-user-role');
+    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
+
+    const resultado = await calcularDisponibilidad(
+      id, 
+      fechaParam, 
+      servicioId, 
+      duracionTotal, 
+      horaRequerida, 
+      excludeCitaId,
+      permitirHorarioExtendido
+    );
 
     return NextResponse.json(resultado, { status: 200 });
   } catch (error: any) {

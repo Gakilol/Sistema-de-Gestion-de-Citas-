@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (estado) dataToUpdate.estado = estado;
     if (notas !== undefined) dataToUpdate.notas = notas;
     if (empleado_id) dataToUpdate.empleado_id = empleado_id;
-    if (fecha) dataToUpdate.fecha = new Date(fecha);
+    if (fecha) dataToUpdate.fecha = parseLocalDateToUTC(fecha.split('T')[0]);
     if (hora) dataToUpdate.hora = hora;
     if (servicio_id) dataToUpdate.servicio_id = servicio_id;
     if (duracion !== undefined) dataToUpdate.duracion = Number(duracion);
@@ -71,9 +72,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         duracionFinal = serviciosDb.reduce((sum, s) => sum + s.duracion, 0);
       }
 
+      const userRole = req.headers.get('x-user-role') || '';
+      const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
+
       const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
       const disponibilidad = await calcularDisponibilidad(
-        empleadoFinal, fechaFinal, null, duracionFinal, horaFinal, id // excludeCitaId = id de la cita actual
+        empleadoFinal, 
+        fechaFinal, 
+        null, 
+        duracionFinal, 
+        horaFinal, 
+        id, 
+        permitirHorarioExtendido // excludeCitaId = id de la cita actual
       );
 
       if (!disponibilidad.disponible) {
@@ -86,7 +96,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           duracionFinal,
           disponibilidad.jornada.inicio,
           disponibilidad.jornada.fin,
-          disponibilidad.intervalosOcupados
+          disponibilidad.intervalosOcupados,
+          permitirHorarioExtendido
         );
 
         if (!validacion.valida) {
@@ -137,11 +148,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         where: { id },
         data: dataToUpdate,
         include: {
-          servicio: true,
+          servicio: {
+            select: {
+              nombre: true,
+              categoriaRel: {
+                select: { nombre: true, color: true }
+              }
+            }
+          },
           citaServicios: {
             include: {
               servicio: {
-                select: { id: true, nombre: true, duracion: true }
+                select: { 
+                  id: true, 
+                  nombre: true, 
+                  duracion: true,
+                  categoriaRel: {
+                    select: { nombre: true, color: true }
+                  }
+                }
               }
             },
             orderBy: { orden: 'asc' }

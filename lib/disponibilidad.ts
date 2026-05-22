@@ -32,7 +32,8 @@ export function validarHoraExacta(
   duracion: number,
   jornadaInicio: string,
   jornadaFin: string,
-  intervalosOcupados: IntervaloOcupado[]
+  intervalosOcupados: IntervaloOcupado[],
+  permitirHorarioExtendido: boolean = false
 ): { valida: boolean; motivo: string } {
   // Validar formato HH:MM
   if (!/^\d{2}:\d{2}$/.test(horaStr)) {
@@ -53,15 +54,17 @@ export function validarHoraExacta(
   const jornadaInicioMin = timeToMinutes(jornadaInicio);
   const jornadaFinMin = timeToMinutes(jornadaFin);
 
-  // Validar que esté dentro de la jornada laboral
-  if (startMin < jornadaInicioMin) {
-    return { valida: false, motivo: `Antes del inicio de jornada (${jornadaInicio})` };
-  }
-  if (endMin > jornadaFinMin) {
-    return { valida: false, motivo: `Excede el fin de jornada (${jornadaFin}). La cita terminaría a las ${minutesToTime(endMin)}` };
+  // Validar que esté dentro de la jornada laboral (solo si no se permite horario especial/extendido)
+  if (!permitirHorarioExtendido) {
+    if (startMin < jornadaInicioMin) {
+      return { valida: false, motivo: `Antes del inicio de jornada (${jornadaInicio})` };
+    }
+    if (endMin > jornadaFinMin) {
+      return { valida: false, motivo: `Excede el fin de jornada (${jornadaFin}). La cita terminaría a las ${minutesToTime(endMin)}` };
+    }
   }
 
-  // Validar conflictos con todos los intervalos ocupados
+  // Validar conflictos con todos los intervalos ocupados (las colisiones de agenda se validan siempre)
   for (const int of intervalosOcupados) {
     if (startMin < int.fin && endMin > int.inicio) {
       return {
@@ -81,7 +84,8 @@ export async function calcularDisponibilidad(
   servicioId?: string | null,
   duracionTotal?: number | null,
   horaRequerida?: string | null,
-  excludeCitaId?: string | null
+  excludeCitaId?: string | null,
+  permitirHorarioExtendido: boolean = false
 ) {
   const fechaDate = parseYYYYMMDD(fechaYYYYMMDD);
 
@@ -136,10 +140,16 @@ export async function calcularDisponibilidad(
   const configDia = horariosGlobales[diaNombre] || DEFAULT_HORARIOS_GLOBALES[diaNombre];
 
   if (!configDia || !configDia.activo) {
-    return { disponible: false, motivo: 'Día no laboral', bloques: [], jornada: null, intervalosOcupados: [] };
+    if (!permitirHorarioExtendido) {
+      return { disponible: false, motivo: 'Día no laboral', bloques: [], jornada: null, intervalosOcupados: [] };
+    }
   }
 
-  const jornada = { inicio: configDia.inicio as string, fin: configDia.fin as string };
+  const jornada = { 
+    inicio: (configDia && configDia.inicio) ? (configDia.inicio as string) : '08:00', 
+    fin: (configDia && configDia.fin) ? (configDia.fin as string) : '18:00',
+    activo: configDia ? (configDia.activo as boolean) : false
+  };
 
   // Obtener citas del día, excluyendo la cita que se está editando si aplica
   const citasWhere: any = {
@@ -175,7 +185,7 @@ export async function calcularDisponibilidad(
   ].sort((a, b) => a.inicio - b.inicio);
 
   // ─── Generar bloques sugeridos de 15 min (retrocompatibilidad + Smart Slots) ─
-  const horarioDia: any[] = [{ inicio: configDia.inicio, fin: configDia.fin }];
+  const horarioDia: any[] = [{ inicio: jornada.inicio, fin: jornada.fin }];
   const bloques: Array<{ hora: string; disponible: boolean; motivo: string }> = [];
   const bloqueIntervalo = 15;
 
@@ -199,7 +209,7 @@ export async function calcularDisponibilidad(
 
     while (currentMinutes < endMinutes) {
       const horaString = minutesToTime(currentMinutes);
-      const resultado = validarHoraExacta(horaString, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados);
+      const resultado = validarHoraExacta(horaString, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados, permitirHorarioExtendido);
 
       bloques.push({
         hora: horaString,
@@ -214,7 +224,7 @@ export async function calcularDisponibilidad(
   // ─── Si se solicita validar una hora específica, inyectarla en bloques ──
   if (horaRequerida && /^\d{2}:\d{2}$/.test(horaRequerida)) {
     const existe = bloques.find(b => b.hora === horaRequerida);
-    const resultado = validarHoraExacta(horaRequerida, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados);
+    const resultado = validarHoraExacta(horaRequerida, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados, permitirHorarioExtendido);
 
     if (existe) {
       existe.disponible = resultado.valida;

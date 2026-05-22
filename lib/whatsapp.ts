@@ -16,13 +16,10 @@ export interface CitaWA {
 
 const SALON_NAME = 'HAIR STYLE Salon & Barber';
 
+import { formatDBDateLong } from './timezone';
+
 function fmtFecha(d: string | Date): string {
-  return new Date(d).toLocaleDateString('es-NI', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  return formatDBDateLong(d);
 }
 
 // ─── Confirmación de cita ───────────────────────────────────────────────────
@@ -102,7 +99,7 @@ export function generarEnlaceWA(telefono: string, mensaje: string): string {
   const cleaned = telefono.replace(/\D/g, '');
   const numero  = cleaned.startsWith('505') || cleaned.startsWith('506')
     ? cleaned
-    : `505${cleaned}`; // 505 = Nicaragua por defecto
+    : `506${cleaned}`; // 506 = Costa Rica por defecto
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
 

@@ -2,13 +2,13 @@ import { prisma } from './db';
 import { EstadoCita } from '@prisma/client';
 
 /**
- * Sincroniza automáticamente los estados de las citas elegibles en base a la hora actual de America/Managua (UTC-6).
+ * Sincroniza automáticamente los estados de las citas elegibles en base a la hora actual de Costa Rica/San José (UTC-6).
  * Las citas 'CANCELADA' y 'REPROGRAMADA' quedan totalmente excluidas de esta automatización.
  */
 export async function syncCitaEstados(): Promise<void> {
   try {
-    // 1. Obtener la hora actual de America/Managua (UTC-6) de forma timezone-safe
-    const nowInManagua = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    // 1. Obtener la hora actual de Costa Rica (UTC-6) de forma timezone-safe
+    const nowInCostaRica = new Date(Date.now() - 6 * 60 * 60 * 1000);
 
     // 2. Consultar citas activas que estén en un estado automatizable
     const citasActivas = await prisma.cita.findMany({
@@ -36,16 +36,16 @@ export async function syncCitaEstados(): Promise<void> {
 
       let targetEstado = cita.estado;
 
-      if (nowInManagua < startOfCita) {
+      if (nowInCostaRica < startOfCita) {
         // Si aún no ha iniciado, conservar PENDIENTE o CONFIRMADA.
         // Si por algún motivo estaba en EN_PROGRESO, restablecer a PENDIENTE.
         if (cita.estado !== EstadoCita.PENDIENTE && cita.estado !== EstadoCita.CONFIRMADA) {
           targetEstado = EstadoCita.PENDIENTE;
         }
-      } else if (nowInManagua >= startOfCita && nowInManagua < endOfCita) {
+      } else if (nowInCostaRica >= startOfCita && nowInCostaRica < endOfCita) {
         // Cita en curso
         targetEstado = EstadoCita.EN_PROGRESO;
-      } else if (nowInManagua >= endOfCita) {
+      } else if (nowInCostaRica >= endOfCita) {
         // Cita finalizada
         targetEstado = EstadoCita.COMPLETADA;
       }

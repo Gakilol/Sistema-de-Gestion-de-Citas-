@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, ChevronUp, ChevronDown, Minus, Plus, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getBusinessTodayString, getBusinessNowTime } from '@/lib/timezone';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ interface IntervaloOcupado {
 interface Jornada {
   inicio: string;
   fin: string;
+  activo?: boolean;
 }
 
 interface TimeSelectorProps {
@@ -89,8 +91,21 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
   const [jornada, setJornada] = useState<Jornada | null>(null);
   const [intervalosOcupados, setIntervalosOcupados] = useState<IntervaloOcupado[]>([]);
   const [modo, setModo] = useState<'slots' | 'picker'>('slots');
+  const [businessNow, setBusinessNow] = useState('');
 
   const duracion = duracionTotal || 30;
+
+  useEffect(() => {
+    setBusinessNow(getBusinessNowTime());
+    const interval = setInterval(() => {
+      setBusinessNow(getBusinessNowTime());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isToday = useMemo(() => {
+    return fecha === getBusinessTodayString();
+  }, [fecha]);
 
   // ─── Fetch Disponibilidad ───────────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +164,13 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     if (!selectedTime || !jornada) return null;
     return validarLocal(selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados);
   }, [selectedTime, selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados, jornada]);
+
+  const isHorarioEspecial = useMemo(() => {
+    if (!selectedTime || !jornada) return false;
+    const isDiaInactivo = jornada.activo === false;
+    const outsideJornada = selectedMinutes < jornadaInicioMin || (selectedMinutes + duracion) > jornadaFinMin;
+    return isDiaInactivo || outsideJornada;
+  }, [selectedTime, selectedMinutes, duracion, jornada, jornadaInicioMin, jornadaFinMin]);
 
   const disponiblesCount = useMemo(() => bloques.filter(b => b.disponible).length, [bloques]);
 
@@ -256,6 +278,25 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
             );
           })}
 
+          {/* Real-time current time indicator line */}
+          {isToday && businessNow && (() => {
+            const nowMin = timeToMinutes(businessNow);
+            const currentPercentage = ((nowMin - jornadaInicioMin) / jornadaDuracion) * 100;
+            if (currentPercentage >= 0 && currentPercentage <= 100) {
+              return (
+                <div
+                  className="absolute top-0 w-0.5 h-full bg-amber-500 z-10 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  style={{ left: `${currentPercentage}%` }}
+                  title={`Hora actual: ${formatHora12(businessNow)}`}
+                >
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-500" />
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-500" />
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           {/* Selected time indicator */}
           {selectedTime && selectedMinutes >= jornadaInicioMin && (
             <>
@@ -326,15 +367,23 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
     if (validacionActual.valida) {
       return (
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-sm animate-in fade-in slide-in-from-bottom-1 duration-200">
-          <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-          <div>
-            <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-              ✓ Horario disponible
-            </span>
-            <span className="text-emerald-600/80 dark:text-emerald-400/70 ml-1.5">
-              — {formatHora12(selectedTime)} a {formatHora12(minutesToTime(selectedMinutes + duracion))}
-            </span>
+        <div className="flex flex-col gap-2 w-full">
+          {isHorarioEspecial && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs glow-gold font-medium animate-in fade-in duration-200">
+              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />
+              <span>Cita en horario especial (fuera de jornada laboral)</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-sm animate-in fade-in slide-in-from-bottom-1 duration-200">
+            <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+            <div>
+              <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                ✓ Horario disponible
+              </span>
+              <span className="text-emerald-600/80 dark:text-emerald-400/70 ml-1.5">
+                — {formatHora12(selectedTime)} a {formatHora12(minutesToTime(selectedMinutes + duracion))}
+              </span>
+            </div>
           </div>
         </div>
       );

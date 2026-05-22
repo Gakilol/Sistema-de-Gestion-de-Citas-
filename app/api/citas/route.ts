@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncCitaEstados } from '@/lib/automatizacion';
+import { parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,11 +17,25 @@ export async function GET(req: NextRequest) {
       },
       include: {
         empleado: { select: { nombre: true } },
-        servicio: { select: { nombre: true } },
+        servicio: { 
+          select: { 
+            nombre: true,
+            categoriaRel: {
+              select: { nombre: true, color: true }
+            }
+          } 
+        },
         citaServicios: {
           include: {
             servicio: {
-              select: { id: true, nombre: true, duracion: true }
+              select: { 
+                id: true, 
+                nombre: true, 
+                duracion: true,
+                categoriaRel: {
+                  select: { nombre: true, color: true }
+                }
+              }
             }
           },
           orderBy: { orden: 'asc' }
@@ -86,8 +101,19 @@ export async function POST(req: NextRequest) {
     const primerServicioId = serviciosDbOrdenados[0].id;
 
     // VALIDACIÓN DE DISPONIBILIDAD — Backend es la fuente de verdad absoluta
+    const userRole = req.headers.get('x-user-role') || '';
+    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
+
     const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
-    const disponibilidad = await calcularDisponibilidad(empleado_id, fecha.split('T')[0], primerServicioId, duracionCalculada, hora);
+    const disponibilidad = await calcularDisponibilidad(
+      empleado_id, 
+      fecha.split('T')[0], 
+      primerServicioId, 
+      duracionCalculada, 
+      hora, 
+      null, 
+      permitirHorarioExtendido
+    );
     
     if (!disponibilidad.disponible) {
       return NextResponse.json({ error: 'El empleado no está disponible este día: ' + disponibilidad.motivo }, { status: 400 });
@@ -103,7 +129,8 @@ export async function POST(req: NextRequest) {
       duracionCalculada,
       disponibilidad.jornada.inicio,
       disponibilidad.jornada.fin,
-      disponibilidad.intervalosOcupados
+      disponibilidad.intervalosOcupados,
+      permitirHorarioExtendido
     );
 
     if (!validacion.valida) {
@@ -141,7 +168,7 @@ export async function POST(req: NextRequest) {
           cliente_telefono: cliente_telefono?.trim() || null,
           servicio_id: primerServicioId,
           empleado_id,
-          fecha: new Date(fecha),
+          fecha: parseLocalDateToUTC(fecha.split('T')[0]),
           hora,
           duracion: duracionCalculada,
           notas,
