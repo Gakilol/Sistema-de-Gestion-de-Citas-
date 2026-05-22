@@ -130,7 +130,8 @@ export async function POST(req: NextRequest) {
       disponibilidad.jornada.inicio,
       disponibilidad.jornada.fin,
       disponibilidad.intervalosOcupados,
-      permitirHorarioExtendido
+      permitirHorarioExtendido,
+      disponibilidad.turnosEmpleado
     );
 
     if (!validacion.valida) {

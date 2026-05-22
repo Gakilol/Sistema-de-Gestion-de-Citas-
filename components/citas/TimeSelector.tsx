@@ -243,8 +243,8 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
   // ─── Separate morning / afternoon ───────────────────────────────────────
   const bloquesDisponibles = bloques.filter(b => b.disponible);
-  const mañana = bloquesDisponibles.filter(b => parseInt(b.hora.split(':')[0]) < 13);
-  const tarde = bloquesDisponibles.filter(b => parseInt(b.hora.split(':')[0]) >= 13);
+  const mañana = bloquesDisponibles.filter(b => parseInt(b.hora.split(':')[0]) < 12);
+  const tarde = bloquesDisponibles.filter(b => parseInt(b.hora.split(':')[0]) >= 12);
 
   // ─── Timeline Rendering ────────────────────────────────────────────────
   const jornadaDuracion = jornadaFinMin - jornadaInicioMin;
@@ -346,7 +346,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                 className="absolute text-[10px] text-muted-foreground font-medium -translate-x-1/2"
                 style={{ left: `${pos}%` }}
               >
-                {minutesToTime(h).replace(':00', '')}h
+                {formatHora12(minutesToTime(h)).replace(':00', '')}
               </span>
             );
           })}
@@ -431,7 +431,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                     : "bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:shadow-sm active:scale-95"
                 )}
               >
-                {bloque.hora}
+                {formatHora12(bloque.hora)}
               </button>
             );
           })}
@@ -444,8 +444,25 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
   const renderTimePicker = () => {
     const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
     const currentM = selectedTime ? selectedMinutes % 60 : 0;
-    const minH = 0;
-    const maxH = 23;
+    const h12 = currentH === 0 ? 12 : currentH > 12 ? currentH - 12 : currentH;
+    const isPM = currentH >= 12;
+
+    const toggleAmPm = () => {
+      const newH = isPM ? currentH - 12 : currentH + 12;
+      if (newH >= 0 && newH <= 23) {
+        setHour(newH);
+      }
+    };
+
+    const cycleHourUp = () => {
+      const newH = currentH >= 23 ? 0 : currentH + 1;
+      setHour(newH);
+    };
+
+    const cycleHourDown = () => {
+      const newH = currentH <= 0 ? 23 : currentH - 1;
+      setHour(newH);
+    };
 
     return (
       <div className="space-y-4">
@@ -455,20 +472,18 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
           <div className="flex flex-col items-center">
             <button
               type="button"
-              onClick={() => setHour(Math.min(maxH, currentH + 1))}
-              disabled={currentH >= maxH}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              onClick={cycleHourUp}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
             >
               <ChevronUp className="w-5 h-5" />
             </button>
             <div className="w-16 h-14 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-2xl font-bold tabular-nums text-foreground">
-              {String(currentH).padStart(2, '0')}
+              {String(h12).padStart(2, '0')}
             </div>
             <button
               type="button"
-              onClick={() => setHour(Math.max(minH, currentH - 1))}
-              disabled={currentH <= minH}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              onClick={cycleHourDown}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
             >
               <ChevronDown className="w-5 h-5" />
             </button>
@@ -503,16 +518,21 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
             </button>
           </div>
 
-          {/* AM/PM indicator */}
+          {/* AM/PM toggle button */}
           <div className="ml-2 self-center">
-            <span className={cn(
-              "text-xs font-bold px-2 py-1 rounded-md",
-              currentH >= 12
-                ? "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400"
-                : "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
-            )}>
-              {currentH >= 12 ? 'PM' : 'AM'}
-            </span>
+            <button
+              type="button"
+              onClick={toggleAmPm}
+              className={cn(
+                "text-xs font-bold px-2.5 py-1.5 rounded-md transition-all duration-200 cursor-pointer border active:scale-95",
+                isPM
+                  ? "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50 hover:bg-indigo-200 dark:hover:bg-indigo-900/50"
+                  : "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+              )}
+              title="Clic para alternar AM/PM"
+            >
+              {isPM ? 'PM' : 'AM'}
+            </button>
           </div>
         </div>
 

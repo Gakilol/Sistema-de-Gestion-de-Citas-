@@ -97,7 +97,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           disponibilidad.jornada.inicio,
           disponibilidad.jornada.fin,
           disponibilidad.intervalosOcupados,
-          permitirHorarioExtendido
+          permitirHorarioExtendido,
+          disponibilidad.turnosEmpleado
         );
 
         if (!validacion.valida) {

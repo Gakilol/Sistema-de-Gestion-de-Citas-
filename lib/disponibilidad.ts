@@ -25,6 +25,12 @@ export interface IntervaloOcupado {
   motivo: string;
 }
 
+// ─── Interfaz de turno individual de empleado ───────────────────────────────
+export interface TurnoEmpleado {
+  inicio: string;
+  fin: string;
+}
+
 // ─── Validación pura de hora exacta (sin I/O, sin side-effects) ─────────────
 // Esta es la FUENTE DE VERDAD para determinar si una hora es válida.
 export function validarHoraExacta(
@@ -33,7 +39,8 @@ export function validarHoraExacta(
   jornadaInicio: string,
   jornadaFin: string,
   intervalosOcupados: IntervaloOcupado[],
-  permitirHorarioExtendido: boolean = false
+  permitirHorarioExtendido: boolean = false,
+  turnosEmpleado?: TurnoEmpleado[]
 ): { valida: boolean; motivo: string } {
   // Validar formato HH:MM
   if (!/^\d{2}:\d{2}$/.test(horaStr)) {
@@ -51,16 +58,29 @@ export function validarHoraExacta(
 
   const startMin = timeToMinutes(horaStr);
   const endMin = startMin + duracion;
-  const jornadaInicioMin = timeToMinutes(jornadaInicio);
-  const jornadaFinMin = timeToMinutes(jornadaFin);
 
-  // Validar que esté dentro de la jornada laboral (solo si no se permite horario especial/extendido)
+  // Validar límites de jornada / turnos (solo si NO se permite horario especial/extendido)
   if (!permitirHorarioExtendido) {
-    if (startMin < jornadaInicioMin) {
-      return { valida: false, motivo: `Antes del inicio de jornada (${jornadaInicio})` };
-    }
-    if (endMin > jornadaFinMin) {
-      return { valida: false, motivo: `Excede el fin de jornada (${jornadaFin}). La cita terminaría a las ${minutesToTime(endMin)}` };
+    // Si el empleado tiene turnos individuales definidos, validar contra ellos
+    if (turnosEmpleado && turnosEmpleado.length > 0) {
+      const dentroDeAlgunTurno = turnosEmpleado.some(t => {
+        const tInicio = timeToMinutes(t.inicio);
+        const tFin = timeToMinutes(t.fin);
+        return startMin >= tInicio && endMin <= tFin;
+      });
+      if (!dentroDeAlgunTurno) {
+        return { valida: false, motivo: 'Fuera del turno del empleado' };
+      }
+    } else {
+      // Sin turnos individuales → validar contra jornada global
+      const jornadaInicioMin = timeToMinutes(jornadaInicio);
+      const jornadaFinMin = timeToMinutes(jornadaFin);
+      if (startMin < jornadaInicioMin) {
+        return { valida: false, motivo: `Antes del inicio de jornada (${jornadaInicio})` };
+      }
+      if (endMin > jornadaFinMin) {
+        return { valida: false, motivo: `Excede el fin de jornada (${jornadaFin}). La cita terminaría a las ${minutesToTime(endMin)}` };
+      }
     }
   }
 
@@ -119,11 +139,19 @@ export async function calcularDisponibilidad(
   }
 
   if (empleado.vacaciones.length > 0) {
-    return { disponible: false, motivo: 'De vacaciones', bloques: [], jornada: null, intervalosOcupados: [] };
+    return { disponible: false, motivo: 'De vacaciones', bloques: [], jornada: null, intervalosOcupados: [], turnosEmpleado: undefined };
   }
 
   const diaIndex = fechaDate.getUTCDay();
   const diaNombre = DIAS_SEMANA[diaIndex];
+
+  // ─── Turnos individuales del empleado para este día ─────────────────────
+  const horarioEmpleado = empleado.horario as any;
+  const turnosEmpleadoDia: TurnoEmpleado[] | undefined =
+    (horarioEmpleado && Array.isArray(horarioEmpleado[diaNombre]))
+      ? horarioEmpleado[diaNombre]
+      : undefined;
+  const tieneTurnosIndividuales = turnosEmpleadoDia !== undefined && horarioEmpleado !== null;
 
   const DEFAULT_HORARIOS_GLOBALES: any = {
     lunes:     { activo: true,  inicio: '08:00', fin: '18:00' },
@@ -139,17 +167,38 @@ export async function calcularDisponibilidad(
   const horariosGlobales = (config?.horarios as any) || DEFAULT_HORARIOS_GLOBALES;
   const configDia = horariosGlobales[diaNombre] || DEFAULT_HORARIOS_GLOBALES[diaNombre];
 
-  if (!configDia || !configDia.activo) {
+  // ─── Determinar si el día es laborable ──────────────────────────────────
+  // Si el empleado tiene turnos individuales, un arreglo vacío = día libre del empleado
+  if (tieneTurnosIndividuales && turnosEmpleadoDia!.length === 0) {
     if (!permitirHorarioExtendido) {
-      return { disponible: false, motivo: 'Día no laboral', bloques: [], jornada: null, intervalosOcupados: [] };
+      return { disponible: false, motivo: 'Día libre del empleado', bloques: [], jornada: null, intervalosOcupados: [], turnosEmpleado: turnosEmpleadoDia };
+    }
+  } else if (!tieneTurnosIndividuales && (!configDia || !configDia.activo)) {
+    if (!permitirHorarioExtendido) {
+      return { disponible: false, motivo: 'Día no laboral', bloques: [], jornada: null, intervalosOcupados: [], turnosEmpleado: undefined };
     }
   }
 
-  const jornada = { 
-    inicio: (configDia && configDia.inicio) ? (configDia.inicio as string) : '08:00', 
-    fin: (configDia && configDia.fin) ? (configDia.fin as string) : '18:00',
-    activo: configDia ? (configDia.activo as boolean) : false
-  };
+  // ─── Calcular jornada dinámica ──────────────────────────────────────────
+  let jornada: { inicio: string; fin: string; activo: boolean };
+
+  if (tieneTurnosIndividuales && turnosEmpleadoDia!.length > 0) {
+    // Jornada basada en turnos individuales del empleado
+    const inicioMasTemplrano = Math.min(...turnosEmpleadoDia!.map(t => timeToMinutes(t.inicio)));
+    const finMasTarde = Math.max(...turnosEmpleadoDia!.map(t => timeToMinutes(t.fin)));
+    jornada = {
+      inicio: minutesToTime(inicioMasTemplrano),
+      fin: minutesToTime(finMasTarde),
+      activo: true
+    };
+  } else {
+    // Jornada basada en configuración global
+    jornada = {
+      inicio: (configDia && configDia.inicio) ? (configDia.inicio as string) : '08:00',
+      fin: (configDia && configDia.fin) ? (configDia.fin as string) : '18:00',
+      activo: configDia ? (configDia.activo as boolean) : false
+    };
+  }
 
   // Obtener citas del día, excluyendo la cita que se está editando si aplica
   const citasWhere: any = {
@@ -184,8 +233,14 @@ export async function calcularDisponibilidad(
     }))
   ].sort((a, b) => a.inicio - b.inicio);
 
-  // ─── Generar bloques sugeridos de 15 min (retrocompatibilidad + Smart Slots) ─
-  const horarioDia: any[] = [{ inicio: jornada.inicio, fin: jornada.fin }];
+  // ─── Generar bloques sugeridos de 15 min ───────────────────────────────
+  // Si el empleado tiene turnos individuales, generar bloques por cada turno;
+  // de lo contrario, usar la jornada global.
+  const horarioDia: Array<{ inicio: string; fin: string }> =
+    (tieneTurnosIndividuales && turnosEmpleadoDia!.length > 0)
+      ? turnosEmpleadoDia!
+      : [{ inicio: jornada.inicio, fin: jornada.fin }];
+
   const bloques: Array<{ hora: string; disponible: boolean; motivo: string }> = [];
   const bloqueIntervalo = 15;
 
@@ -194,12 +249,12 @@ export async function calcularDisponibilidad(
     let fin = '';
 
     if (typeof turno === 'string') {
-      const parts = turno.split('-');
+      const parts = (turno as string).split('-');
       inicio = parts[0] || '';
       fin = parts[1] || '';
     } else if (turno && typeof turno === 'object') {
-      inicio = turno.inicio || turno.start || '';
-      fin = turno.fin || turno.end || '';
+      inicio = (turno as any).inicio || (turno as any).start || '';
+      fin = (turno as any).fin || (turno as any).end || '';
     }
 
     if (!inicio || !fin) continue;
@@ -209,7 +264,7 @@ export async function calcularDisponibilidad(
 
     while (currentMinutes < endMinutes) {
       const horaString = minutesToTime(currentMinutes);
-      const resultado = validarHoraExacta(horaString, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados, permitirHorarioExtendido);
+      const resultado = validarHoraExacta(horaString, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados, permitirHorarioExtendido, turnosEmpleadoDia);
 
       bloques.push({
         hora: horaString,
@@ -224,7 +279,7 @@ export async function calcularDisponibilidad(
   // ─── Si se solicita validar una hora específica, inyectarla en bloques ──
   if (horaRequerida && /^\d{2}:\d{2}$/.test(horaRequerida)) {
     const existe = bloques.find(b => b.hora === horaRequerida);
-    const resultado = validarHoraExacta(horaRequerida, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados, permitirHorarioExtendido);
+    const resultado = validarHoraExacta(horaRequerida, duracionServicio, jornada.inicio, jornada.fin, intervalosOcupados, permitirHorarioExtendido, turnosEmpleadoDia);
 
     if (existe) {
       existe.disponible = resultado.valida;
@@ -245,6 +300,7 @@ export async function calcularDisponibilidad(
     motivo: '',
     bloques,
     jornada,
-    intervalosOcupados
+    intervalosOcupados,
+    turnosEmpleado: turnosEmpleadoDia
   };
 }
