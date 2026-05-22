@@ -59,15 +59,18 @@ function validarLocal(
   duracion: number,
   jornadaInicioMin: number,
   jornadaFinMin: number,
-  intervalos: IntervaloOcupado[]
+  intervalos: IntervaloOcupado[],
+  permitirHorarioExtendido: boolean = true
 ): { valida: boolean; motivo: string } {
   const endMin = startMin + duracion;
 
-  if (startMin < jornadaInicioMin) {
-    return { valida: false, motivo: `Antes del inicio de jornada (${minutesToTime(jornadaInicioMin)})` };
-  }
-  if (endMin > jornadaFinMin) {
-    return { valida: false, motivo: `Excede el fin de jornada (${minutesToTime(jornadaFinMin)})` };
+  if (!permitirHorarioExtendido) {
+    if (startMin < jornadaInicioMin) {
+      return { valida: false, motivo: `Antes del inicio de jornada (${minutesToTime(jornadaInicioMin)})` };
+    }
+    if (endMin > jornadaFinMin) {
+      return { valida: false, motivo: `Excede el fin de jornada (${minutesToTime(jornadaFinMin)})` };
+    }
   }
 
   for (const int of intervalos) {
@@ -162,7 +165,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
   const validacionActual = useMemo(() => {
     if (!selectedTime || !jornada) return null;
-    return validarLocal(selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados);
+    return validarLocal(selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados, true);
   }, [selectedTime, selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados, jornada]);
 
   const isHorarioEspecial = useMemo(() => {
@@ -183,22 +186,22 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
       newMinutes = jornadaInicioMin;
     }
 
-    // Clamp to jornada bounds
-    newMinutes = Math.max(jornadaInicioMin, Math.min(jornadaFinMin - 1, newMinutes));
+    // Permitir cualquier hora del día (00:00 a 23:59)
+    newMinutes = Math.max(0, Math.min(1439, newMinutes));
     onTimeSelect(minutesToTime(newMinutes));
-  }, [selectedTime, selectedMinutes, jornadaInicioMin, jornadaFinMin, onTimeSelect]);
+  }, [selectedTime, selectedMinutes, jornadaInicioMin, onTimeSelect]);
 
   const setHour = useCallback((h: number) => {
     const currentM = selectedTime ? selectedMinutes % 60 : 0;
     const newMinutes = h * 60 + currentM;
-    onTimeSelect(minutesToTime(Math.max(jornadaInicioMin, Math.min(jornadaFinMin - 1, newMinutes))));
-  }, [selectedTime, selectedMinutes, jornadaInicioMin, jornadaFinMin, onTimeSelect]);
+    onTimeSelect(minutesToTime(Math.max(0, Math.min(1439, newMinutes))));
+  }, [selectedTime, selectedMinutes, onTimeSelect]);
 
   const setMinute = useCallback((m: number) => {
     const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
     const newMinutes = currentH * 60 + m;
-    onTimeSelect(minutesToTime(Math.max(jornadaInicioMin, Math.min(jornadaFinMin - 1, newMinutes))));
-  }, [selectedTime, selectedMinutes, jornadaInicioMin, jornadaFinMin, onTimeSelect]);
+    onTimeSelect(minutesToTime(Math.max(0, Math.min(1439, newMinutes))));
+  }, [selectedTime, selectedMinutes, jornadaInicioMin, onTimeSelect]);
 
   // ─── Empty / Loading / Error States ─────────────────────────────────────
   if (!empleadoId || !fecha) {
@@ -441,8 +444,8 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
   const renderTimePicker = () => {
     const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
     const currentM = selectedTime ? selectedMinutes % 60 : 0;
-    const minH = Math.floor(jornadaInicioMin / 60);
-    const maxH = Math.floor((jornadaFinMin - 1) / 60);
+    const minH = 0;
+    const maxH = 23;
 
     return (
       <div className="space-y-4">

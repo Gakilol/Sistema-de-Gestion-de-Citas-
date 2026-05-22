@@ -273,7 +273,7 @@ export default function Citas() {
       const cli = data.cliente;
       toast.success('Cliente creado');
       setClientesList(prev => [...prev, cli]);
-      setForm(prev => ({
+      setForm((prev: any) => ({
         ...prev,
         cliente_id: cli.id,
         cliente_nombre: cli.nombre,
