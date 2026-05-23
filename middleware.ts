@@ -13,6 +13,7 @@ export async function middleware(req: NextRequest) {
   const isPublicPath = 
     path === '/login' ||
     path.startsWith('/api/auth') ||
+    path.startsWith('/api/cron') || // Permitir Crons (ej. Vercel Cron) con firma propia
     path.startsWith('/_next') || 
     path.startsWith('/favicon.ico') ||
     path.startsWith('/logo') ||

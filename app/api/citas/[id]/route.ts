@@ -6,7 +6,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
-    const { estado, notas, empleado_id, fecha, hora, servicio_id, servicio_ids, duracion, cliente_id, cliente_nombre, cliente_telefono } = body;
+    const { estado, notas, empleado_id, fecha, hora, servicio_id, servicio_ids, servicios_seleccionados, duracion, cliente_id, cliente_nombre, cliente_telefono } = body;
 
     const dataToUpdate: any = {};
     if (estado) dataToUpdate.estado = estado;
@@ -51,7 +51,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // ─── VALIDACIÓN DE DISPONIBILIDAD AL EDITAR (Backend = fuente de verdad) ───
     // Si cambian hora, fecha, empleado o servicios, re-validar disponibilidad
-    const cambiaHorario = hora || fecha || empleado_id || (Array.isArray(finalServicioIds) && finalServicioIds.length > 0);
+    const cambiaHorario = hora || fecha || empleado_id || 
+      (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) ||
+      (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0);
     
     if (cambiaHorario) {
       const citaActual = await prisma.cita.findUnique({ where: { id } });
@@ -65,7 +67,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       // Calcular duración final
       let duracionFinal = citaActual.duracion;
-      if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
+      if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+        duracionFinal = servicios_seleccionados.reduce((sum, s) => sum + (typeof s.duracion === 'number' && s.duracion > 0 ? s.duracion : 30), 0);
+      } else if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
         const serviciosDb = await prisma.servicio.findMany({
           where: { id: { in: finalServicioIds } }
         });
@@ -108,40 +112,59 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const cita = await prisma.$transaction(async (tx) => {
-      if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
+      let serviciosParaActualizar: { id: string; duracion: number }[] = [];
+      let flagActualizarServicios = false;
+
+      if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+        flagActualizarServicios = true;
+        const ids = servicios_seleccionados.map(s => s.id);
+        const serviciosDb = await tx.servicio.findMany({
+          where: { id: { in: ids } }
+        });
+        serviciosParaActualizar = servicios_seleccionados.map(sel => {
+          const sDb = serviciosDb.find(s => s.id === sel.id);
+          return {
+            id: sel.id,
+            duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30)
+          };
+        }).filter(s => s.id);
+      } else if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
+        flagActualizarServicios = true;
         const serviciosDb = await tx.servicio.findMany({
           where: { id: { in: finalServicioIds } }
         });
-
-        // Mantener orden de la petición
         const serviciosDbOrdenados = finalServicioIds
           .map(sid => serviciosDb.find(s => s.id === sid))
           .filter((s): s is NonNullable<typeof s> => !!s);
+        serviciosParaActualizar = serviciosDbOrdenados.map(s => ({
+          id: s.id,
+          duracion: s.duracion
+        }));
+      }
 
-        if (serviciosDbOrdenados.length > 0) {
-          const duracionCalculada = serviciosDbOrdenados.reduce((sum, s) => sum + s.duracion, 0);
-          const primerServicioId = serviciosDbOrdenados[0].id;
+      if (flagActualizarServicios && serviciosParaActualizar.length > 0) {
+        const duracionCalculada = serviciosParaActualizar.reduce((sum, s) => sum + s.duracion, 0);
+        const primerServicioId = serviciosParaActualizar[0].id;
 
-          dataToUpdate.servicio_id = primerServicioId;
-          dataToUpdate.duracion = duracionCalculada;
+        dataToUpdate.servicio_id = primerServicioId;
+        dataToUpdate.duracion = duracionCalculada;
 
-          // Limpiar relaciones anteriores
-          await tx.citaServicio.deleteMany({
-            where: { cita_id: id }
-          });
+        // Limpiar relaciones anteriores
+        await tx.citaServicio.deleteMany({
+          where: { cita_id: id }
+        });
 
-          // Insertar nuevas relaciones
-          const newCitaServicios = serviciosDbOrdenados.map((s, index) => ({
-            cita_id: id,
-            servicio_id: s.id,
-            duracion: s.duracion,
-            orden: index
-          }));
+        // Insertar nuevas relaciones
+        const newCitaServicios = serviciosParaActualizar.map((s, index) => ({
+          cita_id: id,
+          servicio_id: s.id,
+          duracion: s.duracion,
+          orden: index
+        }));
 
-          await tx.citaServicio.createMany({
-            data: newCitaServicios
-          });
-        }
+        await tx.citaServicio.createMany({
+          data: newCitaServicios
+        });
       }
 
       // Actualizar la cita

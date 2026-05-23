@@ -64,9 +64,13 @@ model Cita {
   creador          Empleado @relation("CreadorCita", fields: [created_by], references: [id])
   citaServicios    CitaServicio[]
 
+  whatsapp_reminder_sent    Boolean   @default(false)
+  whatsapp_reminder_sent_at DateTime?
+
   @@index([empleado_id])
   @@index([estado])
   @@index([fecha])
+  @@index([whatsapp_reminder_sent, fecha, estado])
 }
 
 enum RolUsuario {

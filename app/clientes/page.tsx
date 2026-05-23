@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
+import { PhoneInput } from '@/components/shared/PhoneInput';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -282,8 +283,13 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
             <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono (opcional)</label>
-            <Input value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} placeholder="8888-0000" />
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono *</label>
+            <PhoneInput
+              value={form.telefono}
+              onChange={(formattedVal, isValid) => {
+                setForm(prev => ({ ...prev, telefono: formattedVal }));
+              }}
+            />
           </div>
           <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
             El cliente quedará registrado como pendiente. Puede programarle una cita luego desde la sección de Citas.

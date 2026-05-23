@@ -73,32 +73,51 @@ export async function POST(req: NextRequest) {
       cliente_nombre, 
       cliente_telefono, 
       servicio_id, 
-      servicio_ids, // new array of services
+      servicio_ids, 
+      servicios_seleccionados,
       empleado_id, 
       fecha, 
       hora, 
       notas 
     } = body;
 
-    // Resolver IDs de servicios
-    const ids = Array.isArray(servicio_ids) && servicio_ids.length > 0 ? servicio_ids : [servicio_id];
-    
-    // Obtener los detalles de los servicios para sumar duración
-    const serviciosDb = await prisma.servicio.findMany({
-      where: { id: { in: ids } }
-    });
+    // Resolver servicios y sus duraciones personalizadas o por defecto de la BD
+    let serviciosParaCita: { id: string; duracion: number }[] = [];
+    if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+      const ids = servicios_seleccionados.map(s => s.id);
+      const serviciosDb = await prisma.servicio.findMany({
+        where: { id: { in: ids } }
+      });
+      if (serviciosDb.length === 0) {
+        return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
+      }
+      serviciosParaCita = servicios_seleccionados.map(sel => {
+        const sDb = serviciosDb.find(s => s.id === sel.id);
+        return {
+          id: sel.id,
+          duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30)
+        };
+      }).filter(s => s.id);
+    } else {
+      const ids = Array.isArray(servicio_ids) && servicio_ids.length > 0 ? servicio_ids : [servicio_id];
+      const serviciosDb = await prisma.servicio.findMany({
+        where: { id: { in: ids } }
+      });
+      const serviciosDbOrdenados = ids
+        .map(id => serviciosDb.find(s => s.id === id))
+        .filter((s): s is NonNullable<typeof s> => !!s);
 
-    // Ordenar para respetar la selección
-    const serviciosDbOrdenados = ids
-      .map(id => serviciosDb.find(s => s.id === id))
-      .filter((s): s is NonNullable<typeof s> => !!s);
-
-    if (serviciosDbOrdenados.length === 0) {
-      return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
+      if (serviciosDbOrdenados.length === 0) {
+        return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
+      }
+      serviciosParaCita = serviciosDbOrdenados.map(s => ({
+        id: s.id,
+        duracion: s.duracion
+      }));
     }
 
-    const duracionCalculada = serviciosDbOrdenados.reduce((sum, s) => sum + s.duracion, 0);
-    const primerServicioId = serviciosDbOrdenados[0].id;
+    const duracionCalculada = serviciosParaCita.reduce((sum, s) => sum + s.duracion, 0);
+    const primerServicioId = serviciosParaCita[0].id;
 
     // VALIDACIÓN DE DISPONIBILIDAD — Backend es la fuente de verdad absoluta
     const userRole = req.headers.get('x-user-role') || '';
@@ -177,7 +196,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const citaServiciosData = serviciosDbOrdenados.map((s, index) => ({
+      const citaServiciosData = serviciosParaCita.map((s, index) => ({
         cita_id: c.id,
         servicio_id: s.id,
         duracion: s.duracion,

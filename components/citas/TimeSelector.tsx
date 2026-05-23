@@ -1,17 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, ChevronUp, ChevronDown, Minus, Plus, Zap } from 'lucide-react';
+import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, ChevronUp, ChevronDown, Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getBusinessTodayString, getBusinessNowTime } from '@/lib/timezone';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-
-interface TimeBlock {
-  hora: string;
-  disponible: boolean;
-  motivo: string;
-}
 
 interface IntervaloOcupado {
   inicio: number;
@@ -89,11 +83,9 @@ function validarLocal(
 
 export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, selectedTime, onTimeSelect }: TimeSelectorProps) {
   const [loading, setLoading] = useState(false);
-  const [bloques, setBloques] = useState<TimeBlock[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [jornada, setJornada] = useState<Jornada | null>(null);
   const [intervalosOcupados, setIntervalosOcupados] = useState<IntervaloOcupado[]>([]);
-  const [modo, setModo] = useState<'slots' | 'picker'>('slots');
   const [businessNow, setBusinessNow] = useState('');
 
   const duracion = duracionTotal || 30;
@@ -110,10 +102,9 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     return fecha === getBusinessTodayString();
   }, [fecha]);
 
-  // ─── Fetch Disponibilidad ───────────────────────────────────────────────
+  // ─── Fetch Disponibilidad (Solo intervalos y jornada) ───────────────────
   useEffect(() => {
     if (!empleadoId || !fecha) {
-      setBloques([]);
       setJornada(null);
       setIntervalosOcupados([]);
       return;
@@ -136,17 +127,14 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
         if (!data.disponible && data.bloques.length === 0) {
           setError(data.motivo || 'No disponible este día');
-          setBloques([]);
           setJornada(null);
           setIntervalosOcupados([]);
         } else {
-          setBloques(data.bloques || []);
           setJornada(data.jornada || null);
           setIntervalosOcupados(data.intervalosOcupados || []);
         }
       } catch (err: any) {
         setError(err.message);
-        setBloques([]);
         setJornada(null);
         setIntervalosOcupados([]);
       } finally {
@@ -158,8 +146,8 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
   }, [empleadoId, fecha, servicioId, duracionTotal]);
 
   // ─── Derived state ──────────────────────────────────────────────────────
-  const jornadaInicioMin = jornada ? timeToMinutes(jornada.inicio) : 0;
-  const jornadaFinMin = jornada ? timeToMinutes(jornada.fin) : 0;
+  const jornadaInicioMin = jornada ? timeToMinutes(jornada.inicio) : 480; // 08:00 default
+  const jornadaFinMin = jornada ? timeToMinutes(jornada.fin) : 1080;     // 18:00 default
 
   const selectedMinutes = selectedTime ? timeToMinutes(selectedTime) : -1;
 
@@ -174,8 +162,6 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     const outsideJornada = selectedMinutes < jornadaInicioMin || (selectedMinutes + duracion) > jornadaFinMin;
     return isDiaInactivo || outsideJornada;
   }, [selectedTime, selectedMinutes, duracion, jornada, jornadaInicioMin, jornadaFinMin]);
-
-  const disponiblesCount = useMemo(() => bloques.filter(b => b.disponible).length, [bloques]);
 
   // ─── Time Picker Handlers ──────────────────────────────────────────────
   const adjustTime = useCallback((deltaMinutes: number) => {
@@ -208,7 +194,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     return (
       <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-xl text-muted-foreground bg-secondary/10">
         <Clock className="w-8 h-8 mb-2 opacity-50" />
-        <p className="text-sm text-center">Selecciona un empleado y una fecha para ver los horarios disponibles.</p>
+        <p className="text-sm text-center">Selecciona un empleado y una fecha para ver la agenda horaria.</p>
       </div>
     );
   }
@@ -217,7 +203,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     return (
       <div className="flex flex-col items-center justify-center p-8 border border-border rounded-xl bg-secondary/10">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
-        <p className="text-sm text-muted-foreground font-medium animate-pulse">Calculando espacios disponibles...</p>
+        <p className="text-sm text-muted-foreground font-medium animate-pulse">Consultando agenda y colisiones...</p>
       </div>
     );
   }
@@ -232,22 +218,8 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     );
   }
 
-  if (bloques.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center p-6 border border-border rounded-xl bg-secondary/10 text-muted-foreground">
-        <CalendarX2 className="w-8 h-8 mb-2 opacity-50" />
-        <p className="text-sm font-medium">No hay horarios registrados para este día.</p>
-      </div>
-    );
-  }
-
-  // ─── Separate morning / afternoon ───────────────────────────────────────
-  const bloquesDisponibles = bloques.filter(b => b.disponible);
-  const mañana = bloquesDisponibles.filter(b => parseInt(b.hora.split(':')[0]) < 12);
-  const tarde = bloquesDisponibles.filter(b => parseInt(b.hora.split(':')[0]) >= 12);
-
   // ─── Timeline Rendering ────────────────────────────────────────────────
-  const jornadaDuracion = jornadaFinMin - jornadaInicioMin;
+  const jornadaDuracion = Math.max(60, jornadaFinMin - jornadaInicioMin);
 
   const renderTimeline = () => {
     if (!jornada || jornadaDuracion <= 0) return null;
@@ -261,27 +233,27 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
     return (
       <div className="space-y-1.5">
-        {/* Timeline bar */}
-        <div className="relative h-10 bg-emerald-100/60 dark:bg-emerald-900/20 rounded-lg overflow-hidden border border-emerald-200/60 dark:border-emerald-800/30">
-          {/* Occupied intervals */}
+        {/* Barra de tiempo de la Línea de Tiempo */}
+        <div className="relative h-10 bg-emerald-100/60 dark:bg-emerald-900/10 rounded-lg overflow-hidden border border-emerald-200/50 dark:border-emerald-800/20">
+          {/* Intervalos ocupados */}
           {intervalosOcupados.map((int, i) => {
             const left = Math.max(0, ((int.inicio - jornadaInicioMin) / jornadaDuracion) * 100);
             const width = Math.min(100 - left, ((int.fin - int.inicio) / jornadaDuracion) * 100);
             return (
               <div
                 key={i}
-                className="absolute top-0 h-full bg-red-400/30 dark:bg-red-500/25 border-x border-red-300/50 dark:border-red-600/30"
+                className="absolute top-0 h-full bg-red-400/30 dark:bg-red-500/20 border-x border-red-300/40 dark:border-red-600/20"
                 style={{ left: `${left}%`, width: `${width}%` }}
                 title={`${int.motivo}: ${minutesToTime(int.inicio)} - ${minutesToTime(int.fin)}`}
               >
-                <div className="w-full h-full opacity-40" style={{
+                <div className="w-full h-full opacity-30" style={{
                   backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 6px)'
                 }} />
               </div>
             );
           })}
 
-          {/* Real-time current time indicator line */}
+          {/* Línea indicadora de hora actual */}
           {isToday && businessNow && (() => {
             const nowMin = timeToMinutes(businessNow);
             const currentPercentage = ((nowMin - jornadaInicioMin) / jornadaDuracion) * 100;
@@ -300,15 +272,15 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
             return null;
           })()}
 
-          {/* Selected time indicator */}
-          {selectedTime && selectedMinutes >= jornadaInicioMin && (
+          {/* Indicador de Hora Seleccionada y Proyección de Duración */}
+          {selectedTime && selectedMinutes >= 0 && (
             <>
-              {/* Duration projection */}
+              {/* Proyección basada en la duración */}
               <div
                 className={cn(
                   "absolute top-0 h-full transition-all duration-300",
                   validacionActual?.valida
-                    ? "bg-primary/20 dark:bg-primary/15 border-x border-primary/40"
+                    ? "bg-primary/20 dark:bg-primary/15 border-x border-primary/45"
                     : "bg-red-500/20 dark:bg-red-500/15 border-x border-red-500/40"
                 )}
                 style={{
@@ -316,7 +288,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                   width: `${Math.min(100 - ((selectedMinutes - jornadaInicioMin) / jornadaDuracion) * 100, (duracion / jornadaDuracion) * 100)}%`
                 }}
               />
-              {/* Position marker */}
+              {/* Marcador de inicio */}
               <div
                 className={cn(
                   "absolute top-0 w-0.5 h-full transition-all duration-300 shadow-sm",
@@ -335,7 +307,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
           )}
         </div>
 
-        {/* Hour marks */}
+        {/* Marcas horarias legibles */}
         <div className="relative h-4">
           {hourMarks.map(h => {
             const pos = ((h - jornadaInicioMin) / jornadaDuracion) * 100;
@@ -343,7 +315,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
             return (
               <span
                 key={h}
-                className="absolute text-[10px] text-muted-foreground font-medium -translate-x-1/2"
+                className="absolute text-[10px] text-muted-foreground font-semibold -translate-x-1/2"
                 style={{ left: `${pos}%` }}
               >
                 {formatHora12(minutesToTime(h)).replace(':00', '')}
@@ -355,13 +327,13 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     );
   };
 
-  // ─── Availability Status Banner ─────────────────────────────────────────
+  // ─── Banner de Estado de Disponibilidad ──────────────────────────────────
   const renderStatusBanner = () => {
     if (!selectedTime) {
       return (
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border/50 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4 shrink-0 opacity-60" />
-          <span>Selecciona una hora para verificar disponibilidad</span>
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border/50 text-xs text-muted-foreground">
+          <Clock className="w-4 h-4 shrink-0 opacity-60 text-primary" />
+          <span>Ajusta la hora para validar colisiones de horario en tiempo real</span>
         </div>
       );
     }
@@ -372,19 +344,19 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
       return (
         <div className="flex flex-col gap-2 w-full">
           {isHorarioEspecial && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs glow-gold font-medium animate-in fade-in duration-200">
-              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />
-              <span>Cita en horario especial (fuera de jornada laboral)</span>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-semibold animate-in fade-in duration-200">
+              <span className="animate-pulse">⚡</span>
+              <span>Horario especial: fuera de la jornada laboral habitual</span>
             </div>
           )}
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-sm animate-in fade-in slide-in-from-bottom-1 duration-200">
-            <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/30 dark:border-emerald-800/30 text-xs animate-in fade-in duration-200">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             <div>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                ✓ Horario disponible
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                ✓ Disponible
               </span>
               <span className="text-emerald-600/80 dark:text-emerald-400/70 ml-1.5">
-                — {formatHora12(selectedTime)} a {formatHora12(minutesToTime(selectedMinutes + duracion))}
+                ({formatHora12(selectedTime)} – {formatHora12(minutesToTime(selectedMinutes + duracion))})
               </span>
             </div>
           </div>
@@ -393,13 +365,13 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     }
 
     return (
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 text-sm animate-in fade-in slide-in-from-bottom-1 duration-200">
-        <XCircle className="w-4.5 h-4.5 text-red-500 shrink-0" />
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-red-500/10 dark:bg-red-950/20 border border-red-500/30 dark:border-red-800/30 text-xs animate-in fade-in duration-200">
+        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
         <div>
-          <span className="font-semibold text-red-700 dark:text-red-400">
-            ✕ No disponible
+          <span className="font-bold text-red-600 dark:text-red-400">
+            ✕ Conflicto detected
           </span>
-          <span className="text-red-600/80 dark:text-red-400/70 ml-1.5 text-xs">
+          <span className="text-red-600/80 dark:text-red-400/70 ml-1.5">
             — {validacionActual.motivo}
           </span>
         </div>
@@ -407,40 +379,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     );
   };
 
-  // ─── Slots Grid (Smart Slots) ──────────────────────────────────────────
-  const renderSlotsGrid = (blocks: TimeBlock[], label: string, dotColor: string) => {
-    if (blocks.length === 0) return null;
-    return (
-      <div>
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
-          {label}
-        </h4>
-        <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-          {blocks.map((bloque) => {
-            const isSelected = selectedTime === bloque.hora;
-            return (
-              <button
-                key={bloque.hora}
-                type="button"
-                onClick={() => onTimeSelect(bloque.hora)}
-                className={cn(
-                  "py-2 px-1 text-sm font-medium rounded-lg transition-all duration-200 border",
-                  isSelected
-                    ? "bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/20 scale-[1.03]"
-                    : "bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:shadow-sm active:scale-95"
-                )}
-              >
-                {formatHora12(bloque.hora)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // ─── Precision Time Picker ─────────────────────────────────────────────
+  // ─── Precision Time Picker (ÚNICO MODO PERMITIDO) ────────────────────────
   const renderTimePicker = () => {
     const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
     const currentM = selectedTime ? selectedMinutes % 60 : 0;
@@ -466,32 +405,32 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
     return (
       <div className="space-y-4">
-        {/* Digital time display */}
+        {/* Columnas del Selector digital */}
         <div className="flex items-center justify-center gap-1">
-          {/* Hour Column */}
+          {/* Columna de Horas */}
           <div className="flex flex-col items-center">
             <button
               type="button"
               onClick={cycleHourUp}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
             >
-              <ChevronUp className="w-5 h-5" />
+              <ChevronUp className="w-4 h-4" />
             </button>
-            <div className="w-16 h-14 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-2xl font-bold tabular-nums text-foreground">
+            <div className="w-14 h-12 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-xl font-bold tabular-nums text-foreground">
               {String(h12).padStart(2, '0')}
             </div>
             <button
               type="button"
               onClick={cycleHourDown}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
             >
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4" />
             </button>
           </div>
 
-          <span className="text-2xl font-bold text-muted-foreground mx-0.5 self-center">:</span>
+          <span className="text-xl font-bold text-muted-foreground mx-0.5 self-center">:</span>
 
-          {/* Minute Column */}
+          {/* Columna de Minutos */}
           <div className="flex flex-col items-center">
             <button
               type="button"
@@ -499,11 +438,11 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                 const newM = currentM >= 59 ? 0 : currentM + 1;
                 setMinute(newM);
               }}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
             >
-              <ChevronUp className="w-5 h-5" />
+              <ChevronUp className="w-4 h-4" />
             </button>
-            <div className="w-16 h-14 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-2xl font-bold tabular-nums text-foreground">
+            <div className="w-14 h-12 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-xl font-bold tabular-nums text-foreground">
               {String(currentM).padStart(2, '0')}
             </div>
             <button
@@ -512,13 +451,13 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                 const newM = currentM <= 0 ? 59 : currentM - 1;
                 setMinute(newM);
               }}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
             >
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4" />
             </button>
           </div>
 
-          {/* AM/PM toggle button */}
+          {/* Botón AM/PM */}
           <div className="ml-2 self-center">
             <button
               type="button"
@@ -526,17 +465,16 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
               className={cn(
                 "text-xs font-bold px-2.5 py-1.5 rounded-md transition-all duration-200 cursor-pointer border active:scale-95",
                 isPM
-                  ? "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50 hover:bg-indigo-200 dark:hover:bg-indigo-900/50"
-                  : "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+                  ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
               )}
-              title="Clic para alternar AM/PM"
             >
               {isPM ? 'PM' : 'AM'}
             </button>
           </div>
         </div>
 
-        {/* Quick adjustment buttons */}
+        {/* Botones rápidos de ajuste de minutos */}
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
           {[-15, -5, -1, 1, 5, 15].map(delta => (
             <button
@@ -544,9 +482,9 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
               type="button"
               onClick={() => adjustTime(delta)}
               className={cn(
-                "px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all active:scale-95",
+                "px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all active:scale-95 cursor-pointer",
                 delta < 0
-                  ? "bg-secondary/40 border-border/60 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                  ? "bg-secondary/20 border-border/50 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
                   : "bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
               )}
             >
@@ -558,14 +496,14 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
           ))}
         </div>
 
-        {/* 12h formatted display */}
+        {/* Leyenda del fin de la cita */}
         {selectedTime && (
-          <p className="text-center text-sm text-muted-foreground">
-            Hora seleccionada:{' '}
-            <span className="font-bold text-foreground">{formatHora12(selectedTime)}</span>
+          <p className="text-center text-xs text-muted-foreground">
+            Cita: <span className="font-bold text-foreground">{formatHora12(selectedTime)}</span>
             {validacionActual?.valida && (
-              <span className="text-emerald-600 dark:text-emerald-400"> → {formatHora12(minutesToTime(selectedMinutes + duracion))}</span>
+              <span className="text-emerald-500 font-semibold"> → {formatHora12(minutesToTime(selectedMinutes + duracion))}</span>
             )}
+            <span className="ml-1">({duracion} min)</span>
           </p>
         )}
       </div>
@@ -574,80 +512,23 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {/* Status Banner */}
+    <div className="space-y-4 animate-in fade-in duration-300">
+      {/* Banner de Estado */}
       {renderStatusBanner()}
 
-      {/* Timeline */}
+      {/* Selector Horario Digital Preciso */}
+      {renderTimePicker()}
+
+      {/* Línea de tiempo visual */}
       {renderTimeline()}
 
-      {/* Mode Switcher */}
-      <div className="flex items-center gap-1 p-0.5 bg-secondary/40 rounded-lg border border-border/50 w-fit">
-        <button
-          type="button"
-          onClick={() => setModo('slots')}
-          className={cn(
-            "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
-            modo === 'slots'
-              ? "bg-card text-foreground shadow-sm border border-border/60"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <span className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3" />
-            Rápido
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setModo('picker')}
-          className={cn(
-            "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
-            modo === 'picker'
-              ? "bg-card text-foreground shadow-sm border border-border/60"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <span className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3" />
-            Hora exacta
-          </span>
-        </button>
-      </div>
-
-      {/* Content */}
-      {modo === 'slots' ? (
-        <div className="space-y-3">
-          {disponiblesCount === 0 ? (
-            <div className="flex flex-col items-center justify-center p-4 border border-border rounded-xl bg-secondary/10 text-muted-foreground">
-              <CalendarX2 className="w-6 h-6 mb-1.5 opacity-50" />
-              <p className="text-xs font-medium">No hay horarios rápidos disponibles.</p>
-              <button
-                type="button"
-                onClick={() => setModo('picker')}
-                className="text-xs text-primary font-semibold mt-1 hover:underline"
-              >
-                Probar con hora exacta →
-              </button>
-            </div>
-          ) : (
-            <>
-              {renderSlotsGrid(mañana, 'Mañana', 'bg-amber-400')}
-              {renderSlotsGrid(tarde, 'Tarde / Noche', 'bg-indigo-400')}
-            </>
-          )}
-        </div>
-      ) : (
-        renderTimePicker()
-      )}
-
       {/* Info footer */}
-      <div className="flex items-center justify-between text-[10px] text-muted-foreground/70 pt-1 border-t border-border/30">
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 pt-1.5 border-t border-border/20">
         <span>
-          {jornada && `Jornada: ${formatHora12(jornada.inicio)} – ${formatHora12(jornada.fin)}`}
+          {jornada && `Jornada del estilista: ${formatHora12(jornada.inicio)} – ${formatHora12(jornada.fin)}`}
         </span>
         <span>
-          {disponiblesCount} horario{disponiblesCount !== 1 ? 's' : ''} rápido{disponiblesCount !== 1 ? 's' : ''} disponible{disponiblesCount !== 1 ? 's' : ''}
+          {fecha.split('-').reverse().join('/')}
         </span>
       </div>
     </div>

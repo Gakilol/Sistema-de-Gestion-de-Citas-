@@ -63,6 +63,23 @@ export function mensajeRecordatorio(cita: CitaWA): string {
   return lines.filter(Boolean).join('\n');
 }
 
+// ─── Recordatorio 1 Hora Antes ───────────────────────────────────────────────
+export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
+  const lines = [
+    `*${SALON_NAME}* ⏱️`,
+    ``,
+    `Hola *${cita.cliente_nombre}*,`,
+    `Le recordamos que su cita está programada para *hoy*:`,
+    ``,
+    `*Servicio:* ${cita.servicio}`,
+    `*Estilista:* ${cita.empleado}`,
+    `*Hora:* ${cita.hora}`,
+    ``,
+    `📍 Le sugerimos llegar 10 minutos antes. ¡Le esperamos!`,
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
 // ─── Cancelación ────────────────────────────────────────────────────────────
 export function mensajeCancelacion(cita: CitaWA): string {
   return [

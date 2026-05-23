@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, X, Search, MessageCircle, UserPlus, CheckCircle2, Zap } from 'lucide-react';
+import { Plus, Edit, X, Search, MessageCircle, UserPlus, CheckCircle2, Minus } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
+import { PhoneInput } from '@/components/shared/PhoneInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -18,6 +19,7 @@ const getEmptyForm = () => ({
   cliente_telefono: '',
   servicio_id: '',
   servicio_ids: [] as string[],
+  servicio_duraciones: {} as Record<string, number>, // custom durations
   empleado_id: '',
   fecha: '',
   hora: '',
@@ -175,12 +177,22 @@ export default function Citas() {
       ? c.citaServicios.map((cs: any) => cs.servicio_id)
       : (c.servicio_id ? [c.servicio_id] : []);
 
+    const duraciones: Record<string, number> = {};
+    if (Array.isArray(c.citaServicios) && c.citaServicios.length > 0) {
+      c.citaServicios.forEach((cs: any) => {
+        duraciones[cs.servicio_id] = cs.duracion;
+      });
+    } else if (c.servicio_id) {
+      duraciones[c.servicio_id] = c.duracion;
+    }
+
     setForm({
       cliente_id: c.cliente_id || '',
       cliente_nombre: c.cliente_nombre,
       cliente_telefono: c.cliente_telefono || '',
       servicio_id: c.servicio_id || '',
       servicio_ids: ids,
+      servicio_duraciones: duraciones,
       empleado_id: c.empleado_id,
       fecha: new Date(c.fecha).toISOString().split('T')[0],
       hora: c.hora,
@@ -207,6 +219,10 @@ export default function Citas() {
       cliente_telefono: form.cliente_telefono || null,
       servicio_id: form.servicio_ids[0],
       servicio_ids: form.servicio_ids,
+      servicios_seleccionados: form.servicio_ids.map((id: string) => ({
+        id,
+        duracion: form.servicio_duraciones[id] || 30
+      })),
       empleado_id: form.empleado_id,
       fecha: form.fecha,
       hora: form.hora,
@@ -501,6 +517,7 @@ export default function Citas() {
                         fecha: cita.fecha,
                         hora: cita.hora,
                       }) : null;
+                      const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
                       return (
                         <tr key={cita.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
                           <td className="px-4 py-3.5">
@@ -559,7 +576,14 @@ export default function Citas() {
                           <td className="px-4 py-3.5 text-muted-foreground">{cita.empleado?.nombre || '-'}</td>
                           <td className="px-4 py-3.5">
                             <p className="font-medium text-foreground">{fmtDate(cita.fecha)}</p>
-                            <p className="text-xs text-muted-foreground">{cita.hora} · {cita.duracion} min</p>
+                            <p className="text-xs text-muted-foreground">
+                              {cita.hora} · {cita.duracion} min
+                              {isPersonalizado && (
+                                <span className="block text-[10px] text-amber-500 font-bold mt-0.5" title="Duración modificada manualmente">
+                                  ⏱ personalizado
+                                </span>
+                              )}
+                            </p>
                           </td>
                           <td className="px-4 py-3.5">
                             <select
@@ -626,6 +650,7 @@ export default function Citas() {
                     fecha: cita.fecha,
                     hora: cita.hora,
                   }) : null;
+                  const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
                   return (
                     <Card key={cita.id} className="p-4 border-border/45 bg-card/60 hover:bg-secondary/15 transition-colors space-y-3">
                       <div className="flex justify-between items-start">
@@ -689,7 +714,14 @@ export default function Citas() {
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-border/10">
                           <p>Estilista: <span className="text-foreground font-semibold">{cita.empleado?.nombre || '-'}</span></p>
-                          <p>Duración: <span className="text-foreground font-semibold">{cita.duracion} min</span></p>
+                          <p>Duración: <span className="text-foreground font-semibold">
+                            {cita.duracion} min
+                            {isPersonalizado && (
+                              <span className="ml-1 text-[10px] text-amber-500 font-bold" title="Duración modificada manualmente">
+                                (⏱ modificado)
+                              </span>
+                            )}
+                          </span></p>
                         </div>
                       </div>
 
@@ -780,13 +812,13 @@ export default function Citas() {
                   </datalist>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono</label>
-                  <Input
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono *</label>
+                  <PhoneInput
                     value={form.cliente_telefono}
-                    onChange={e => setForm({ ...form, cliente_telefono: e.target.value })}
-                    placeholder="8888-0000"
-                    readOnly={!!form.cliente_id}
-                    className={cn(form.cliente_id && 'bg-secondary/30 text-muted-foreground cursor-not-allowed focus-visible:ring-0 focus-visible:ring-offset-0')}
+                    onChange={(formattedVal, isValid) => {
+                      setForm((prev: any) => ({ ...prev, cliente_telefono: formattedVal }));
+                    }}
+                    disabled={!!form.cliente_id}
                   />
                 </div>
               </div>
@@ -802,9 +834,14 @@ export default function Citas() {
                         toast.error('Este servicio ya está agregado');
                         return;
                       }
+                      const s = servicios.find(srv => srv.id === val);
                       setForm((prev: any) => ({
                         ...prev,
                         servicio_ids: [...prev.servicio_ids, val],
+                        servicio_duraciones: {
+                          ...prev.servicio_duraciones,
+                          [val]: s ? s.duracion : 30
+                        },
                         hora: '' // Reset selected time
                       }));
                     }}
@@ -820,41 +857,124 @@ export default function Citas() {
                   </select>
 
                   {form.servicio_ids.length > 0 && (
-                    <div className="border border-border/60 rounded-lg p-2.5 space-y-1.5 bg-secondary/15">
+                    <div className="border border-border/60 rounded-lg p-2.5 space-y-2 bg-secondary/15">
                       {form.servicio_ids.map((id: string, index: number) => {
                         const s = servicios.find(srv => srv.id === id);
                         if (!s) return null;
+                        const currentDur = form.servicio_duraciones[id] || s.duracion;
                         return (
-                          <div key={id} className="flex items-center justify-between bg-card border border-border/40 px-2.5 py-1.5 rounded-md text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold bg-primary/10 text-primary w-5 h-5 flex items-center justify-center rounded-full">
-                                {index + 1}
-                              </span>
-                              <span className="font-medium text-foreground">{s.nombre}</span>
-                              <span className="text-xs text-muted-foreground">({s.duracion} min)</span>
+                          <div key={id} className="flex flex-col gap-2 bg-card border border-border/40 p-2.5 rounded-md text-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold bg-primary/10 text-primary w-5 h-5 flex items-center justify-center rounded-full">
+                                  {index + 1}
+                                </span>
+                                <span className="font-medium text-foreground">{s.nombre}</span>
+                                {currentDur !== s.duracion && (
+                                  <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/25 px-1.5 py-0.5 rounded font-semibold">
+                                    ⏱ personalizado
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setForm((prev: any) => {
+                                    const newDurs = { ...prev.servicio_duraciones };
+                                    delete newDurs[id];
+                                    return {
+                                      ...prev,
+                                      servicio_ids: prev.servicio_ids.filter((sid: string) => sid !== id),
+                                      servicio_duraciones: newDurs,
+                                      hora: '' // Reset selected time
+                                    };
+                                  });
+                                }}
+                                className="text-muted-foreground hover:text-red-500 p-0.5 rounded transition-colors"
+                                title="Quitar servicio"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setForm((prev: any) => ({
-                                  ...prev,
-                                  servicio_ids: prev.servicio_ids.filter((sid: string) => sid !== id),
-                                  hora: '' // Reset selected time
-                                }));
-                              }}
-                              className="text-muted-foreground hover:text-red-500 p-0.5 rounded transition-colors"
-                              title="Quitar servicio"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                            
+                            {/* Control Manual de Duración */}
+                            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/20 flex-wrap sm:flex-nowrap">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase mr-1">Duración:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newVal = Math.max(5, currentDur - 5);
+                                    setForm((prev: any) => ({
+                                      ...prev,
+                                      servicio_duraciones: { ...prev.servicio_duraciones, [id]: newVal },
+                                      hora: ''
+                                    }));
+                                  }}
+                                  className="p-1 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="5"
+                                  max="240"
+                                  value={currentDur}
+                                  onChange={(e) => {
+                                    const val = Math.max(5, Math.min(240, Number(e.target.value) || 5));
+                                    setForm((prev: any) => ({
+                                      ...prev,
+                                      servicio_duraciones: { ...prev.servicio_duraciones, [id]: val },
+                                      hora: ''
+                                    }));
+                                  }}
+                                  className="w-12 h-7 text-xs text-center bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary font-bold text-foreground"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newVal = Math.min(240, currentDur + 5);
+                                    setForm((prev: any) => ({
+                                      ...prev,
+                                      servicio_duraciones: { ...prev.servicio_duraciones, [id]: newVal },
+                                      hora: ''
+                                    }));
+                                  }}
+                                  className="p-1 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                                <span className="text-[10px] text-muted-foreground font-medium">min</span>
+                              </div>
+                              
+                              {/* Presets rápidos */}
+                              <div className="flex gap-1">
+                                {[5, 10, 15, 30].map(p => (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    onClick={() => {
+                                      const newVal = Math.min(240, currentDur + p);
+                                      setForm((prev: any) => ({
+                                        ...prev,
+                                        servicio_duraciones: { ...prev.servicio_duraciones, [id]: newVal },
+                                        hora: ''
+                                      }));
+                                    }}
+                                    className="px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary text-[10px] font-bold hover:bg-primary/10 active:scale-95 transition-all cursor-pointer"
+                                  >
+                                    +{p}m
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
                       
                       {(() => {
                         const totalDur = form.servicio_ids.reduce((sum: number, id: string) => {
-                          const s = servicios.find(srv => srv.id === id);
-                          return sum + (s?.duracion || 0);
+                          return sum + (form.servicio_duraciones[id] || 0);
                         }, 0);
                         return (
                           <div className="flex items-center justify-between pt-1.5 border-t border-border/50 px-1 text-xs font-semibold text-foreground">
@@ -900,8 +1020,7 @@ export default function Citas() {
                     fecha={form.fecha}
                     servicioId={form.servicio_ids[0]}
                     duracionTotal={form.servicio_ids.reduce((sum: number, id: string) => {
-                      const s = servicios.find(srv => srv.id === id);
-                      return sum + (s?.duracion || 0);
+                      return sum + (form.servicio_duraciones[id] || 0);
                     }, 0)}
                     selectedTime={form.hora}
                     onTimeSelect={h => setForm({ ...form, hora: h })}
@@ -914,8 +1033,7 @@ export default function Citas() {
                     <span className="text-muted-foreground">Duración total estimada:</span>{' '}
                     <strong>
                       {form.servicio_ids.reduce((sum: number, id: string) => {
-                        const s = servicios.find(srv => srv.id === id);
-                        return sum + (s?.duracion || 0);
+                        return sum + (form.servicio_duraciones[id] || 0);
                       }, 0)}{' '}
                       minutos
                     </strong>
@@ -952,8 +1070,13 @@ export default function Citas() {
                 <Input value={newCliente.nombre} onChange={e => setNewCliente({ ...newCliente, nombre: e.target.value })} required placeholder="Ej: Juan Pérez" />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono</label>
-                <Input value={newCliente.telefono} onChange={e => setNewCliente({ ...newCliente, telefono: e.target.value })} placeholder="8888-0000" />
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono *</label>
+                <PhoneInput
+                  value={newCliente.telefono}
+                  onChange={(formattedVal, isValid) => {
+                    setNewCliente(prev => ({ ...prev, telefono: formattedVal }));
+                  }}
+                />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowClienteModal(false)}>Cancelar</Button>

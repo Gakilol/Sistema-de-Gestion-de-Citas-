@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -45,6 +45,11 @@ interface MenuGroup {
 // ─── Toggle Tema ─────────────────────────────────────────────────────────────
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const cycles = [
     { value: 'light', icon: Sun,     label: 'Claro' },
@@ -52,14 +57,18 @@ function ThemeToggle() {
     { value: 'system', icon: Monitor, label: 'Sistema' },
   ];
 
-  const current = cycles.find((c) => c.value === theme) ?? cycles[2];
-  const next    = cycles[(cycles.indexOf(current) + 1) % cycles.length];
-  const Icon    = current.icon;
+  // Forzar una representación inicial neutral y coincidente con el servidor
+  const current = mounted 
+    ? (cycles.find((c) => c.value === theme) ?? cycles[2])
+    : cycles[2];
+
+  const next = cycles[(cycles.indexOf(current) + 1) % cycles.length];
+  const Icon = current.icon;
 
   return (
     <button
       onClick={() => setTheme(next.value)}
-      title={`Modo: ${current.label}. Clic para cambiar a ${next.label}`}
+      title={mounted ? `Modo: ${current.label}. Clic para cambiar a ${next.label}` : ''}
       className={cn(
         'flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-sm font-medium',
         'text-[hsl(var(--sidebar-foreground)/0.7)] hover:text-[hsl(var(--sidebar-foreground))]',

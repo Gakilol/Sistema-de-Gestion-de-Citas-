@@ -147,10 +147,21 @@ export async function calcularDisponibilidad(
 
   // ─── Turnos individuales del empleado para este día ─────────────────────
   const horarioEmpleado = empleado.horario as any;
-  const turnosEmpleadoDia: TurnoEmpleado[] | undefined =
-    (horarioEmpleado && Array.isArray(horarioEmpleado[diaNombre]))
-      ? horarioEmpleado[diaNombre]
-      : undefined;
+  let turnosEmpleadoDia: TurnoEmpleado[] | undefined = undefined;
+
+  if (horarioEmpleado && Array.isArray(horarioEmpleado[diaNombre])) {
+    turnosEmpleadoDia = horarioEmpleado[diaNombre].map((t: any) => {
+      if (typeof t === 'string') {
+        const [inicio, fin] = t.split('-');
+        return { inicio, fin };
+      }
+      return {
+        inicio: t.inicio || t.start || '08:00',
+        fin: t.fin || t.end || '18:00'
+      };
+    });
+  }
+
   const tieneTurnosIndividuales = turnosEmpleadoDia !== undefined && horarioEmpleado !== null;
 
   const DEFAULT_HORARIOS_GLOBALES: any = {
