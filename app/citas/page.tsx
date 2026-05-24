@@ -19,7 +19,7 @@ const getEmptyForm = () => ({
   cliente_telefono: '',
   servicio_id: '',
   servicio_ids: [] as string[],
-  servicio_duraciones: {} as Record<string, number>, // custom durations
+  servicio_duraciones: [] as number[], // custom durations parallel to servicio_ids
   empleado_id: '',
   fecha: '',
   hora: '',
@@ -177,13 +177,13 @@ export default function Citas() {
       ? c.citaServicios.map((cs: any) => cs.servicio_id)
       : (c.servicio_id ? [c.servicio_id] : []);
 
-    const duraciones: Record<string, number> = {};
+    const duraciones: number[] = [];
     if (Array.isArray(c.citaServicios) && c.citaServicios.length > 0) {
       c.citaServicios.forEach((cs: any) => {
-        duraciones[cs.servicio_id] = cs.duracion;
+        duraciones.push(cs.duracion);
       });
     } else if (c.servicio_id) {
-      duraciones[c.servicio_id] = c.duracion;
+      duraciones.push(c.duracion);
     }
 
     setForm({
@@ -219,9 +219,9 @@ export default function Citas() {
       cliente_telefono: form.cliente_telefono || null,
       servicio_id: form.servicio_ids[0],
       servicio_ids: form.servicio_ids,
-      servicios_seleccionados: form.servicio_ids.map((id: string) => ({
+      servicios_seleccionados: form.servicio_ids.map((id: string, index: number) => ({
         id,
-        duracion: form.servicio_duraciones[id] || 30
+        duracion: form.servicio_duraciones[index] || 30
       })),
       empleado_id: form.empleado_id,
       fecha: form.fecha,
@@ -830,18 +830,11 @@ export default function Citas() {
                     onChange={e => {
                       const val = e.target.value;
                       if (!val) return;
-                      if (form.servicio_ids.includes(val)) {
-                        toast.error('Este servicio ya está agregado');
-                        return;
-                      }
                       const s = servicios.find(srv => srv.id === val);
                       setForm((prev: any) => ({
                         ...prev,
                         servicio_ids: [...prev.servicio_ids, val],
-                        servicio_duraciones: {
-                          ...prev.servicio_duraciones,
-                          [val]: s ? s.duracion : 30
-                        },
+                        servicio_duraciones: [...prev.servicio_duraciones, s ? s.duracion : 30],
                         hora: '' // Reset selected time
                       }));
                     }}
@@ -850,7 +843,6 @@ export default function Citas() {
                     <option value="">+ Agregar servicio...</option>
                     {servicios
                       .filter(s => s.activo || form.servicio_ids.includes(s.id))
-                      .filter(s => !form.servicio_ids.includes(s.id))
                       .map(s => (
                         <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min)</option>
                       ))}
@@ -861,9 +853,9 @@ export default function Citas() {
                       {form.servicio_ids.map((id: string, index: number) => {
                         const s = servicios.find(srv => srv.id === id);
                         if (!s) return null;
-                        const currentDur = form.servicio_duraciones[id] || s.duracion;
+                        const currentDur = form.servicio_duraciones[index] ?? s.duracion;
                         return (
-                          <div key={id} className="flex flex-col gap-2 bg-card border border-border/40 p-2.5 rounded-md text-sm">
+                          <div key={`${id}-${index}`} className="flex flex-col gap-2 bg-card border border-border/40 p-2.5 rounded-md text-sm">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold bg-primary/10 text-primary w-5 h-5 flex items-center justify-center rounded-full">
@@ -880,11 +872,11 @@ export default function Citas() {
                                 type="button"
                                 onClick={() => {
                                   setForm((prev: any) => {
-                                    const newDurs = { ...prev.servicio_duraciones };
-                                    delete newDurs[id];
+                                    const newIds = prev.servicio_ids.filter((_: string, idx: number) => idx !== index);
+                                    const newDurs = prev.servicio_duraciones.filter((_: number, idx: number) => idx !== index);
                                     return {
                                       ...prev,
-                                      servicio_ids: prev.servicio_ids.filter((sid: string) => sid !== id),
+                                      servicio_ids: newIds,
                                       servicio_duraciones: newDurs,
                                       hora: '' // Reset selected time
                                     };
@@ -905,11 +897,15 @@ export default function Citas() {
                                   type="button"
                                   onClick={() => {
                                     const newVal = Math.max(5, currentDur - 5);
-                                    setForm((prev: any) => ({
-                                      ...prev,
-                                      servicio_duraciones: { ...prev.servicio_duraciones, [id]: newVal },
-                                      hora: ''
-                                    }));
+                                    setForm((prev: any) => {
+                                      const newDurs = [...prev.servicio_duraciones];
+                                      newDurs[index] = newVal;
+                                      return {
+                                        ...prev,
+                                        servicio_duraciones: newDurs,
+                                        hora: ''
+                                      };
+                                    });
                                   }}
                                   className="p-1 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
                                 >
@@ -922,11 +918,15 @@ export default function Citas() {
                                   value={currentDur}
                                   onChange={(e) => {
                                     const val = Math.max(5, Math.min(240, Number(e.target.value) || 5));
-                                    setForm((prev: any) => ({
-                                      ...prev,
-                                      servicio_duraciones: { ...prev.servicio_duraciones, [id]: val },
-                                      hora: ''
-                                    }));
+                                    setForm((prev: any) => {
+                                      const newDurs = [...prev.servicio_duraciones];
+                                      newDurs[index] = val;
+                                      return {
+                                        ...prev,
+                                        servicio_duraciones: newDurs,
+                                        hora: ''
+                                      };
+                                    });
                                   }}
                                   className="w-12 h-7 text-xs text-center bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary font-bold text-foreground"
                                 />
@@ -934,11 +934,15 @@ export default function Citas() {
                                   type="button"
                                   onClick={() => {
                                     const newVal = Math.min(240, currentDur + 5);
-                                    setForm((prev: any) => ({
-                                      ...prev,
-                                      servicio_duraciones: { ...prev.servicio_duraciones, [id]: newVal },
-                                      hora: ''
-                                    }));
+                                    setForm((prev: any) => {
+                                      const newDurs = [...prev.servicio_duraciones];
+                                      newDurs[index] = newVal;
+                                      return {
+                                        ...prev,
+                                        servicio_duraciones: newDurs,
+                                        hora: ''
+                                      };
+                                    });
                                   }}
                                   className="p-1 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
                                 >
@@ -955,11 +959,15 @@ export default function Citas() {
                                     type="button"
                                     onClick={() => {
                                       const newVal = Math.min(240, currentDur + p);
-                                      setForm((prev: any) => ({
-                                        ...prev,
-                                        servicio_duraciones: { ...prev.servicio_duraciones, [id]: newVal },
-                                        hora: ''
-                                      }));
+                                      setForm((prev: any) => {
+                                        const newDurs = [...prev.servicio_duraciones];
+                                        newDurs[index] = newVal;
+                                        return {
+                                          ...prev,
+                                          servicio_duraciones: newDurs,
+                                          hora: ''
+                                        };
+                                      });
                                     }}
                                     className="px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary text-[10px] font-bold hover:bg-primary/10 active:scale-95 transition-all cursor-pointer"
                                   >
@@ -973,9 +981,7 @@ export default function Citas() {
                       })}
                       
                       {(() => {
-                        const totalDur = form.servicio_ids.reduce((sum: number, id: string) => {
-                          return sum + (form.servicio_duraciones[id] || 0);
-                        }, 0);
+                        const totalDur = form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0);
                         return (
                           <div className="flex items-center justify-between pt-1.5 border-t border-border/50 px-1 text-xs font-semibold text-foreground">
                             <span>Total: {form.servicio_ids.length} servicio(s)</span>
@@ -1019,9 +1025,7 @@ export default function Citas() {
                     empleadoId={form.empleado_id}
                     fecha={form.fecha}
                     servicioId={form.servicio_ids[0]}
-                    duracionTotal={form.servicio_ids.reduce((sum: number, id: string) => {
-                      return sum + (form.servicio_duraciones[id] || 0);
-                    }, 0)}
+                    duracionTotal={form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}
                     selectedTime={form.hora}
                     onTimeSelect={h => setForm({ ...form, hora: h })}
                   />
@@ -1032,9 +1036,7 @@ export default function Citas() {
                   <p>
                     <span className="text-muted-foreground">Duración total estimada:</span>{' '}
                     <strong>
-                      {form.servicio_ids.reduce((sum: number, id: string) => {
-                        return sum + (form.servicio_duraciones[id] || 0);
-                      }, 0)}{' '}
+                      {form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}{' '}
                       minutos
                     </strong>
                   </p>

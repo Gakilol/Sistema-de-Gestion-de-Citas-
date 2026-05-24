@@ -175,7 +175,6 @@ model CitaServicio {
   cita        Cita     @relation(fields: [cita_id], references: [id], onDelete: Cascade)
   servicio    Servicio @relation(fields: [servicio_id], references: [id], onDelete: Restrict)
 
-  @@unique([cita_id, servicio_id])
   @@index([cita_id])
 }
 
