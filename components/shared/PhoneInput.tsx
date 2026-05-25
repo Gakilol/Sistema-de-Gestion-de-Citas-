@@ -149,9 +149,13 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
           {phoneNumber.length > 0 && (
             <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center">
               {validation.isValid ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" title="Número de teléfono válido" />
+                <span title="Número de teléfono válido">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </span>
               ) : (
-                <AlertCircle className="w-4 h-4 text-red-500" title={validation.message} />
+                <span title={validation.message}>
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                </span>
               )}
             </div>
           )}

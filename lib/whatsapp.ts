@@ -30,17 +30,13 @@ export function mensajeConfirmacion(cita: CitaWA): string {
     `Hola ${cita.cliente_nombre},`,
     `Su cita ha sido *confirmada*. Aqui estan los detalles:`,
     ``,
-    `*Servicio:* ${cita.servicio}`,
-    `*Estilista:* ${cita.empleado}`,
+    `*Su profesional asignado (a) para su cita:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
     `*Hora:* ${cita.hora}`,
     cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
     cita.notas     ? `*Notas:* ${cita.notas}` : null,
     ``,
-    `Por favor llegue 10 minutos antes de su cita.`,
-    `Si necesita reprogramar o cancelar, contactenos con anticipacion.`,
-    ``,
-    `Le esperamos.`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ];
   return lines.filter((l) => l !== null).join('\n');
 }
@@ -53,12 +49,11 @@ export function mensajeRecordatorio(cita: CitaWA): string {
     `Hola ${cita.cliente_nombre},`,
     `Le recordamos que tiene una cita *manana*:`,
     ``,
-    `*Servicio:* ${cita.servicio}`,
-    `*Estilista:* ${cita.empleado}`,
+    `*Su profesional asignado (a) para su cita:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
     `*Hora:* ${cita.hora}`,
     ``,
-    `Le esperamos.`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ];
   return lines.filter(Boolean).join('\n');
 }
@@ -71,11 +66,10 @@ export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
     `Hola *${cita.cliente_nombre}*,`,
     `Le recordamos que su cita está programada para *hoy*:`,
     ``,
-    `*Servicio:* ${cita.servicio}`,
-    `*Estilista:* ${cita.empleado}`,
+    `*Su profesional asignado (a) para su cita:* ${cita.empleado}`,
     `*Hora:* ${cita.hora}`,
     ``,
-    `📍 Le sugerimos llegar 10 minutos antes. ¡Le esperamos!`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ];
   return lines.filter(Boolean).join('\n');
 }
@@ -101,12 +95,11 @@ export function mensajeReprogramacion(cita: CitaWA): string {
     `Hola ${cita.cliente_nombre},`,
     `Su cita ha sido *reprogramada*:`,
     ``,
-    `*Servicio:* ${cita.servicio}`,
-    `*Estilista:* ${cita.empleado}`,
+    `*Su profesional asignado (a) para su cita:* ${cita.empleado}`,
     `*Nueva fecha:* ${fmtFecha(cita.fecha)}`,
     `*Nueva hora:* ${cita.hora}`,
     ``,
-    `Le esperamos.`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ].join('\n');
 }
 
