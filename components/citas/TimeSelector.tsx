@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, ChevronUp, ChevronDown, Minus, Plus } from 'lucide-react';
+import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getBusinessTodayString, getBusinessNowTime } from '@/lib/timezone';
 
@@ -379,133 +379,119 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     );
   };
 
-  // ─── Precision Time Picker (ÚNICO MODO PERMITIDO) ────────────────────────
+  // ─── Dropdown Time Picker ──────────────────────────────────────────────────
   const renderTimePicker = () => {
     const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
     const currentM = selectedTime ? selectedMinutes % 60 : 0;
-    const h12 = currentH === 0 ? 12 : currentH > 12 ? currentH - 12 : currentH;
-    const isPM = currentH >= 12;
+    const h12      = currentH === 0 ? 12 : currentH > 12 ? currentH - 12 : currentH;
+    const isPM     = currentH >= 12;
 
-    const toggleAmPm = () => {
-      const newH = isPM ? currentH - 12 : currentH + 12;
-      if (newH >= 0 && newH <= 23) {
-        setHour(newH);
+    const handleHourChange = (val: string) => {
+      const h12New  = parseInt(val, 10);
+      const h24New  = isPM
+        ? (h12New === 12 ? 12 : h12New + 12)
+        : (h12New === 12 ? 0 : h12New);
+      setHour(h24New);
+    };
+
+    const handleMinuteChange = (val: string) => {
+      setMinute(parseInt(val, 10));
+    };
+
+    const handlePeriodChange = (val: string) => {
+      const wantPM = val === 'PM';
+      if (wantPM && !isPM) {
+        const newH = currentH + 12;
+        if (newH <= 23) setHour(newH);
+      } else if (!wantPM && isPM) {
+        const newH = currentH - 12;
+        if (newH >= 0) setHour(newH);
       }
     };
 
-    const cycleHourUp = () => {
-      const newH = currentH >= 23 ? 0 : currentH + 1;
-      setHour(newH);
-    };
-
-    const cycleHourDown = () => {
-      const newH = currentH <= 0 ? 23 : currentH - 1;
-      setHour(newH);
-    };
+    // Calcular hora fin para el panel
+    const horaFinMin = selectedTime ? selectedMinutes + duracion : -1;
+    const horaFinStr = horaFinMin >= 0 ? minutesToTime(Math.min(1439, horaFinMin)) : null;
 
     return (
       <div className="space-y-4">
-        {/* Columnas del Selector digital */}
-        <div className="flex items-center justify-center gap-1">
-          {/* Columna de Horas */}
-          <div className="flex flex-col items-center">
-            <button
-              type="button"
-              onClick={cycleHourUp}
-              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
-            >
-              <ChevronUp className="w-4 h-4" />
-            </button>
-            <div className="w-14 h-12 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-xl font-bold tabular-nums text-foreground">
-              {String(h12).padStart(2, '0')}
-            </div>
-            <button
-              type="button"
-              onClick={cycleHourDown}
-              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
-
-          <span className="text-xl font-bold text-muted-foreground mx-0.5 self-center">:</span>
-
-          {/* Columna de Minutos */}
-          <div className="flex flex-col items-center">
-            <button
-              type="button"
-              onClick={() => {
-                const newM = currentM >= 59 ? 0 : currentM + 1;
-                setMinute(newM);
-              }}
-              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
-            >
-              <ChevronUp className="w-4 h-4" />
-            </button>
-            <div className="w-14 h-12 flex items-center justify-center rounded-xl bg-card border border-border shadow-sm text-xl font-bold tabular-nums text-foreground">
-              {String(currentM).padStart(2, '0')}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const newM = currentM <= 0 ? 59 : currentM - 1;
-                setMinute(newM);
-              }}
-              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Botón AM/PM */}
-          <div className="ml-2 self-center">
-            <button
-              type="button"
-              onClick={toggleAmPm}
-              className={cn(
-                "text-xs font-bold px-2.5 py-1.5 rounded-md transition-all duration-200 cursor-pointer border active:scale-95",
-                isPM
-                  ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
-              )}
-            >
-              {isPM ? 'PM' : 'AM'}
-            </button>
-          </div>
-        </div>
-
-        {/* Botones rápidos de ajuste de minutos */}
-        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-          {[-15, -5, -1, 1, 5, 15].map(delta => (
-            <button
-              key={delta}
-              type="button"
-              onClick={() => adjustTime(delta)}
-              className={cn(
-                "px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all active:scale-95 cursor-pointer",
-                delta < 0
-                  ? "bg-secondary/20 border-border/50 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-                  : "bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
-              )}
-            >
-              <span className="flex items-center gap-0.5">
-                {delta < 0 ? <Minus className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                {Math.abs(delta)}m
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Leyenda del fin de la cita */}
+        {/* ─── Panel de Información de Tiempo ────────────────────────────── */}
         {selectedTime && (
-          <p className="text-center text-xs text-muted-foreground">
-            Cita: <span className="font-bold text-foreground">{formatHora12(selectedTime)}</span>
-            {validacionActual?.valida && (
-              <span className="text-emerald-500 font-semibold"> → {formatHora12(minutesToTime(selectedMinutes + duracion))}</span>
-            )}
-            <span className="ml-1">({duracion} min)</span>
-          </p>
+          <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-secondary/30 border border-border/50">
+            <div className="text-center">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Inicio</p>
+              <p className="text-sm font-bold text-foreground tabular-nums">{formatHora12(selectedTime)}</p>
+            </div>
+            <div className="text-center border-x border-border/40">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Duración</p>
+              <p className="text-sm font-bold text-primary tabular-nums">{duracion} min</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Fin</p>
+              <p className={cn(
+                "text-sm font-bold tabular-nums",
+                validacionActual?.valida ? "text-emerald-500" : "text-red-500"
+              )}>
+                {horaFinStr ? formatHora12(horaFinStr) : '--'}
+              </p>
+            </div>
+          </div>
         )}
+
+        {/* ─── Selectores de Hora / Minuto / Período ──────────────────────── */}
+        <div className="flex items-center justify-center gap-2">
+          {/* Selector de Hora (1–12) */}
+          <div className="flex flex-col items-center gap-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Hora</label>
+            <select
+              value={String(h12).padStart(2, '0')}
+              onChange={e => handleHourChange(e.target.value)}
+              className="w-16 h-11 text-center text-xl font-bold rounded-xl bg-card border border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                <option key={h} value={String(h).padStart(2, '0')}>
+                  {String(h).padStart(2, '0')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <span className="text-2xl font-bold text-muted-foreground self-end mb-2">:</span>
+
+          {/* Selector de Minuto (00–59) */}
+          <div className="flex flex-col items-center gap-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Min</label>
+            <select
+              value={String(currentM).padStart(2, '0')}
+              onChange={e => handleMinuteChange(e.target.value)}
+              className="w-16 h-11 text-center text-xl font-bold rounded-xl bg-card border border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
+            >
+              {Array.from({ length: 60 }, (_, i) => i).map(m => (
+                <option key={m} value={String(m).padStart(2, '0')}>
+                  {String(m).padStart(2, '0')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Selector de Período AM/PM */}
+          <div className="flex flex-col items-center gap-1 ml-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Período</label>
+            <select
+              value={isPM ? 'PM' : 'AM'}
+              onChange={e => handlePeriodChange(e.target.value)}
+              className={cn(
+                "w-16 h-11 text-center text-sm font-bold rounded-xl border shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none transition-colors",
+                isPM
+                  ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-500"
+              )}
+            >
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+        </div>
       </div>
     );
   };

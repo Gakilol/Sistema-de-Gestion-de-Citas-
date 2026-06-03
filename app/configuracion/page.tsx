@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -41,9 +42,11 @@ const defaultHorarios: Record<string, { activo: boolean; inicio: string; fin: st
 };
 
 export default function Configuracion() {
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [tab, setTab]       = useState('negocio');
   const [saved, setSaved]   = useState(false);
+  const isTechSupport = user?.rol === 'TECH_SUPPORT';
 
   const [negocio, setNegocio] = useState({
     nombre: 'HAIR STYLE',
@@ -158,10 +161,16 @@ export default function Configuracion() {
               <h1 className="text-2xl font-bold text-foreground">Configuración</h1>
               <p className="text-sm text-muted-foreground">Personaliza tu sistema HAIR STYLE</p>
             </div>
-            <Button onClick={handleSave} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
-              {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-              {saved ? 'Guardado' : 'Guardar cambios'}
-            </Button>
+            {isTechSupport ? (
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                Modo Solo Lectura
+              </span>
+            ) : (
+              <Button onClick={handleSave} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
+                {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                {saved ? 'Guardado' : 'Guardar cambios'}
+              </Button>
+            )}
           </div>
 
           {/* Tabs */}
@@ -177,11 +186,12 @@ export default function Configuracion() {
 
           {/* ── Tab: Negocio ─────────────────────────────────── */}
           {tab === 'negocio' && (
-            <Card className="p-6 border-border/50 space-y-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Store className="w-4 h-4 text-primary"/>
-                <h2 className="font-semibold text-foreground">Información del Negocio</h2>
-              </div>
+            <Card className="p-6 border-border/50">
+              <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
+                <div className="flex items-center gap-2 mb-2">
+                  <Store className="w-4 h-4 text-primary"/>
+                  <h2 className="font-semibold text-foreground">Información del Negocio</h2>
+                </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre del negocio</label>
@@ -227,16 +237,18 @@ export default function Configuracion() {
                   <option value="America/Mexico_City">Ciudad de México (UTC-6)</option>
                 </select>
               </div>
+              </fieldset>
             </Card>
           )}
 
           {/* ── Tab: Horarios ────────────────────────────────── */}
           {tab === 'horarios' && (
             <Card className="p-6 border-border/50">
-              <div className="flex items-center gap-2 mb-5">
-                <Clock className="w-4 h-4 text-primary"/>
-                <h2 className="font-semibold text-foreground">Horario General del Salón</h2>
-              </div>
+              <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
+                <div className="flex items-center gap-2 mb-5">
+                  <Clock className="w-4 h-4 text-primary"/>
+                  <h2 className="font-semibold text-foreground">Horario General del Salón</h2>
+                </div>
               <p className="text-xs text-muted-foreground mb-4">
                 Este es el horario general de apertura. Los horarios individuales de cada empleado se configuran en su perfil.
               </p>
@@ -277,6 +289,7 @@ export default function Configuracion() {
                   );
                 })}
               </div>
+              </fieldset>
             </Card>
           )}
 
@@ -284,11 +297,12 @@ export default function Configuracion() {
 
           {/* ── Tab: WhatsApp ──────────────────────────────────── */}
           {tab === 'whatsapp' && (
-            <Card className="p-6 border-border/50 space-y-5">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageCircle className="w-4 h-4 text-[#25D366]"/>
-                <h2 className="font-semibold text-foreground">Configuración de WhatsApp</h2>
-              </div>
+            <Card className="p-6 border-border/50">
+              <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageCircle className="w-4 h-4 text-[#25D366]"/>
+                  <h2 className="font-semibold text-foreground">Configuración de WhatsApp</h2>
+                </div>
               <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-xl p-4 text-sm text-foreground">
                 <p className="font-medium mb-1">✅ Sistema usando enlaces wa.me (gratuito)</p>
                 <p className="text-muted-foreground text-xs">Los botones de WhatsApp en citas generan enlace directo sin necesidad de API externa.</p>
@@ -330,16 +344,18 @@ export default function Configuracion() {
                   rows={3}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"/>
               </div>
+              </fieldset>
             </Card>
           )}
 
           {/* ── Tab: Apariencia ──────────────────────────────── */}
           {tab === 'apariencia' && (
-            <Card className="p-6 border-border/50 space-y-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Palette className="w-4 h-4 text-primary"/>
-                <h2 className="font-semibold text-foreground">Apariencia del Sistema</h2>
-              </div>
+            <Card className="p-6 border-border/50">
+              <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
+                <div className="flex items-center gap-2 mb-2">
+                  <Palette className="w-4 h-4 text-primary"/>
+                  <h2 className="font-semibold text-foreground">Apariencia del Sistema</h2>
+                </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Modo de color</p>
                 <div className="grid grid-cols-3 gap-3">
@@ -369,6 +385,7 @@ export default function Configuracion() {
                   </div>
                 </div>
               </div>
+              </fieldset>
             </Card>
           )}
 

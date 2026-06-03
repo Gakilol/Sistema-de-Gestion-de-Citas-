@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 // ─── GET /api/configuracion
 export async function GET() {
@@ -39,6 +40,14 @@ export async function PATCH(req: NextRequest) {
         ...(whatsapp ? { whatsapp } : {}),
         ...(apariencia ? { apariencia } : {}),
       },
+    });
+
+    await registrarAuditoria({
+      entidad: 'Configuracion',
+      entidadId: 'default',
+      accion: 'ACTUALIZAR',
+      detalles: { secciones: Object.keys(body).filter(k => body[k] !== undefined) },
+      realizadoPor: req.headers.get('x-user-id'),
     });
 
     return NextResponse.json({ config: updated, mensaje: 'Configuración guardada exitosamente' });

@@ -20,6 +20,7 @@ interface Cliente {
   id: string;
   nombre: string;
   telefono: string | null;
+  correo: string | null;
   totalCitas: number;
   citasCompletadas: number;
   ultimaCita: string;
@@ -105,6 +106,9 @@ function HistorialModal({ cliente, onClose, onDelete, isAdmin }: { cliente: Clie
             </div>
             {cliente.telefono && (
               <p className="text-sm text-muted-foreground">{cliente.telefono}</p>
+            )}
+            {cliente.correo && (
+              <p className="text-xs text-muted-foreground truncate">{cliente.correo}</p>
             )}
           </div>
           <button
@@ -210,6 +214,9 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
           ) : (
             <p className="text-xs text-muted-foreground/50 mt-0.5 italic">Sin teléfono</p>
           )}
+          {cliente.correo && (
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{cliente.correo}</p>
+          )}
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
       </div>
@@ -245,12 +252,14 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
 
 // ─── Modal Agregar Cliente ─────────────────────────────────────────────────
 function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ nombre: '', telefono: '' });
+  const [form, setForm] = useState({ nombre: '', telefono: '', correo: '' });
+  const [phoneValid, setPhoneValid] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
     try {
       const res = await fetch('/api/clientes', {
@@ -283,16 +292,22 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
             <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono *</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono (opcional)</label>
             <PhoneInput
               value={form.telefono}
+              optional={true}
               onChange={(formattedVal, isValid) => {
                 setForm(prev => ({ ...prev, telefono: formattedVal }));
+                setPhoneValid(isValid);
               }}
             />
           </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Correo electrónico (opcional)</label>
+            <Input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="juan.perez@ejemplo.com" />
+          </div>
           <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
-            El cliente quedará registrado como pendiente. Puede programarle una cita luego desde la sección de Citas.
+            El cliente quedará registrado y podrá programarle una cita desde el panel correspondiente.
           </p>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
@@ -374,9 +389,11 @@ export default function Clientes() {
               <Button variant="outline" size="sm" onClick={() => fetchClientes(busqueda)} className="gap-1.5">
                 <RefreshCcw className="w-3.5 h-3.5" /> Actualizar
               </Button>
-              <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
-                <UserPlus className="w-3.5 h-3.5" /> Agregar Cliente
-              </Button>
+              {user?.rol !== 'TECH_SUPPORT' && (
+                <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
+                  <UserPlus className="w-3.5 h-3.5" /> Agregar Cliente
+                </Button>
+              )}
             </div>
           </div>
 

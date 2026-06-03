@@ -49,8 +49,9 @@ export async function middleware(req: NextRequest) {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
     const userRole = payload.rol as string;
 
-    // Solo ADMIN o EMPLEADO tienen acceso, si no, lo rechazamos
-    if (userRole !== 'ADMIN' && userRole !== 'EMPLEADO') {
+    // Solo ADMIN, EMPLEADO o TECH_SUPPORT tienen acceso, si no, lo rechazamos
+    const allowedRoles = ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'];
+    if (!allowedRoles.includes(userRole)) {
       if (path.startsWith('/api/')) {
         return NextResponse.json({ error: 'Rol no autorizado' }, { status: 403 });
       }

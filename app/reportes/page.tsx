@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { BarChart2, Users, Download, Calendar, Loader2 } from 'lucide-react';
+import { BarChart2, Users, Download, Calendar, Loader2, ClipboardList } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { id: 'citas',     label: 'Citas',       icon: Calendar },
   { id: 'empleados', label: 'Empleados',   icon: Users },
+  { id: 'auditoria', label: 'Auditoría',   icon: ClipboardList },
 ];
 
 const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316', '#06b6d4'];
@@ -43,6 +44,31 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+function formatAuditDetails(log: any) {
+  if (!log.detalles) return 'Sin detalles';
+  try {
+    const d = typeof log.detalles === 'string' ? JSON.parse(log.detalles) : log.detalles;
+    if (log.entidad === 'Cita') {
+      return `Cliente: ${d.cliente_nombre || '—'}, Fecha: ${d.fecha ? new Date(d.fecha).toLocaleDateString('es-NI') : '—'}, Hora: ${d.hora || '—'}`;
+    }
+    if (log.entidad === 'Cliente') {
+      return `Nombre: ${d.nombre || '—'}${d.telefono ? `, Tel: ${d.telefono}` : ''}${d.correo ? `, Correo: ${d.correo}` : ''}`;
+    }
+    if (log.entidad === 'Empleado') {
+      return `Nombre: ${d.nombre || '—'}, Rol: ${d.rol || '—'}`;
+    }
+    if (log.entidad === 'Servicio') {
+      return `Nombre: ${d.nombre || '—'}, Duración: ${d.duracion || '—'}m`;
+    }
+    if (log.entidad === 'Categoria') {
+      return `Nombre: ${d.nombre || '—'}`;
+    }
+    return JSON.stringify(d);
+  } catch {
+    return String(log.detalles);
+  }
+}
+
 // Preset de fechas
 function getPreset(preset: string) {
   const now  = new Date();
@@ -63,6 +89,12 @@ export default function Reportes() {
   const [preset, setPreset]     = useState('30d');
   const [[desde, hasta], setRango] = useState<[string, string]>(getPreset('30d'));
 
+  // Auditoría States
+  const [logs, setLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [filtroEntidad, setFiltroEntidad] = useState('');
+  const [filtroAccion, setFiltroAccion] = useState('');
+
   const fetchData = useCallback(async (tipo: string, d: string, h: string) => {
     setLoading(true);
     setData(null);
@@ -77,9 +109,31 @@ export default function Reportes() {
     }
   }, []);
 
+  const fetchLogs = useCallback(async (d: string, h: string, ent = '', acc = '') => {
+    setLogsLoading(true);
+    try {
+      const url = `/api/auditorias?desde=${d}&hasta=${h}&entidad=${ent}&accion=${acc}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (res.ok) setLogs(json.logs || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchData(tab, desde, hasta);
+    if (tab !== 'auditoria') {
+      fetchData(tab, desde, hasta);
+    }
   }, [tab, desde, hasta, fetchData]);
+
+  useEffect(() => {
+    if (tab === 'auditoria') {
+      fetchLogs(desde, hasta, filtroEntidad, filtroAccion);
+    }
+  }, [tab, desde, hasta, filtroEntidad, filtroAccion, fetchLogs]);
 
   const applyPreset = (p: string) => {
     const rango = getPreset(p);
@@ -176,9 +230,11 @@ export default function Reportes() {
               <p className="text-sm text-muted-foreground">Análisis y estadísticas de agendamiento</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1.5">
-                <Download className="w-3.5 h-3.5" /> Exportar PDF
-              </Button>
+              {tab !== 'auditoria' && (
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1.5">
+                  <Download className="w-3.5 h-3.5" /> Exportar PDF
+                </Button>
+              )}
             </div>
           </div>
 
@@ -320,6 +376,123 @@ export default function Reportes() {
                     </tbody>
                   </table>
                 </Card>
+              )}
+
+              {/* TAB: Auditoría */}
+              {tab === 'auditoria' && (
+                <div className="space-y-4">
+                  {/* Filtros de Auditoría */}
+                  <div className="flex flex-wrap gap-3 bg-secondary/35 p-3 rounded-xl border border-border/40">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ml-1">Entidad</span>
+                      <select
+                        value={filtroEntidad}
+                        onChange={e => setFiltroEntidad(e.target.value)}
+                        className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs min-w-[150px] outline-none focus:ring-1 focus:ring-primary text-foreground"
+                      >
+                        <option value="">Todas las Entidades</option>
+                        <option value="Cita">Cita</option>
+                        <option value="Cliente">Cliente</option>
+                        <option value="Empleado">Empleado</option>
+                        <option value="Servicio">Servicio</option>
+                        <option value="Categoria">Categoría</option>
+                        <option value="Configuracion">Configuración</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ml-1">Acción</span>
+                      <select
+                        value={filtroAccion}
+                        onChange={e => setFiltroAccion(e.target.value)}
+                        className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs min-w-[150px] outline-none focus:ring-1 focus:ring-primary text-foreground"
+                      >
+                        <option value="">Todas las Acciones</option>
+                        <option value="CREAR">Crear</option>
+                        <option value="ACTUALIZAR">Actualizar</option>
+                        <option value="ELIMINAR">Eliminar</option>
+                        <option value="CANCELAR">Cancelar</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <Card className="border-border/50 overflow-hidden">
+                    <div className="p-5 border-b border-border/50 flex justify-between items-center">
+                      <h2 className="text-sm font-semibold">Registro de Auditoría</h2>
+                      <span className="text-xs text-muted-foreground">Mostrando {logs.length} registro(s)</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-secondary/70">
+                          <tr>
+                            {['Fecha y Hora', 'Entidad', 'Acción', 'Descripción', 'ID Entidad'].map(h => (
+                              <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logsLoading ? (
+                            Array.from({ length: 3 }).map((_, i) => (
+                              <tr key={i}>
+                                <td colSpan={5} className="px-5 py-4">
+                                  <div className="skeleton h-8 w-full rounded-lg animate-pulse" />
+                                </td>
+                              </tr>
+                            ))
+                          ) : logs.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-5 py-12 text-center text-muted-foreground">
+                                No hay registros de auditoría que coincidan con los filtros.
+                              </td>
+                            </tr>
+                          ) : (
+                            logs.map((log: any) => (
+                              <tr key={log.id} className="border-t border-border/40 hover:bg-secondary/20 transition-colors">
+                                <td className="px-5 py-3 text-muted-foreground font-mono text-xs whitespace-nowrap">
+                                  {new Date(log.fecha).toLocaleString('es-NI', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })}
+                                </td>
+                                <td className="px-5 py-3">
+                                  <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
+                                    log.entidad === 'Cita' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' :
+                                    log.entidad === 'Cliente' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
+                                    log.entidad === 'Empleado' ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400' :
+                                    log.entidad === 'Servicio' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' :
+                                    'bg-secondary text-muted-foreground'
+                                  )}>
+                                    {log.entidad}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3">
+                                  <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                                    log.accion === 'CREAR' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
+                                    log.accion === 'ACTUALIZAR' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' :
+                                    log.accion === 'ELIMINAR' ? 'bg-red-500/15 text-red-600 dark:text-red-400' :
+                                    'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                  )}>
+                                    {log.accion}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3 text-foreground font-medium max-w-xs truncate" title={formatAuditDetails(log)}>
+                                  {formatAuditDetails(log)}
+                                </td>
+                                <td className="px-5 py-3 text-muted-foreground font-mono text-xs truncate max-w-[120px]" title={log.entidadId}>
+                                  {log.entidadId}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </div>
               )}
             </>
           )}

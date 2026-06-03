@@ -1,19 +1,21 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 // ─── GET /api/clientes
-// Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas
+// Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas.
+// Soporta búsqueda por nombre, teléfono y correo electrónico.
 export async function GET(req: NextRequest) {
   try {
     const busqueda = req.nextUrl.searchParams.get('q') ?? '';
 
-    // Buscar clientes en la base de datos
     let whereClause = {};
     if (busqueda) {
       whereClause = {
         OR: [
-          { nombre: { contains: busqueda, mode: 'insensitive' } },
+          { nombre:  { contains: busqueda, mode: 'insensitive' } },
           { telefono: { contains: busqueda, mode: 'insensitive' } },
+          { correo:  { contains: busqueda, mode: 'insensitive' } },
         ],
       };
     }
@@ -35,7 +37,6 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Mapear y calcular métricas para cada cliente
     const clientes = clientesData.map((c) => {
       let citasCompletadas = 0;
       let ultimaCita = c.createdAt;
@@ -43,29 +44,27 @@ export async function GET(req: NextRequest) {
       const serviciosFrecuentes: Record<string, number> = {};
 
       if (c.citas.length > 0) {
-        primeraCita = c.citas[c.citas.length - 1].fecha; // la más antigua, ya que están ordenadas desc
-        ultimaCita = c.citas[0].fecha; // la más reciente
+        primeraCita = c.citas[c.citas.length - 1].fecha;
+        ultimaCita  = c.citas[0].fecha;
       }
 
       for (const cita of c.citas) {
-        if (cita.estado === 'COMPLETADA') {
-          citasCompletadas++;
-        }
+        if (cita.estado === 'COMPLETADA') citasCompletadas++;
         if (cita.fecha > ultimaCita) ultimaCita = cita.fecha;
         if (cita.fecha < primeraCita) primeraCita = cita.fecha;
-        
+
         const sn = cita.servicio?.nombre;
-        if (sn) {
-          serviciosFrecuentes[sn] = (serviciosFrecuentes[sn] ?? 0) + 1;
-        }
+        if (sn) serviciosFrecuentes[sn] = (serviciosFrecuentes[sn] ?? 0) + 1;
       }
 
-      const servicioFavorito = Object.entries(serviciosFrecuentes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const servicioFavorito =
+        Object.entries(serviciosFrecuentes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
       return {
         id: c.id,
         nombre: c.nombre,
         telefono: c.telefono,
+        correo: c.correo,
         totalCitas: c.citas.length,
         citasCompletadas,
         ultimaCita,
@@ -76,7 +75,6 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Ordenar: más citas primero
     clientes.sort((a, b) => b.totalCitas - a.totalCitas);
 
     return NextResponse.json({ clientes, total: clientes.length }, { status: 200 });
@@ -90,22 +88,64 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const userRole = req.headers.get('x-user-role');
+    const userId   = req.headers.get('x-user-id');
+
     if (!userRole) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
+    // TECH_SUPPORT no puede crear clientes
+    if (userRole === 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'El rol Soporte Técnico no puede crear registros' }, { status: 403 });
+    }
+
     const body = await req.json();
-    const { nombre, telefono } = body;
+    const { nombre, telefono, correo } = body;
 
     if (!nombre || nombre.trim().length < 2) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
     }
 
+    // Validar teléfono duplicado (solo si se provee uno)
+    if (telefono && telefono.trim()) {
+      const duplicadoTel = await prisma.cliente.findFirst({
+        where: { telefono: telefono.trim() },
+      });
+      if (duplicadoTel) {
+        return NextResponse.json(
+          { error: `Ya existe un cliente con el teléfono ${telefono.trim()} (${duplicadoTel.nombre})` },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Validar correo duplicado (solo si se provee uno)
+    if (correo && correo.trim()) {
+      const duplicadoEmail = await prisma.cliente.findFirst({
+        where: { correo: correo.trim().toLowerCase() },
+      });
+      if (duplicadoEmail) {
+        return NextResponse.json(
+          { error: `Ya existe un cliente con ese correo electrónico (${duplicadoEmail.nombre})` },
+          { status: 409 }
+        );
+      }
+    }
+
     const nuevoCliente = await prisma.cliente.create({
       data: {
-        nombre: nombre.trim(),
+        nombre:  nombre.trim(),
         telefono: telefono?.trim() || null,
+        correo:   correo?.trim().toLowerCase() || null,
       },
+    });
+
+    await registrarAuditoria({
+      entidad: 'Cliente',
+      entidadId: nuevoCliente.id,
+      accion: 'CREAR',
+      detalles: { nombre: nuevoCliente.nombre, telefono: nuevoCliente.telefono, correo: nuevoCliente.correo },
+      realizadoPor: userId,
     });
 
     return NextResponse.json({ cliente: nuevoCliente, mensaje: 'Cliente registrado exitosamente' }, { status: 201 });

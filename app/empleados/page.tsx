@@ -110,9 +110,11 @@ export default function Empleados() {
               <h1 className="text-2xl font-bold text-foreground">Gestión de Personal</h1>
               <p className="text-sm text-muted-foreground">{activos} activo{activos!==1?'s':''} de {empleados.length}</p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4"/> Nuevo Empleado
-            </Button>
+            {user?.rol !== 'TECH_SUPPORT' && (
+              <Button onClick={openCreate} className="gap-1.5 glow-gold">
+                <Plus className="w-4 h-4"/> Nuevo Empleado
+              </Button>
+            )}
           </div>
 
           <Card className="border-border/50 overflow-hidden">
@@ -147,30 +149,40 @@ export default function Empleados() {
                       <td className="px-5 py-3.5 text-muted-foreground">{emp.especialidad||'General'}</td>
                       <td className="px-5 py-3.5">
                         <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
-                          emp.rol==='ADMIN'?'bg-amber-500/15 text-amber-600 dark:text-amber-400':'bg-secondary text-muted-foreground')}>
-                          {emp.rol==='ADMIN'?'Admin':'Empleado'}
+                          emp.rol==='ADMIN'?'bg-amber-500/15 text-amber-600 dark:text-amber-400':
+                          emp.rol==='TECH_SUPPORT'?'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400':'bg-secondary text-muted-foreground')}>
+                          {emp.rol==='ADMIN'?'Admin':emp.rol==='TECH_SUPPORT'?'Soporte Técnico':'Empleado'}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <button onClick={()=>toggleActivo(emp)}
+                        <button onClick={()=>user?.rol !== 'TECH_SUPPORT' && toggleActivo(emp)}
+                          disabled={user?.rol === 'TECH_SUPPORT'}
                           className={cn('px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-all',
                             emp.activo?'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25'
-                                     :'bg-red-500/10 text-red-500 hover:bg-red-500/20')}>
+                                     :'bg-red-500/10 text-red-500 hover:bg-red-500/20',
+                            user?.rol === 'TECH_SUPPORT' && 'cursor-default hover:bg-emerald-500/15 hover:bg-red-500/10')}>
                           {emp.activo?'Activo':'Inactivo'}
                         </button>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)} title="Editar empleado">
-                            <Edit className="w-3.5 h-3.5"/>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" onClick={()=>router.push(`/empleados/${emp.id}/horarios`)} title="Configurar horarios">
-                            <Clock className="w-3.5 h-3.5"/>
-                          </Button>
+                          {user?.rol !== 'TECH_SUPPORT' && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)} title="Editar empleado">
+                                <Edit className="w-3.5 h-3.5"/>
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" onClick={()=>router.push(`/empleados/${emp.id}/horarios`)} title="Configurar horarios">
+                                <Clock className="w-3.5 h-3.5"/>
+                              </Button>
+                            </>
+                          )}
                           {user?.rol === 'ADMIN' && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={()=>handleEliminarEmpleado(emp)} title="Eliminar empleado">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </Button>
+                          )}
+                          {user?.rol === 'TECH_SUPPORT' && (
+                            <span className="text-xs text-muted-foreground italic">Solo lectura</span>
                           )}
                         </div>
                       </td>
@@ -222,6 +234,7 @@ export default function Empleados() {
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
                     <option value="EMPLEADO">Empleado</option>
                     <option value="ADMIN">Administrador</option>
+                    <option value="TECH_SUPPORT">Soporte Técnico</option>
                   </select>
                 </div>
               </div>

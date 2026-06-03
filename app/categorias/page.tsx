@@ -58,8 +58,8 @@ export default function Categorias() {
   };
 
   useEffect(() => {
-    if (user && user.rol !== 'ADMIN') {
-      // Si no es ADMIN, no cargamos y mostramos acceso denegado
+    if (user && user.rol !== 'ADMIN' && user.rol !== 'TECH_SUPPORT') {
+      // Si no es ADMIN ni TECH_SUPPORT, no cargamos y mostramos acceso denegado
       setIsLoading(false);
       return;
     }
@@ -184,8 +184,8 @@ export default function Categorias() {
     );
   }
 
-  // Protección de Rol ADMIN
-  if (user && user.rol !== 'ADMIN') {
+  // Protección de Rol ADMIN y TECH_SUPPORT
+  if (user && user.rol !== 'ADMIN' && user.rol !== 'TECH_SUPPORT') {
     return (
       <div className="flex min-h-screen bg-background">
         <AdminSidebar />
@@ -196,7 +196,7 @@ export default function Categorias() {
             </div>
             <h2 className="text-lg font-bold text-foreground">Acceso Denegado</h2>
             <p className="text-sm text-muted-foreground">
-              Esta sección es exclusiva para administradores. Si eres parte del personal, puedes gestionar las citas en el panel correspondiente.
+              Esta sección es exclusiva para administradores y soporte técnico. Si eres parte del personal, puedes gestionar las citas en el panel correspondiente.
             </p>
             <Button onClick={() => router.push('/dashboard')} className="w-full glow-gold">
               Volver al Dashboard
@@ -221,9 +221,11 @@ export default function Categorias() {
                 {categorias.filter(c => c.activo).length} activas de {categorias.length} en total
               </p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4" /> Nueva Categoría
-            </Button>
+            {user?.rol !== 'TECH_SUPPORT' && (
+              <Button onClick={openCreate} className="gap-1.5 glow-gold">
+                <Plus className="w-4 h-4" /> Nueva Categoría
+              </Button>
+            )}
           </div>
 
           {/* Buscador y Filtros */}
@@ -302,12 +304,14 @@ export default function Categorias() {
                           </h3>
                         </div>
                         <button
-                          onClick={() => toggleActivo(cat)}
+                          onClick={() => user?.rol !== 'TECH_SUPPORT' && toggleActivo(cat)}
+                          disabled={user?.rol === 'TECH_SUPPORT'}
                           className={cn(
                             'text-[10px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0 border uppercase tracking-wider transition-all hover:brightness-110',
                             cat.activo 
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' 
-                              : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
+                              : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20',
+                            user?.rol === 'TECH_SUPPORT' && 'cursor-default hover:brightness-100'
                           )}
                         >
                           {cat.activo ? 'Activo' : 'Inactivo'}
@@ -332,24 +336,26 @@ export default function Categorias() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-2 pt-2 border-t border-border/10">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1 h-8 text-xs gap-1.5 bg-background/55 hover:bg-background/85 border-border/45" 
-                        onClick={() => openEdit(cat)}
-                      >
-                        <Edit className="w-3 h-3" /> Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-8 w-8 px-0 flex items-center justify-center bg-red-950/20 hover:bg-red-900/35 border border-red-500/30 text-red-500 hover:text-red-400"
-                        onClick={() => handleEliminarCategoria(cat)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    {user?.rol !== 'TECH_SUPPORT' && (
+                      <div className="flex gap-2 pt-2 border-t border-border/10">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 h-8 text-xs gap-1.5 bg-background/55 hover:bg-background/85 border-border/45" 
+                          onClick={() => openEdit(cat)}
+                        >
+                          <Edit className="w-3 h-3" /> Editar
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 w-8 px-0 flex items-center justify-center bg-red-950/20 hover:bg-red-900/35 border border-red-500/30 text-red-500 hover:text-red-400"
+                          onClick={() => handleEliminarCategoria(cat)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

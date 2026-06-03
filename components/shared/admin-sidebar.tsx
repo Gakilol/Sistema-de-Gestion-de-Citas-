@@ -97,13 +97,15 @@ function UserAvatar({ nombre, rol }: { nombre: string; rol: string }) {
     .toUpperCase();
 
   const roleColors: Record<string, string> = {
-    ADMIN:    'bg-gradient-to-br from-amber-400 to-amber-600 text-white',
-    EMPLEADO: 'bg-gradient-to-br from-slate-400 to-slate-600 text-white',
+    ADMIN:        'bg-gradient-to-br from-amber-400 to-amber-600 text-white',
+    EMPLEADO:     'bg-gradient-to-br from-slate-400 to-slate-600 text-white',
+    TECH_SUPPORT: 'bg-gradient-to-br from-cyan-500 to-cyan-700 text-white',
   };
 
   const roleLabels: Record<string, string> = {
-    ADMIN:    'Administrador',
-    EMPLEADO: 'Empleado',
+    ADMIN:        'Administrador',
+    EMPLEADO:     'Empleado',
+    TECH_SUPPORT: 'Soporte Técnico',
   };
 
   return (
@@ -135,7 +137,7 @@ const menuGroups: MenuGroup[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
-        roles: ['ADMIN', 'EMPLEADO'],
+        roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
       },
     ],
   },
@@ -146,13 +148,13 @@ const menuGroups: MenuGroup[] = [
         title: 'Citas',
         href: '/citas',
         icon: Calendar,
-        roles: ['ADMIN', 'EMPLEADO'],
+        roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
       },
       {
         title: 'Clientes',
         href: '/clientes',
         icon: Users,
-        roles: ['ADMIN', 'EMPLEADO'],
+        roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
         isNew: true,
       },
     ],
@@ -164,32 +166,32 @@ const menuGroups: MenuGroup[] = [
         title: 'Servicios',
         href: '/servicios',
         icon: Scissors,
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
         title: 'Categorías',
         href: '/categorias',
         icon: Tag,
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
         title: 'Personal',
         href: '/empleados',
         icon: UserRound,
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
         title: 'Reportes',
         href: '/reportes',
         icon: BarChart3,
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'TECH_SUPPORT'],
         isNew: true,
       },
       {
         title: 'Configuración',
         href: '/configuracion',
         icon: Settings,
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'TECH_SUPPORT'],
       },
     ],
   },

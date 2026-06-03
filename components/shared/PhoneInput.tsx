@@ -11,6 +11,7 @@ interface PhoneInputProps {
   disabled?: boolean;
   className?: string;
   placeholder?: string;
+  optional?: boolean;
 }
 
 const COUNTRIES = [
@@ -18,7 +19,7 @@ const COUNTRIES = [
   { code: '505', name: 'Nicaragua', flag: '🇳🇮', placeholder: '8888-7777' },
 ];
 
-export function PhoneInput({ value, onChange, disabled = false, className, placeholder }: PhoneInputProps) {
+export function PhoneInput({ value, onChange, disabled = false, className, placeholder, optional = false }: PhoneInputProps) {
   const [countryCode, setCountryCode] = useState('506'); // Costa Rica por defecto
   const [phoneNumber, setPhoneNumber] = useState('');
 
@@ -51,7 +52,7 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
     const cleanNumber = phoneNumber.replace(/\D/g, '');
     
     if (cleanNumber.length === 0) {
-      return { isValid: false, message: 'El teléfono es obligatorio' };
+      return { isValid: optional, message: optional ? '' : 'El teléfono es obligatorio' };
     }
     
     if (cleanNumber.length !== 8) {
@@ -74,7 +75,7 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
     }
 
     return { isValid: true, message: 'Teléfono válido' };
-  }, [phoneNumber, countryCode]);
+  }, [phoneNumber, countryCode, optional]);
 
   // Manejar el cambio del número telefónico
   const handlePhoneChange = (val: string) => {
@@ -83,9 +84,11 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
     setPhoneNumber(cleanDigits);
 
     const fullFormatted = cleanDigits ? `${countryCode}${cleanDigits}` : '';
-    const isValid = cleanDigits.length === 8 && (
-      (countryCode === '505' && ['8', '7', '5', '6', '2'].includes(cleanDigits[0])) ||
-      (countryCode === '506' && ['8', '7', '6', '5', '2', '4'].includes(cleanDigits[0]))
+    const isValid = cleanDigits.length === 0 && optional ? true : (
+      cleanDigits.length === 8 && (
+        (countryCode === '505' && ['8', '7', '5', '6', '2'].includes(cleanDigits[0])) ||
+        (countryCode === '506' && ['8', '7', '6', '5', '2', '4'].includes(cleanDigits[0]))
+      )
     );
     onChange(fullFormatted, isValid);
   };
@@ -94,9 +97,11 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
   const handleCountryChange = (code: string) => {
     setCountryCode(code);
     const fullFormatted = phoneNumber ? `${code}${phoneNumber}` : '';
-    const isValid = phoneNumber.length === 8 && (
-      (code === '505' && ['8', '7', '5', '6', '2'].includes(phoneNumber[0])) ||
-      (code === '506' && ['8', '7', '6', '5', '2', '4'].includes(phoneNumber[0]))
+    const isValid = phoneNumber.length === 0 && optional ? true : (
+      phoneNumber.length === 8 && (
+        (code === '505' && ['8', '7', '5', '6', '2'].includes(phoneNumber[0])) ||
+        (code === '506' && ['8', '7', '6', '5', '2', '4'].includes(phoneNumber[0]))
+      )
     );
     onChange(fullFormatted, isValid);
   };

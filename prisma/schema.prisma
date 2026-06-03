@@ -76,6 +76,7 @@ model Cita {
 enum RolUsuario {
   EMPLEADO
   ADMIN
+  TECH_SUPPORT
 }
 
 enum EstadoCita {
@@ -147,6 +148,7 @@ model Cliente {
   id        String   @id @default(dbgenerated("gen_random_uuid()"))
   nombre    String
   telefono  String?
+  correo    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   

@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 export async function GET(req: NextRequest) {
   try {
@@ -49,6 +50,14 @@ export async function POST(req: NextRequest) {
         categoria: legacyCategoria,
         categoria_id: categoria_id || null,
       },
+    });
+
+    await registrarAuditoria({
+      entidad: 'Servicio',
+      entidadId: servicio.id,
+      accion: 'CREAR',
+      detalles: { nombre, duracion: Number(duracion), categoria_id },
+      realizadoPor: req.headers.get('x-user-id'),
     });
 
     return NextResponse.json({ servicio, mensaje: 'Servicio creado exitosamente' }, { status: 201 });

@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 export async function GET(req: NextRequest) {
   try {
@@ -59,6 +60,14 @@ export async function POST(req: NextRequest) {
         rol: rol || 'EMPLEADO',
       },
       select: { id: true, nombre: true, correo: true, rol: true }
+    });
+
+    await registrarAuditoria({
+      entidad: 'Empleado',
+      entidadId: empleado.id,
+      accion: 'CREAR',
+      detalles: { nombre, correo, rol: rol || 'EMPLEADO' },
+      realizadoPor: req.headers.get('x-user-id'),
     });
 
     return NextResponse.json({ empleado, mensaje: 'Empleado creado exitosamente' }, { status: 201 });

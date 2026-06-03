@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, X, Search, MessageCircle, UserPlus, CheckCircle2, Minus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
+import { useAuth } from '@/components/providers/auth-provider';
 
 const getEmptyForm = () => ({
   cliente_id: '',
@@ -113,17 +115,14 @@ export default function Citas() {
   const [filtroSmart, setFiltroSmart] = useState('activas');
   const [page, setPage]           = useState(1);
   const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router                    = useRouter();
+  const { user }                  = useAuth();
+  const isAdmin                   = user?.rol === 'ADMIN';
 
-  useEffect(() => {
-    const savedFilter = sessionStorage.getItem('citas_filtro_smart');
-    if (savedFilter) {
-      setFiltroSmart(savedFilter);
-    }
-  }, []);
-
-  const [showClienteModal, setShowClienteModal] = useState(false);
-  const [newCliente, setNewCliente] = useState({ nombre: '', telefono: '' });
-  const [creatingCliente, setCreatingCliente] = useState(false);
+  // Estado para el buscador inteligente de clientes
+  const [clienteBusqueda, setClienteBusqueda] = useState('');
+  const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false);
+  const [forzar, setForzar]       = useState(false);
 
   const fetchCitas = async (q?: string, estado?: string, empleado?: string) => {
     setIsLoading(true);
@@ -162,45 +161,35 @@ export default function Citas() {
 
   const openCreate = () => {
     const activeServs = servicios.filter(s => s.activo);
-    const activeEmps = empleados.filter(e => e.activo);
+    const activeEmps  = empleados.filter(e => e.activo);
     if (!activeServs.length || !activeEmps.length) {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
     setForm(getEmptyForm());
+    setClienteBusqueda('');
+    setForzar(false);
     setEditingId(null);
     setShowModal(true);
   };
 
-  const openEdit = (c: any) => {
-    const ids = Array.isArray(c.citaServicios) && c.citaServicios.length > 0 
-      ? c.citaServicios.map((cs: any) => cs.servicio_id)
-      : (c.servicio_id ? [c.servicio_id] : []);
 
-    const duraciones: number[] = [];
-    if (Array.isArray(c.citaServicios) && c.citaServicios.length > 0) {
-      c.citaServicios.forEach((cs: any) => {
-        duraciones.push(cs.duracion);
-      });
-    } else if (c.servicio_id) {
-      duraciones.push(c.duracion);
-    }
 
-    setForm({
-      cliente_id: c.cliente_id || '',
-      cliente_nombre: c.cliente_nombre,
-      cliente_telefono: c.cliente_telefono || '',
-      servicio_id: c.servicio_id || '',
-      servicio_ids: ids,
-      servicio_duraciones: duraciones,
-      empleado_id: c.empleado_id,
-      fecha: new Date(c.fecha).toISOString().split('T')[0],
-      hora: c.hora,
-      notas: c.notas || '',
-    });
-    setEditingId(c.id);
-    setShowModal(true);
-  };
+  // Clientes filtrados para el buscador inteligente
+  const clientesFiltrados = useMemo(() => {
+    if (!clienteBusqueda.trim() || clienteBusqueda.trim().length < 2) return [];
+    const q = clienteBusqueda.toLowerCase().trim();
+    return clientesList.filter(c =>
+      c.nombre?.toLowerCase().includes(q) ||
+      (c.telefono && c.telefono.includes(q)) ||
+      (c.correo && c.correo.toLowerCase().includes(q))
+    ).slice(0, 8);
+  }, [clienteBusqueda, clientesList]);
+
+  // Guardar filtro smart en sesión
+  useEffect(() => {
+    sessionStorage.setItem('citas_filtro_smart', filtroSmart);
+  }, [filtroSmart]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,6 +199,10 @@ export default function Citas() {
     }
     if (!form.hora) {
       toast.error('Selecciona una hora');
+      return;
+    }
+    if (!form.cliente_id) {
+      toast.error('Debes seleccionar un cliente existente');
       return;
     }
     setSaving(true);
@@ -227,6 +220,7 @@ export default function Citas() {
       fecha: form.fecha,
       hora: form.hora,
       notas: form.notas || null,
+      forzar: forzar && isAdmin,
     };
     try {
       const url  = editingId ? `/api/citas/${editingId}` : '/api/citas';
@@ -242,6 +236,7 @@ export default function Citas() {
       }
       toast.success(editingId ? 'Cita actualizada' : 'Cita creada exitosamente');
       setShowModal(false);
+      setForzar(false);
       fetchCitas(busqueda, filtroEstado, filtroEmpleado);
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar');
@@ -268,40 +263,35 @@ export default function Citas() {
     }
   };
 
-  const handleCreateCliente = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCliente.nombre.trim()) {
-      toast.error('Nombre obligatorio');
-      return;
+  // openEdit también resetea estado de forzar
+  const openEdit = (c: any) => {
+    const ids = Array.isArray(c.citaServicios) && c.citaServicios.length > 0
+      ? c.citaServicios.map((cs: any) => cs.servicio_id)
+      : (c.servicio_id ? [c.servicio_id] : []);
+
+    const duraciones: number[] = [];
+    if (Array.isArray(c.citaServicios) && c.citaServicios.length > 0) {
+      c.citaServicios.forEach((cs: any) => { duraciones.push(cs.duracion); });
+    } else if (c.servicio_id) {
+      duraciones.push(c.duracion);
     }
-    setCreatingCliente(true);
-    try {
-      const res = await fetch('/api/clientes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCliente),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error);
-      }
-      const data = await res.json();
-      const cli = data.cliente;
-      toast.success('Cliente creado');
-      setClientesList(prev => [...prev, cli]);
-      setForm((prev: any) => ({
-        ...prev,
-        cliente_id: cli.id,
-        cliente_nombre: cli.nombre,
-        cliente_telefono: cli.telefono || '',
-      }));
-      setShowClienteModal(false);
-      setNewCliente({ nombre: '', telefono: '' });
-    } catch (err: any) {
-      toast.error(err.message || 'Error al crear');
-    } finally {
-      setCreatingCliente(false);
-    }
+
+    setForm({
+      cliente_id:        c.cliente_id || '',
+      cliente_nombre:    c.cliente_nombre,
+      cliente_telefono:  c.cliente_telefono || '',
+      servicio_id:       c.servicio_id || '',
+      servicio_ids:      ids,
+      servicio_duraciones: duraciones,
+      empleado_id:       c.empleado_id,
+      fecha:             new Date(c.fecha).toISOString().split('T')[0],
+      hora:              c.hora,
+      notas:             c.notas || '',
+    });
+    setClienteBusqueda(c.cliente_nombre || '');
+    setForzar(false);
+    setEditingId(c.id);
+    setShowModal(true);
   };
 
   const filteredAndSortedCitas = useMemo(() => {
@@ -775,52 +765,96 @@ export default function Citas() {
             <h2 className="text-lg font-bold mb-5">{editingId ? 'Editar Cita' : 'Nueva Cita'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nombre del cliente *</label>
-                    <button type="button" onClick={() => setShowClienteModal(true)} className="text-[10px] flex items-center gap-1 font-bold text-primary hover:underline">
-                      <UserPlus className="w-3.5 h-3.5" /> Nuevo
+                {/* ─── Selector Inteligente de Cliente ──────────────────── */}
+              <div className="col-span-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Cliente *</label>
+                {form.cliente_id ? (
+                  /* Cliente ya seleccionado: mostrar tarjeta */
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-emerald-500/8 border border-emerald-500/30">
+                    <div className="flex items-center gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold text-foreground">{form.cliente_nombre}</p>
+                        {form.cliente_telefono && (
+                          <p className="text-xs text-muted-foreground">{form.cliente_telefono}</p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((prev: any) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
+                        setClienteBusqueda('');
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-md px-2 py-1 transition-colors"
+                    >
+                      Cambiar
                     </button>
                   </div>
+                ) : (
+                  /* Buscador inteligente */
                   <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <Input
-                      list="clientes-list"
-                      value={form.cliente_nombre}
+                      value={clienteBusqueda}
                       onChange={e => {
-                        const val = e.target.value;
-                        const match = clientesList.find(c => c.nombre.toLowerCase() === val.toLowerCase());
-                        if (match) {
-                          setForm({ ...form, cliente_nombre: match.nombre, cliente_telefono: match.telefono || '', cliente_id: match.id });
-                        } else {
-                          setForm({ ...form, cliente_nombre: val, cliente_id: '' });
-                        }
+                        setClienteBusqueda(e.target.value);
+                        setClienteDropdownOpen(true);
+                        setForm((prev: any) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
                       }}
-                      required
-                      placeholder="Escriba o seleccione..."
-                      className={cn(form.cliente_id && 'pr-8 border-emerald-500/50')}
+                      onFocus={() => setClienteDropdownOpen(true)}
+                      placeholder="Buscar por nombre, teléfono o correo..."
+                      className="pl-9"
+                      autoComplete="off"
                     />
-                    {form.cliente_id && (
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-500" title="Cliente vinculado a la base de datos">
-                        <CheckCircle2 className="w-4 h-4" />
+                    {clienteDropdownOpen && clienteBusqueda.trim().length >= 2 && (
+                      <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border shadow-xl rounded-xl overflow-hidden">
+                        {clientesFiltrados.length > 0 ? (
+                          <ul className="divide-y divide-border/40 max-h-52 overflow-y-auto">
+                            {clientesFiltrados.map(c => (
+                              <li key={c.id}>
+                                <button
+                                  type="button"
+                                  className="w-full text-left px-4 py-2.5 hover:bg-secondary/40 transition-colors"
+                                  onClick={() => {
+                                    setForm((prev: any) => ({
+                                      ...prev,
+                                      cliente_id: c.id,
+                                      cliente_nombre: c.nombre,
+                                      cliente_telefono: c.telefono || '',
+                                    }));
+                                    setClienteBusqueda(c.nombre);
+                                    setClienteDropdownOpen(false);
+                                  }}
+                                >
+                                  <p className="text-sm font-semibold text-foreground">{c.nombre}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {[c.telefono, c.correo].filter(Boolean).join(' · ') || 'Sin contacto registrado'}
+                                  </p>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="px-4 py-5 text-center space-y-2">
+                            <p className="text-sm font-semibold text-muted-foreground">Cliente no encontrado.</p>
+                            <p className="text-xs text-muted-foreground">Debe registrarlo primero.</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 mt-1"
+                              onClick={() => { setShowModal(false); router.push('/clientes'); }}
+                            >
+                              Registrar Cliente
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                  <datalist id="clientes-list">
-                    {clientesList.map(c => (
-                      <option key={c.id} value={c.nombre}>{c.telefono ? `${c.nombre} (${c.telefono})` : c.nombre}</option>
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono *</label>
-                  <PhoneInput
-                    value={form.cliente_telefono}
-                    onChange={(formattedVal, isValid) => {
-                      setForm((prev: any) => ({ ...prev, cliente_telefono: formattedVal }));
-                    }}
-                    disabled={!!form.cliente_id}
-                  />
-                </div>
+                )}
+              </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Servicio(s) *</label>
@@ -1046,44 +1080,28 @@ export default function Citas() {
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas / Comentarios</label>
                 <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones o peticiones especiales..." />
               </div>
+              {/* Checkbox forzar agendamiento (solo para ADMIN cuando hay conflicto) */}
+              {isAdmin && (
+                <label className="flex items-start gap-3 px-3 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 cursor-pointer hover:bg-amber-500/10 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={forzar}
+                    onChange={e => setForzar(e.target.checked)}
+                    className="mt-0.5 accent-amber-500 w-4 h-4 flex-shrink-0"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Forzar agendamiento (ignorar conflictos)
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Solo disponible para administradores. Se registrará en la auditoría.</p>
+                  </div>
+                </label>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
                 <Button type="submit" disabled={saving} className="glow-gold">
                   {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
-      {/* Modal Crear Cliente Inline */}
-      {showClienteModal && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <Card className="w-full max-w-sm p-6 relative border-border/50 shadow-2xl">
-            <button onClick={() => setShowClienteModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" /> Crear Cliente
-            </h2>
-            <form onSubmit={handleCreateCliente} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
-                <Input value={newCliente.nombre} onChange={e => setNewCliente({ ...newCliente, nombre: e.target.value })} required placeholder="Ej: Juan Pérez" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono *</label>
-                <PhoneInput
-                  value={newCliente.telefono}
-                  onChange={(formattedVal, isValid) => {
-                    setNewCliente(prev => ({ ...prev, telefono: formattedVal }));
-                  }}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowClienteModal(false)}>Cancelar</Button>
-                <Button type="submit" disabled={creatingCliente} className="glow-gold">
-                  {creatingCliente ? 'Guardando...' : 'Guardar y Seleccionar'}
                 </Button>
               </div>
             </form>

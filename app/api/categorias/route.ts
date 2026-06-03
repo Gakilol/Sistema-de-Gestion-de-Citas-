@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,6 +48,14 @@ export async function POST(req: NextRequest) {
         orden: orden !== undefined ? Number(orden) : 0,
         activo: activo !== undefined ? Boolean(activo) : true,
       },
+    });
+
+    await registrarAuditoria({
+      entidad: 'Categoria',
+      entidadId: categoria.id,
+      accion: 'CREAR',
+      detalles: { nombre: categoria.nombre, color: categoria.color },
+      realizadoPor: req.headers.get('x-user-id'),
     });
 
     return NextResponse.json({ categoria, mensaje: 'Categoría creada exitosamente' }, { status: 201 });

@@ -148,9 +148,11 @@ export default function Servicios() {
               <h1 className="text-2xl font-bold text-foreground">Catálogo de Servicios</h1>
               <p className="text-sm text-muted-foreground">{servicios.filter(s => s.activo).length} activos de {servicios.length}</p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4" /> Nuevo Servicio
-            </Button>
+            {user?.rol !== 'TECH_SUPPORT' && (
+              <Button onClick={openCreate} className="gap-1.5 glow-gold">
+                <Plus className="w-4 h-4" /> Nuevo Servicio
+              </Button>
+            )}
           </div>
 
           {/* Tabs por categoría */}
@@ -196,10 +198,12 @@ export default function Servicios() {
                         {serv.descripcion && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{serv.descripcion}</p>}
                       </div>
                       <button
-                        onClick={() => toggleActivo(serv)}
+                        onClick={() => user?.rol !== 'TECH_SUPPORT' && toggleActivo(serv)}
+                        disabled={user?.rol === 'TECH_SUPPORT'}
                         className={cn(
                           'text-[10px] font-bold px-2 py-1 rounded-full ml-2 flex-shrink-0',
-                          serv.activo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-500'
+                          serv.activo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-500',
+                          user?.rol === 'TECH_SUPPORT' && 'cursor-default'
                         )}
                       >
                         {serv.activo ? 'Activo' : 'Inactivo'}
@@ -228,9 +232,11 @@ export default function Servicios() {
                       </span>
                     )}
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1 h-8 text-xs gap-1.5" onClick={() => openEdit(serv)}>
-                        <Edit className="w-3 h-3" /> Editar
-                      </Button>
+                      {user?.rol !== 'TECH_SUPPORT' && (
+                        <Button variant="outline" size="sm" className="flex-1 h-8 text-xs gap-1.5" onClick={() => openEdit(serv)}>
+                          <Edit className="w-3 h-3" /> Editar
+                        </Button>
+                      )}
                       {user?.rol === 'ADMIN' && (
                         <Button
                           variant="destructive"
