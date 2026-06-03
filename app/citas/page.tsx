@@ -124,6 +124,22 @@ export default function Citas() {
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false);
   const [forzar, setForzar]       = useState(false);
 
+  // Ref para cerrar el buscador de clientes al hacer click fuera
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Escuchar clicks fuera para cerrar el dropdown de clientes
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setClienteDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const fetchCitas = async (q?: string, estado?: string, empleado?: string) => {
     setIsLoading(true);
     try {
@@ -177,8 +193,11 @@ export default function Citas() {
 
   // Clientes filtrados para el buscador inteligente
   const clientesFiltrados = useMemo(() => {
-    if (!clienteBusqueda.trim() || clienteBusqueda.trim().length < 2) return [];
     const q = clienteBusqueda.toLowerCase().trim();
+    if (!q) {
+      // Mostrar primeros 8 clientes si la búsqueda está vacía
+      return clientesList.slice(0, 8);
+    }
     return clientesList.filter(c =>
       c.nombre?.toLowerCase().includes(q) ||
       (c.telefono && c.telefono.includes(q)) ||
@@ -793,7 +812,7 @@ export default function Citas() {
                   </div>
                 ) : (
                   /* Buscador inteligente */
-                  <div className="relative">
+                  <div className="relative" ref={dropdownRef}>
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <Input
                       value={clienteBusqueda}
@@ -807,7 +826,7 @@ export default function Citas() {
                       className="pl-9"
                       autoComplete="off"
                     />
-                    {clienteDropdownOpen && clienteBusqueda.trim().length >= 2 && (
+                    {clienteDropdownOpen && (
                       <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border shadow-xl rounded-xl overflow-hidden">
                         {clientesFiltrados.length > 0 ? (
                           <ul className="divide-y divide-border/40 max-h-52 overflow-y-auto">

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { EstadoCita } from '@prisma/client';
-import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
+import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import { syncCitaEstados } from '@/lib/automatizacion';
 
 export class AdminServicio {
@@ -9,11 +9,13 @@ export class AdminServicio {
     // Sincronizar estados de citas de forma automática y JIT antes de computar métricas
     await syncCitaEstados();
 
-    const now = new Date();
-    const hoy = startOfDay(now);
-    const finHoy = endOfDay(now);
-    const inicioMes = startOfMonth(now);
-    const finMes = endOfMonth(now);
+    const todayStr = getBusinessTodayString();
+    const dateToday = parseLocalDateToUTC(todayStr);
+
+    const [year, month] = todayStr.split('-').map(Number);
+    const inicioMes = new Date(Date.UTC(year, month - 1, 1));
+    const lastDay = new Date(year, month, 0).getDate();
+    const finMes = new Date(Date.UTC(year, month - 1, lastDay, 23, 59, 59, 999));
 
     // ── Conteos paralelos ───────────────────────────────────────────────
     const [
@@ -35,12 +37,12 @@ export class AdminServicio {
       // Completadas totales
       prisma.cita.count({ where: { estado: EstadoCita.COMPLETADA } }),
       // Citas hoy (todas)
-      prisma.cita.count({ where: { fecha: { gte: hoy, lte: finHoy } } }),
-      // Pendientes hoy
+      prisma.cita.count({ where: { fecha: dateToday } }),
+      // Pendientes hoy o futuros
       prisma.cita.count({
         where: {
           estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA] },
-          fecha: { gte: hoy },
+          fecha: { gte: dateToday },
         },
       }),
       // Empleados activos
@@ -56,14 +58,14 @@ export class AdminServicio {
       prisma.cita.count({
         where: {
           estado: EstadoCita.COMPLETADA,
-          fecha: { gte: hoy, lte: finHoy },
+          fecha: dateToday,
         },
       }),
       // Próximas citas (5)
       prisma.cita.findMany({
         where: {
           estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.REPROGRAMADA] },
-          fecha: { gte: hoy },
+          fecha: { gte: dateToday },
         },
         orderBy: [{ fecha: 'asc' }, { hora: 'asc' }],
         take: 5,
@@ -90,7 +92,7 @@ export class AdminServicio {
       }),
       // Citas de hoy en detalle
       prisma.cita.findMany({
-        where: { fecha: { gte: hoy, lte: finHoy } },
+        where: { fecha: dateToday },
         orderBy: { hora: 'asc' },
         include: {
           empleado: { select: { nombre: true } },
@@ -173,23 +175,32 @@ export class AdminServicio {
 
   // ─── Citas últimos 7 días ────────────────────────────────────────
   static async getCitasUltimos7Dias() {
+    const todayStr = getBusinessTodayString();
+    const [year, month, day] = todayStr.split('-').map(Number);
+    const baseDate = new Date(Date.UTC(year, month - 1, day));
+
     const dias = Array.from({ length: 7 }, (_, i) => {
-      const d = subDays(new Date(), 6 - i);
-      return { inicio: startOfDay(d), fin: endOfDay(d), label: format(d, 'EEE', { locale: undefined }) };
+      const d = new Date(baseDate);
+      d.setUTCDate(d.getUTCDate() - (6 - i));
+      return d;
     });
 
     const resultados = await Promise.all(
-      dias.map(async ({ inicio, fin, label }) => {
+      dias.map(async (d) => {
         const agg = await prisma.cita.aggregate({
           where: {
             estado: EstadoCita.COMPLETADA,
-            fecha: { gte: inicio, lte: fin },
+            fecha: d,
           },
           _count: { id: true },
         });
+
+        const dayLabel = d.toLocaleDateString('es-CR', { weekday: 'short', timeZone: 'UTC' }).slice(0, 3);
+        const dateLabel = `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+
         return {
-          fecha: format(inicio, 'dd/MM'),
-          dia: label,
+          fecha: dateLabel,
+          dia: dayLabel,
           citas: agg._count.id ?? 0,
         };
       })

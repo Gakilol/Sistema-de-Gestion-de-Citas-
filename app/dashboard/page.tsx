@@ -60,7 +60,8 @@ const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
 // Eliminado format USD
 
 function fmtDate(d: string | Date) {
-  return new Date(d).toLocaleDateString('es-NI', { day: '2-digit', month: 'short' });
+  const date = typeof d === 'string' ? new Date(d) : d;
+  return date.toLocaleDateString('es-NI', { day: '2-digit', month: 'short', timeZone: 'UTC' }).replace(/\./g, '');
 }
 
 // ─── Skeleton ───────────────────────────────────────────────────────────────
