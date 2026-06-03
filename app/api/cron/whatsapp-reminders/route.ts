@@ -55,9 +55,9 @@ async function handleCron(req: NextRequest) {
 
     if (citas.length === 0) {
       console.log('[CRON] No hay citas elegibles para enviar recordatorios en este lote.');
-      return NextResponse.json({ 
-        mensaje: 'Sincronizado. No hay citas elegibles para recordatorios.', 
-        procesados: 0 
+      return NextResponse.json({
+        mensaje: 'Sincronizado. No hay citas elegibles para recordatorios.',
+        procesados: 0
       }, { status: 200 });
     }
 
@@ -87,7 +87,7 @@ async function handleCron(req: NextRequest) {
     // 6. Enviar mensajes y registrar en la BD
     for (const item of citasPorEnviar) {
       const { cita, diffMinutes } = item;
-      
+
       const servicioNombres = cita.citaServicios.length > 0
         ? cita.citaServicios.map(cs => cs.servicio.nombre).join(' + ')
         : cita.servicio.nombre;
