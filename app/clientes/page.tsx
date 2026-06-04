@@ -391,7 +391,7 @@ export default function Clientes() {
               </Button>
               {user?.rol !== 'TECH_SUPPORT' && (
                 <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
-                  <UserPlus className="w-3.5 h-3.5" /> Agregar Cliente
+                  <UserPlus className="w-3.5 h-3.5" /> Registrar Cliente
                 </Button>
               )}
             </div>
