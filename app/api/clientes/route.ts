@@ -94,10 +94,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // TECH_SUPPORT no puede crear clientes
-    if (userRole === 'TECH_SUPPORT') {
-      return NextResponse.json({ error: 'El rol Soporte Técnico no puede crear registros' }, { status: 403 });
-    }
+
 
     const body = await req.json();
     const { nombre, telefono, correo } = body;

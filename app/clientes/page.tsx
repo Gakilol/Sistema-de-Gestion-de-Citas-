@@ -389,11 +389,9 @@ export default function Clientes() {
               <Button variant="outline" size="sm" onClick={() => fetchClientes(busqueda)} className="gap-1.5">
                 <RefreshCcw className="w-3.5 h-3.5" /> Actualizar
               </Button>
-              {user?.rol !== 'TECH_SUPPORT' && (
-                <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
-                  <UserPlus className="w-3.5 h-3.5" /> Registrar Cliente
-                </Button>
-              )}
+              <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
+                <UserPlus className="w-3.5 h-3.5" /> Registrar Cliente
+              </Button>
             </div>
           </div>
 
