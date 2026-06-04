@@ -16,8 +16,8 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   try {
     const userRole = req.headers.get('x-user-role');
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo administradores pueden modificar la configuración' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo administradores y soporte técnico pueden modificar la configuración' }, { status: 403 });
     }
 
     const body = await req.json();

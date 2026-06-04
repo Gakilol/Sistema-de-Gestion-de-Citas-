@@ -10,11 +10,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const userRole = req.headers.get('x-user-role') || '';
     const userId   = req.headers.get('x-user-id');
 
-    // TECH_SUPPORT no puede modificar citas
-    if (userRole === 'TECH_SUPPORT') {
-      return NextResponse.json({ error: 'El rol Soporte Técnico no puede modificar citas' }, { status: 403 });
-    }
-
     const {
       estado,
       notas,
@@ -28,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       cliente_id,
       cliente_nombre,
       cliente_telefono,
-      forzar,   // ← flag para forzar agendamiento (solo ADMIN)
+      forzar,
     } = body;
 
     const dataToUpdate: any = {};
@@ -77,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) ||
       (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0);
 
-    const esForzado = forzar === true && userRole === 'ADMIN';
+    const esForzado = forzar === true && (userRole === 'ADMIN' || userRole === 'TECH_SUPPORT');
 
     if (cambiaHorario) {
       const citaActual = await prisma.cita.findUnique({ where: { id } });
@@ -110,7 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }, 0);
       }
 
-      const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
+      const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
       const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
       const disponibilidad = await calcularDisponibilidad(
@@ -248,8 +243,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const userRole = req.headers.get('x-user-role');
     const userId   = req.headers.get('x-user-id');
 
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden eliminar citas' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar citas' }, { status: 403 });
     }
 
     await prisma.cita.delete({ where: { id } });

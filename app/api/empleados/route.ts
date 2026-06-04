@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const userRole = req.headers.get('x-user-role');
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden agregar empleados' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden agregar empleados' }, { status: 403 });
     }
 
     const body = await req.json();

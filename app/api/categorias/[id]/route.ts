@@ -5,8 +5,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden editar categorías' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar categorías' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -60,8 +60,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden eliminar categorías' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar categorías' }, { status: 403 });
     }
 
     // Verificar si hay servicios asociados a esta categoría

@@ -46,7 +46,7 @@ export default function Configuracion() {
   const { theme, setTheme } = useTheme();
   const [tab, setTab]       = useState('negocio');
   const [saved, setSaved]   = useState(false);
-  const isTechSupport = user?.rol === 'TECH_SUPPORT';
+  const isTechSupport = false;
 
   const [negocio, setNegocio] = useState({
     nombre: 'HAIR STYLE',

@@ -29,8 +29,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden editar horarios y bloqueos' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar horarios y bloqueos' }, { status: 403 });
     }
 
     const { bloqueos } = await req.json();

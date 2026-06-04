@@ -65,11 +65,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
     }
 
-    // TECH_SUPPORT no puede crear citas
-    if (userRole === 'TECH_SUPPORT') {
-      return NextResponse.json({ error: 'El rol Soporte Técnico no puede crear citas' }, { status: 403 });
-    }
-
     const {
       cliente_id,
       cliente_nombre,
@@ -81,7 +76,7 @@ export async function POST(req: NextRequest) {
       fecha,
       hora,
       notas,
-      forzar,   // ← flag para forzar agendamiento (solo ADMIN)
+      forzar,
     } = body;
 
     // Resolver servicios
@@ -116,9 +111,9 @@ export async function POST(req: NextRequest) {
     const primerServicioId  = serviciosParaCita[0].id;
 
     // ─── VALIDACIÓN DE DISPONIBILIDAD ───────────────────────────────────────
-    // Si el admin manda forzar: true, se omite la validación de colisiones
-    const esForzado = forzar === true && userRole === 'ADMIN';
-    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
+    // Si el admin o tech support manda forzar: true, se omite la validación de colisiones
+    const esForzado = forzar === true && (userRole === 'ADMIN' || userRole === 'TECH_SUPPORT');
+    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
     const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
     const disponibilidad = await calcularDisponibilidad(

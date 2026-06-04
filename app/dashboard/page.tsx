@@ -169,7 +169,7 @@ export default function Dashboard() {
 
   useEffect(() => { if (user) load(); }, [user, load]);
 
-  const isAdmin = user?.rol === 'ADMIN';
+  const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT';
 
   // ─── Loading skeleton ───────────────────────────────────────────────
   if (isAuthLoading || isLoading) {

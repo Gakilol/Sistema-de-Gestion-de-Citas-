@@ -7,8 +7,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const userRole = req.headers.get('x-user-role');
     
     // Solo administradores pueden eliminar clientes
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden eliminar clientes' }, { status: 403 });
+    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar clientes' }, { status: 403 });
     }
 
     // 1. Desvincular las citas históricas poniendo cliente_id en null.

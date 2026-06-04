@@ -110,11 +110,9 @@ export default function Empleados() {
               <h1 className="text-2xl font-bold text-foreground">Gestión de Personal</h1>
               <p className="text-sm text-muted-foreground">{activos} activo{activos!==1?'s':''} de {empleados.length}</p>
             </div>
-            {user?.rol !== 'TECH_SUPPORT' && (
-              <Button onClick={openCreate} className="gap-1.5 glow-gold">
-                <Plus className="w-4 h-4"/> Nuevo Empleado
-              </Button>
-            )}
+            <Button onClick={openCreate} className="gap-1.5 glow-gold">
+              <Plus className="w-4 h-4"/> Nuevo Empleado
+            </Button>
           </div>
 
           <Card className="border-border/50 overflow-hidden">
@@ -155,34 +153,25 @@ export default function Empleados() {
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <button onClick={()=>user?.rol !== 'TECH_SUPPORT' && toggleActivo(emp)}
-                          disabled={user?.rol === 'TECH_SUPPORT'}
+                        <button onClick={()=>toggleActivo(emp)}
                           className={cn('px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-all',
                             emp.activo?'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25'
-                                     :'bg-red-500/10 text-red-500 hover:bg-red-500/20',
-                            user?.rol === 'TECH_SUPPORT' && 'cursor-default hover:bg-emerald-500/15 hover:bg-red-500/10')}>
+                                     :'bg-red-500/10 text-red-500 hover:bg-red-500/20')}>
                           {emp.activo?'Activo':'Inactivo'}
                         </button>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1">
-                          {user?.rol !== 'TECH_SUPPORT' && (
-                            <>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)} title="Editar empleado">
-                                <Edit className="w-3.5 h-3.5"/>
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" onClick={()=>router.push(`/empleados/${emp.id}/horarios`)} title="Configurar horarios">
-                                <Clock className="w-3.5 h-3.5"/>
-                              </Button>
-                            </>
-                          )}
-                          {user?.rol === 'ADMIN' && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={()=>openEdit(emp)} title="Editar empleado">
+                            <Edit className="w-3.5 h-3.5"/>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" onClick={()=>router.push(`/empleados/${emp.id}/horarios`)} title="Configurar horarios">
+                            <Clock className="w-3.5 h-3.5"/>
+                          </Button>
+                          {(user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT') && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={()=>handleEliminarEmpleado(emp)} title="Eliminar empleado">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </Button>
-                          )}
-                          {user?.rol === 'TECH_SUPPORT' && (
-                            <span className="text-xs text-muted-foreground italic">Solo lectura</span>
                           )}
                         </div>
                       </td>
