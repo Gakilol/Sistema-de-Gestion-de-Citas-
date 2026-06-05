@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Star, Phone, Calendar,
-  Scissors, X, RefreshCcw, UserPlus, ChevronRight, Trash2
+  Scissors, X, RefreshCcw, UserPlus, ChevronRight, Trash2, Edit
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -88,7 +88,7 @@ function Skeleton() {
 }
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
-function HistorialModal({ cliente, onClose, onDelete, isAdmin }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; isAdmin: boolean }) {
+function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: Cliente) => void; isAdmin: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
@@ -153,28 +153,40 @@ function HistorialModal({ cliente, onClose, onDelete, isAdmin }: { cliente: Clie
           ))}
         </div>
 
-        {/* Footer con WhatsApp y Eliminación */}
+        {/* Footer con WhatsApp, Edición y Eliminación */}
         <div className="p-4 border-t border-border/50 flex flex-col gap-2">
-          {cliente.telefono ? (
-            <a
-              href={urlWhatsAppConfirmacion({
-                cliente_nombre: cliente.nombre,
-                cliente_telefono: cliente.telefono,
-                servicio: cliente.servicioFavorito ?? 'Servicio',
-                empleado: 'HAIR STYLE',
-                fecha: new Date(),
-                hora: '—',
-              }) ?? '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#1ebe5a] text-white rounded-xl py-2.5 text-sm font-semibold transition-all"
+          <div className="flex gap-2">
+            {cliente.telefono ? (
+              <a
+                href={urlWhatsAppConfirmacion({
+                  cliente_nombre: cliente.nombre,
+                  cliente_telefono: cliente.telefono,
+                  servicio: cliente.servicioFavorito ?? 'Servicio',
+                  empleado: 'HAIR STYLE',
+                  fecha: new Date(),
+                  hora: '—',
+                }) ?? '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 flex-1 bg-[#25D366] hover:bg-[#1ebe5a] text-white rounded-xl py-2.5 text-sm font-semibold transition-all"
+              >
+                <Phone className="w-4 h-4" />
+                WhatsApp
+              </a>
+            ) : (
+              <p className="text-xs text-center text-muted-foreground flex-1 self-center">Sin número registrado</p>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEdit(cliente)}
+              className="flex items-center justify-center gap-2 flex-1 border border-border/50 hover:bg-secondary rounded-xl py-2.5 text-sm font-semibold transition-all"
             >
-              <Phone className="w-4 h-4" />
-              Contactar por WhatsApp
-            </a>
-          ) : (
-            <p className="text-xs text-center text-muted-foreground">Sin número de teléfono registrado</p>
-          )}
+              <Edit className="w-4 h-4" />
+              Editar Datos
+            </Button>
+          </div>
 
           {isAdmin && (
             <Button
@@ -321,6 +333,82 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
   );
 }
 
+// ─── Modal Editar Cliente ───────────────────────────────────────────────────
+function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente; onClose: () => void; onUpdated: (data: { nombre: string; telefono: string | null; correo: string | null }) => void }) {
+  const [form, setForm] = useState({
+    nombre: cliente.nombre || '',
+    telefono: cliente.telefono || '',
+    correo: cliente.correo || '',
+  });
+  const [phoneValid, setPhoneValid] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/clientes/${cliente.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success('Cliente actualizado exitosamente');
+      onUpdated({
+        nombre: form.nombre.trim(),
+        telefono: form.telefono?.trim() || null,
+        correo: form.correo?.trim().toLowerCase() || null,
+      });
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al actualizar cliente');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold text-foreground">Editar Cliente</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
+            <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Teléfono (opcional)</label>
+            <PhoneInput
+              value={form.telefono}
+              optional={true}
+              onChange={(formattedVal, isValid) => {
+                setForm(prev => ({ ...prev, telefono: formattedVal }));
+                setPhoneValid(isValid);
+              }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Correo electrónico (opcional)</label>
+            <Input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="juan.perez@ejemplo.com" />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={saving} className="glow-gold">
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function Clientes() {
   const { user } = useAuth();
@@ -329,6 +417,7 @@ export default function Clientes() {
   const [busqueda, setBusqueda] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [showAgregar, setShowAgregar] = useState(false);
+  const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchClientes = useCallback(async (q = '') => {
@@ -460,6 +549,7 @@ export default function Clientes() {
           cliente={clienteSeleccionado}
           onClose={() => setClienteSeleccionado(null)}
           onDelete={handleEliminarCliente}
+          onEdit={(c) => setClienteAEditar(c)}
           isAdmin={user?.rol === 'ADMIN'}
         />
       )}
@@ -469,6 +559,23 @@ export default function Clientes() {
         <AgregarClienteModal
           onClose={() => setShowAgregar(false)}
           onCreated={() => fetchClientes(busqueda)}
+        />
+      )}
+
+      {/* Modal editar cliente */}
+      {clienteAEditar && (
+        <EditarClienteModal
+          cliente={clienteAEditar}
+          onClose={() => setClienteAEditar(null)}
+          onUpdated={(formFields) => {
+            fetchClientes(busqueda);
+            if (clienteSeleccionado && clienteSeleccionado.id === clienteAEditar.id) {
+              setClienteSeleccionado((prev) => prev ? {
+                ...prev,
+                ...formFields
+              } : null);
+            }
+          }}
         />
       )}
     </div>
