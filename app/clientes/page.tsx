@@ -21,6 +21,7 @@ interface Cliente {
   nombre: string;
   telefono: string | null;
   correo: string | null;
+  notas: string | null;
   totalCitas: number;
   citasCompletadas: number;
   ultimaCita: string;
@@ -264,7 +265,7 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
 
 // ─── Modal Agregar Cliente ─────────────────────────────────────────────────
 function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ nombre: '', telefono: '', correo: '' });
+  const [form, setForm] = useState({ nombre: '', telefono: '', correo: '', notas: '' });
   const [phoneValid, setPhoneValid] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -318,6 +319,16 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Correo electrónico (opcional)</label>
             <Input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="juan.perez@ejemplo.com" />
           </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas (opcional)</label>
+            <textarea
+              value={form.notas}
+              onChange={e => setForm({ ...form, notas: e.target.value })}
+              placeholder="Alergias, preferencias, observaciones..."
+              rows={2}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
+            />
+          </div>
           <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
             El cliente quedará registrado y podrá programarle una cita desde el panel correspondiente.
           </p>
@@ -339,6 +350,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
     nombre: cliente.nombre || '',
     telefono: cliente.telefono || '',
     correo: cliente.correo || '',
+    notas: cliente.notas || '',
   });
   const [phoneValid, setPhoneValid] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -396,6 +408,16 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Correo electrónico (opcional)</label>
             <Input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="juan.perez@ejemplo.com" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas (opcional)</label>
+            <textarea
+              value={form.notas}
+              onChange={e => setForm({ ...form, notas: e.target.value })}
+              placeholder="Alergias, preferencias, observaciones..."
+              rows={2}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
+            />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>

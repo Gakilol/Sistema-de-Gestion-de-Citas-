@@ -13,7 +13,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const body = await req.json();
-    const { nombre, telefono, correo } = body;
+    const { nombre, telefono, correo, notas } = body;
 
     if (!nombre || nombre.trim().length < 2) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
@@ -65,6 +65,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         nombre: nombre.trim(),
         telefono: telefono?.trim() || null,
         correo: correo?.trim().toLowerCase() || null,
+        notas: notas?.trim() || null,
       },
     });
 

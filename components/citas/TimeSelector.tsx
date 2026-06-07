@@ -132,6 +132,19 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
         } else {
           setJornada(data.jornada || null);
           setIntervalosOcupados(data.intervalosOcupados || []);
+
+          // ─── AUTO-SELECCIÓN: si no hay hora seleccionada, elegir el primer
+          // bloque disponible para mantener sincronizado el estado del formulario
+          // con lo que el usuario ve visualmente en los selectores de hora.
+          if (!selectedTime) {
+            const primerDisponible = (data.bloques || []).find((b: { hora: string; disponible: boolean }) => b.disponible);
+            if (primerDisponible) {
+              onTimeSelect(primerDisponible.hora);
+            } else if (data.jornada?.inicio) {
+              // Fallback: si no hay bloques libres, seleccionar inicio de jornada
+              onTimeSelect(data.jornada.inicio);
+            }
+          }
         }
       } catch (err: any) {
         setError(err.message);
@@ -143,6 +156,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     };
 
     fetchDisponibilidad();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empleadoId, fecha, servicioId, duracionTotal]);
 
   // ─── Derived state ──────────────────────────────────────────────────────

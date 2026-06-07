@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
         nombre: c.nombre,
         telefono: c.telefono,
         correo: c.correo,
+        notas: c.notas,
         totalCitas: c.citas.length,
         citasCompletadas,
         ultimaCita,
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
 
 
     const body = await req.json();
-    const { nombre, telefono, correo } = body;
+    const { nombre, telefono, correo, notas } = body;
 
     if (!nombre || nombre.trim().length < 2) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
         nombre:  nombre.trim(),
         telefono: telefono?.trim() || null,
         correo:   correo?.trim().toLowerCase() || null,
+        notas:   notas?.trim() || null,
       },
     });
 

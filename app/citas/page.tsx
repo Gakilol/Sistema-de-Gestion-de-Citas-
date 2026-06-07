@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -115,9 +114,14 @@ export default function Citas() {
   const [filtroSmart, setFiltroSmart] = useState('activas');
   const [page, setPage]           = useState(1);
   const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const router                    = useRouter();
   const { user }                  = useAuth();
   const isAdmin                   = user?.rol === 'ADMIN';
+
+  // ─── Estado para modal inline de nuevo cliente ─────────────────────────
+  const [showCrearCliente, setShowCrearCliente] = useState(false);
+  const [formNuevoCliente, setFormNuevoCliente] = useState({ nombre: '', telefono: '', correo: '', notas: '' });
+  const [savingCliente, setSavingCliente]       = useState(false);
+  const [phoneValidCliente, setPhoneValidCliente] = useState(false);
 
   // Estado para el buscador inteligente de clientes
   const [clienteBusqueda, setClienteBusqueda] = useState('');
@@ -189,6 +193,49 @@ export default function Citas() {
     setShowModal(true);
   };
 
+  // ─── Crear cliente inline desde formulario de cita ──────────────────────
+  const handleCrearCliente = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNuevoCliente.nombre.trim() || formNuevoCliente.nombre.trim().length < 2) {
+      toast.error('El nombre es obligatorio (mínimo 2 caracteres)');
+      return;
+    }
+    if (!formNuevoCliente.telefono || !phoneValidCliente) {
+      toast.error('Ingresa un teléfono válido');
+      return;
+    }
+    setSavingCliente(true);
+    try {
+      const res = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formNuevoCliente),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const nuevoCliente = data.cliente;
+      // Añadir al inicio de la lista local sin recargar la página
+      setClientesList((prev: any[]) => [nuevoCliente, ...prev]);
+      // Seleccionar automáticamente el nuevo cliente en el formulario de cita
+      setForm((prev: any) => ({
+        ...prev,
+        cliente_id: nuevoCliente.id,
+        cliente_nombre: nuevoCliente.nombre,
+        cliente_telefono: nuevoCliente.telefono || '',
+      }));
+      setClienteBusqueda(nuevoCliente.nombre);
+      // Limpiar y cerrar el modal de creación
+      setFormNuevoCliente({ nombre: '', telefono: '', correo: '', notas: '' });
+      setPhoneValidCliente(false);
+      setShowCrearCliente(false);
+      toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al crear cliente');
+    } finally {
+      setSavingCliente(false);
+    }
+  };
 
 
   // Clientes filtrados para el buscador inteligente
@@ -376,7 +423,7 @@ export default function Citas() {
   const totalPages = Math.ceil(filteredAndSortedCitas.length / PAGE_SIZE);
   const paginated  = filteredAndSortedCitas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  return (
+  const mainContent = (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
@@ -828,8 +875,25 @@ export default function Citas() {
                     />
                     {clienteDropdownOpen && (
                       <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border shadow-xl rounded-xl overflow-hidden">
+                        {/* ─── Botón "+ Nuevo Cliente" siempre visible ───── */}
+                        <button
+                          type="button"
+                          className="w-full text-left px-4 py-2.5 flex items-center gap-2.5 bg-primary/5 hover:bg-primary/10 border-b border-border/50 transition-colors group"
+                          onClick={() => {
+                            setClienteDropdownOpen(false);
+                            setFormNuevoCliente({ nombre: clienteBusqueda, telefono: '', correo: '', notas: '' });
+                            setPhoneValidCliente(false);
+                            setShowCrearCliente(true);
+                          }}
+                        >
+                          <span className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/25 transition-colors">
+                            <UserPlus className="w-3.5 h-3.5 text-primary" />
+                          </span>
+                          <span className="text-sm font-semibold text-primary">+ Nuevo Cliente</span>
+                        </button>
+
                         {clientesFiltrados.length > 0 ? (
-                          <ul className="divide-y divide-border/40 max-h-52 overflow-y-auto">
+                          <ul className="divide-y divide-border/40 max-h-48 overflow-y-auto">
                             {clientesFiltrados.map(c => (
                               <li key={c.id}>
                                 <button
@@ -855,18 +919,9 @@ export default function Citas() {
                             ))}
                           </ul>
                         ) : (
-                          <div className="px-4 py-5 text-center space-y-2">
-                            <p className="text-sm font-semibold text-muted-foreground">Cliente no encontrado.</p>
-                            <p className="text-xs text-muted-foreground">Debe registrarlo primero.</p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 mt-1"
-                              onClick={() => { setShowModal(false); router.push('/clientes'); }}
-                            >
-                              Registrar Cliente
-                            </Button>
+                          <div className="px-4 py-4 text-center space-y-2">
+                            <p className="text-sm font-semibold text-muted-foreground">No se encontró el cliente</p>
+                            <p className="text-xs text-muted-foreground">Usa el botón de arriba para crearlo aquí mismo.</p>
                           </div>
                         )}
                       </div>
@@ -1080,7 +1135,7 @@ export default function Citas() {
                     servicioId={form.servicio_ids[0]}
                     duracionTotal={form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}
                     selectedTime={form.hora}
-                    onTimeSelect={h => setForm({ ...form, hora: h })}
+                    onTimeSelect={h => setForm((prev: any) => ({ ...prev, hora: h }))}
                   />
                 </div>
               )}
@@ -1128,5 +1183,106 @@ export default function Citas() {
         </div>
       )}
     </div>
+  );
+
+  return (
+    <>
+      {mainContent}
+
+      {/* ─── Modal inline: Crear Nuevo Cliente ──────────────────────────────── */}
+      {showCrearCliente && (
+        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-border/50">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <UserPlus className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground">Nuevo Cliente</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Se seleccionará automáticamente al guardar</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCrearCliente(false)}
+                className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleCrearCliente} className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                  Nombre completo *
+                </label>
+                <Input
+                  value={formNuevoCliente.nombre}
+                  onChange={e => setFormNuevoCliente(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Ej. María González"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                  Teléfono *
+                </label>
+                <PhoneInput
+                  value={formNuevoCliente.telefono}
+                  optional={false}
+                  onChange={(formattedVal, isValid) => {
+                    setFormNuevoCliente(prev => ({ ...prev, telefono: formattedVal }));
+                    setPhoneValidCliente(isValid);
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                  Correo electrónico <span className="text-muted-foreground/60 normal-case font-normal">(opcional)</span>
+                </label>
+                <Input
+                  type="email"
+                  value={formNuevoCliente.correo}
+                  onChange={e => setFormNuevoCliente(prev => ({ ...prev, correo: e.target.value }))}
+                  placeholder="maria@ejemplo.com"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                  Notas <span className="text-muted-foreground/60 normal-case font-normal">(opcional)</span>
+                </label>
+                <textarea
+                  value={formNuevoCliente.notas}
+                  onChange={e => setFormNuevoCliente(prev => ({ ...prev, notas: e.target.value }))}
+                  placeholder="Alergias, preferencias, referencias..."
+                  rows={2}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1 border-t border-border/30">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCrearCliente(false)}
+                  disabled={savingCliente}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={savingCliente} className="glow-gold gap-1.5">
+                  <UserPlus className="w-4 h-4" />
+                  {savingCliente ? 'Creando...' : 'Crear y Seleccionar'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
