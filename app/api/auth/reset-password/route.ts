@@ -6,22 +6,33 @@ import { hashPassword } from '@/lib/hash';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { token, password } = body;
+    const { email, token, password } = body;
+
+    if (!email || typeof email !== 'string') {
+      return NextResponse.json({ error: 'El correo electrónico es requerido' }, { status: 400 });
+    }
 
     if (!token || typeof token !== 'string') {
-      return NextResponse.json({ error: 'El token de recuperación es requerido' }, { status: 400 });
+      return NextResponse.json({ error: 'El código de verificación es requerido' }, { status: 400 });
     }
 
     if (!password || typeof password !== 'string' || password.length < 6) {
       return NextResponse.json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' }, { status: 400 });
     }
 
-    // 1. Hash del token recibido para comparar con el hash guardado en DB (SHA256)
+    const trimmedEmail = email.trim().toLowerCase();
+
+    // 1. Hash del token (código de 6 dígitos) recibido para comparar con el hash guardado en DB (SHA256)
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    // 2. Buscar token en DB
-    const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token_hash: tokenHash },
+    // 2. Buscar token en DB asociándolo con el correo
+    const resetToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        token_hash: tokenHash,
+        empleado: {
+          correo: trimmedEmail,
+        },
+      },
       include: { empleado: true },
     });
 

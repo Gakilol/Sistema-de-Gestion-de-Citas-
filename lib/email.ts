@@ -29,7 +29,6 @@ export const sendResetPasswordEmail = async ({
   nombre,
   token,
 }: SendResetPasswordEmailParams) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/restablecer-contrasena?token=${token}`;
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Hairs Style and Salon';
 
   const html = `
@@ -38,7 +37,7 @@ export const sendResetPasswordEmail = async ({
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Restablecer contraseña - ${appName}</title>
+      <title>Código de verificación - ${appName}</title>
       <style>
         body {
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -84,17 +83,19 @@ export const sendResetPasswordEmail = async ({
           margin-top: 0;
           margin-bottom: 24px;
         }
-        .btn {
+        .code-box {
           display: inline-block;
-          background: linear-gradient(135deg, #d4a017 0%, #b8860b 100%);
-          color: #0b0f19 !important;
-          text-decoration: none;
-          font-weight: 700;
-          font-size: 14px;
-          padding: 12px 32px;
-          border-radius: 9999px;
-          transition: all 0.2s ease-in-out;
-          box-shadow: 0 4px 6px -1px rgba(212, 160, 23, 0.2);
+          background-color: #1f2937;
+          border: 2px solid #d4a017;
+          border-radius: 12px;
+          font-size: 36px;
+          font-weight: 800;
+          letter-spacing: 6px;
+          color: #d4a017;
+          padding: 16px 32px;
+          margin: 16px 0;
+          font-family: 'Courier New', Courier, monospace;
+          box-shadow: 0 4px 10px rgba(212, 160, 23, 0.1);
         }
         .footer {
           margin-top: 32px;
@@ -119,13 +120,12 @@ export const sendResetPasswordEmail = async ({
           <div class="logo">${appName}</div>
           <h1>Hola, ${nombre}</h1>
           <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta. Si no has sido tú, puedes ignorar este correo de forma segura.</p>
-          <p>Para restablecer tu contraseña, haz clic en el botón de abajo:</p>
+          <p>Usa el siguiente código de verificación de 6 dígitos para restablecer tu contraseña:</p>
           
-          <a href="${resetUrl}" class="btn" target="_blank">Restablecer Contraseña</a>
+          <div class="code-box">${token}</div>
           
           <div class="divider"></div>
-          <p class="expiry-note">Este enlace de recuperación es válido por 60 minutos.<br>Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:</p>
-          <p style="word-break: break-all; font-size: 13px; color: #d4a017;">${resetUrl}</p>
+          <p class="expiry-note">Este código de verificación es válido por <strong>10 minutos</strong>.<br>No compartas este código con nadie por razones de seguridad.</p>
         </div>
         <div class="footer">
           &copy; ${new Date().getFullYear()} ${appName}. Todos los derechos reservados.
@@ -139,7 +139,7 @@ export const sendResetPasswordEmail = async ({
   await transporter.sendMail({
     from: smtpFrom,
     to: email,
-    subject: `Restablecer contraseña - ${appName}`,
+    subject: `Código de verificación - ${appName}`,
     html,
   });
 };

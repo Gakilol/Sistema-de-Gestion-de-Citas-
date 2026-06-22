@@ -50,10 +50,10 @@ export async function POST(req: NextRequest) {
     // Obtener IP del cliente (si está disponible)
     const clientIp = req.headers.get('x-forwarded-for') || req.ip || null;
 
-    // 3. Generar token criptográfico único
-    const token = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const expiracion = new Date(Date.now() + 60 * 60 * 1000); // 1 hora de validez
+    // 3. Generar código de verificación de 6 dígitos
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const tokenHash = crypto.createHash('sha256').update(code).digest('hex');
+    const expiracion = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos de validez
 
     // Invalida de forma lógica tokens anteriores del mismo usuario que no hayan expirado
     await prisma.passwordResetToken.updateMany({
@@ -82,13 +82,13 @@ export async function POST(req: NextRequest) {
       await sendResetPasswordEmail({
         email: empleado.correo,
         nombre: empleado.nombre,
-        token: token,
+        token: code, // enviamos el código como token
       });
-      console.log(`[FORGOT_PASSWORD] Enlace de recuperación enviado exitosamente a: ${empleado.correo}`);
+      console.log(`[FORGOT_PASSWORD] Código de verificación enviado exitosamente a: ${empleado.correo}`);
     } catch (mailError) {
       console.error('[FORGOT_PASSWORD] Error crítico al enviar correo SMTP:', mailError);
       return NextResponse.json(
-        { error: 'Error al enviar el correo de recuperación. Por favor contacta al soporte técnico.' },
+        { error: 'Error al enviar el correo de verificación. Por favor contacta al soporte técnico.' },
         { status: 500 }
       );
     }
