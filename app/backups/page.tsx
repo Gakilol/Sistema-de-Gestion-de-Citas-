@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/providers/auth-provider';
+import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { toast } from 'sonner';
 import { 
   Database, 
@@ -342,7 +343,10 @@ export default function BackupsPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="flex min-h-screen bg-background">
+      <AdminSidebar />
+      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+        <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       
       {/* HEADER PRINCIPAL */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[hsl(var(--border))] pb-6">
@@ -813,6 +817,8 @@ export default function BackupsPage() {
         </div>
       )}
 
+        </div>
+      </main>
     </div>
   );
 }
