@@ -45,11 +45,14 @@ export class AdminServicio {
           },
         },
       }),
-      // Pendientes hoy o futuros
+      // Pendientes hoy
       prisma.cita.count({
         where: {
           estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA] },
-          fecha: { gte: dateToday },
+          fecha: {
+            gte: dateToday,
+            lte: dateToday,
+          },
         },
       }),
       // Empleados activos
