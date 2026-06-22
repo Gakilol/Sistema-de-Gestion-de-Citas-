@@ -121,3 +121,125 @@ export async function logAudit(options: AuditLogOptions): Promise<void> {
     console.error('[logAudit] Failed to write audit log:', err);
   }
 }
+
+/**
+ * Maps legacy fields of an audit log object to the new schema fields if the new fields are null.
+ */
+export function mapLegacyAuditLog(log: any, employeesMap?: Map<string, any>): any {
+  if (!log) return log;
+
+  const mapped = { ...log };
+
+  // Fallback dates
+  if (!mapped.createdAt && mapped.fecha) {
+    mapped.createdAt = mapped.fecha;
+  }
+
+  // Fallback status (legacy successful operations had status = null, default to SUCCESS)
+  if (!mapped.status) {
+    mapped.status = 'SUCCESS';
+  }
+
+  // Fallback module from entidad
+  if (!mapped.module && mapped.entidad) {
+    const ent = mapped.entidad.toUpperCase();
+    if (ent === 'CITA') mapped.module = 'CITAS';
+    else if (ent === 'EMPLEADO') mapped.module = 'USUARIOS';
+    else if (ent === 'CLIENTE') mapped.module = 'CLIENTES';
+    else if (ent === 'SERVICIO') mapped.module = 'SERVICIOS';
+    else if (ent === 'CONFIGURACION') mapped.module = 'CONFIGURACION';
+    else mapped.module = ent;
+  }
+
+  // Fallback action from accion and entidad
+  if (!mapped.action && mapped.accion) {
+    const ent = mapped.entidad ? mapped.entidad.toUpperCase() : '';
+    const acc = mapped.accion.toUpperCase();
+    
+    if (ent === 'CITA') {
+      if (acc === 'CREAR') mapped.action = 'APPOINTMENT_CREATED';
+      else if (acc === 'ACTUALIZAR') mapped.action = 'APPOINTMENT_UPDATED';
+      else if (acc === 'ELIMINAR') mapped.action = 'APPOINTMENT_DELETED';
+      else if (acc === 'CANCELAR') mapped.action = 'APPOINTMENT_CANCELLED';
+      else if (acc === 'REPROGRAMADA') mapped.action = 'APPOINTMENT_RESCHEDULED';
+      else mapped.action = `APPOINTMENT_${acc}`;
+    } else if (ent === 'EMPLEADO') {
+      if (acc === 'CREAR') mapped.action = 'USER_CREATED';
+      else if (acc === 'ACTUALIZAR') mapped.action = 'USER_UPDATED';
+      else if (acc === 'ELIMINAR') mapped.action = 'USER_DELETED';
+      else mapped.action = `USER_${acc}`;
+    } else if (ent === 'CLIENTE') {
+      if (acc === 'CREAR') mapped.action = 'CLIENT_CREATED';
+      else if (acc === 'ACTUALIZAR') mapped.action = 'CLIENT_UPDATED';
+      else if (acc === 'ELIMINAR') mapped.action = 'CLIENT_DELETED';
+      else mapped.action = `CLIENT_${acc}`;
+    } else if (ent === 'SERVICIO') {
+      if (acc === 'CREAR') mapped.action = 'SERVICE_CREATED';
+      else if (acc === 'ACTUALIZAR') mapped.action = 'SERVICE_UPDATED';
+      else if (acc === 'ELIMINAR') mapped.action = 'SERVICE_DELETED';
+      else mapped.action = `SERVICE_${acc}`;
+    } else if (ent === 'CONFIGURACION') {
+      mapped.action = 'SETTINGS_UPDATED';
+    } else {
+      mapped.action = `${ent}_${acc}`;
+    }
+  }
+
+  // Fallback description
+  if (!mapped.description) {
+    const entName = mapped.entidad || 'Entidad';
+    const accName = mapped.accion ? mapped.accion.toLowerCase() : 'operación';
+    const entId = mapped.entidadId || '';
+    
+    let label = 'registro';
+    if (entName === 'Cita') label = 'cita';
+    else if (entName === 'Empleado') label = 'usuario';
+    else if (entName === 'Cliente') label = 'cliente';
+    else if (entName === 'Servicio') label = 'servicio';
+    else if (entName === 'Configuracion') label = 'configuración';
+
+    let desc = '';
+    if (accName === 'crear') desc = `Creación de ${label}`;
+    else if (accName === 'actualizar') desc = `Actualización de ${label}`;
+    else if (accName === 'eliminar') desc = `Eliminación de ${label}`;
+    else if (accName === 'cancelar') desc = `Cancelación de ${label}`;
+    else desc = `${mapped.accion} de ${label}`;
+
+    if (entId && entId !== 'N/A') {
+      desc += ` (ID: ${entId})`;
+    }
+    mapped.description = desc;
+  }
+
+  // Fallback user information from realizadoPor
+  if ((!mapped.userName || !mapped.userEmail) && mapped.realizadoPor) {
+    const userIdOrVal = mapped.realizadoPor;
+    
+    if (employeesMap && employeesMap.has(userIdOrVal)) {
+      const emp = employeesMap.get(userIdOrVal);
+      mapped.userName = emp.nombre;
+      mapped.userEmail = emp.correo;
+      mapped.userRole = emp.rol;
+      mapped.userId = emp.id;
+    } else {
+      if (userIdOrVal.includes('@')) {
+        mapped.userEmail = userIdOrVal;
+        mapped.userName = userIdOrVal.split('@')[0];
+      } else if (userIdOrVal.match(/^[0-9a-fA-F-]{36}$/)) {
+        mapped.userName = `Empleado (ID: ${userIdOrVal.slice(0, 8)})`;
+      } else {
+        mapped.userName = userIdOrVal;
+      }
+    }
+  }
+
+  return mapped;
+}
+
+/**
+ * Maps a list of legacy audit logs to the new schema format.
+ */
+export function mapLegacyAuditLogs(logs: any[], employeesMap?: Map<string, any>): any[] {
+  return logs.map(log => mapLegacyAuditLog(log, employeesMap));
+}
+

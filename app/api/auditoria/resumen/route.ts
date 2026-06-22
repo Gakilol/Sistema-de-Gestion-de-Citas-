@@ -34,27 +34,64 @@ export async function GET(req: NextRequest) {
       // Total acciones
       prisma.auditLog.count(),
       // Usuarios activos (últimos 7 días)
-      prisma.auditLog.groupBy({
-        by: ['userId'],
+      prisma.auditLog.findMany({
         where: {
-          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-          userId: { not: null }
+          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        },
+        select: {
+          userId: true,
+          realizadoPor: true
         }
-      }).then(res => res.length),
+      }).then(res => {
+        const uniqueUsers = new Set();
+        res.forEach(l => {
+          const userIdentifier = l.userId || l.realizadoPor;
+          if (userIdentifier) uniqueUsers.add(userIdentifier);
+        });
+        return uniqueUsers.size;
+      }),
       // Inicios de sesión exitosos
       prisma.auditLog.count({ where: { action: 'LOGIN_SUCCESS' } }),
       // Inicios de sesión fallidos
       prisma.auditLog.count({ where: { action: 'LOGIN_FAILED' } }),
       // Cambios de configuración
-      prisma.auditLog.count({ where: { module: 'CONFIGURACION' } }),
+      prisma.auditLog.count({
+        where: {
+          OR: [
+            { module: 'CONFIGURACION' },
+            { entidad: 'Configuracion' }
+          ]
+        }
+      }),
       // Cambios de roles
       prisma.auditLog.count({ where: { action: 'ROLE_CHANGED' } }),
       // Citas creadas
-      prisma.auditLog.count({ where: { action: 'APPOINTMENT_CREATED' } }),
+      prisma.auditLog.count({
+        where: {
+          OR: [
+            { action: 'APPOINTMENT_CREATED' },
+            { AND: [{ entidad: 'Cita' }, { accion: 'CREAR' }] }
+          ]
+        }
+      }),
       // Citas canceladas
-      prisma.auditLog.count({ where: { action: 'APPOINTMENT_CANCELLED' } }),
+      prisma.auditLog.count({
+        where: {
+          OR: [
+            { action: 'APPOINTMENT_CANCELLED' },
+            { AND: [{ entidad: 'Cita' }, { accion: 'CANCELAR' }] }
+          ]
+        }
+      }),
       // Citas reprogramadas
-      prisma.auditLog.count({ where: { action: 'APPOINTMENT_RESCHEDULED' } }),
+      prisma.auditLog.count({
+        where: {
+          OR: [
+            { action: 'APPOINTMENT_RESCHEDULED' },
+            { AND: [{ entidad: 'Cita' }, { accion: 'REPROGRAMADA' }] }
+          ]
+        }
+      }),
       // Exportaciones
       prisma.auditLog.count({ where: { action: 'AUDIT_LOG_EXPORTED' } }),
       // Backups
