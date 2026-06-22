@@ -84,6 +84,21 @@ function isSameBusinessMonth(dateStr: string): boolean {
   return ty === y && tm === m;
 }
 
+function isWithinBusinessQuincena(dateStr: string): boolean {
+  const todayStr = getBusinessTodayString();
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const todayDate = new Date(Date.UTC(ty, tm - 1, td));
+  
+  const fifteenDaysAgo = new Date(todayDate);
+  fifteenDaysAgo.setUTCDate(todayDate.getUTCDate() - 14);
+  
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const targetTime = Date.UTC(y, m - 1, d);
+  
+  return targetTime >= fifteenDaysAgo.getTime() && targetTime <= todayDate.getTime();
+}
+
+
 function sortCitas(citasList: any[], ascending: boolean) {
   return [...citasList].sort((a, b) => {
     const dateA = a.fecha.split('T')[0] + 'T' + a.hora;
@@ -112,7 +127,9 @@ export default function Citas() {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroEmpleado, setFiltroEmpleado] = useState('');
   const [filtroSmart, setFiltroSmart] = useState('activas');
+  const [filtroHistorialPeriodo, setFiltroHistorialPeriodo] = useState('todos');
   const [page, setPage]           = useState(1);
+
   const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user }                  = useAuth();
   const isAdmin                   = user?.rol === 'ADMIN';
@@ -406,8 +423,22 @@ export default function Citas() {
         result = result.filter(c => isSameBusinessMonth(c.fecha.split('T')[0]));
         isAscending = true;
       } else if (filtroSmart === 'historial') {
-        result = result.filter(c => ['COMPLETADA', 'CANCELADA'].includes(c.estado));
+        if (filtroHistorialPeriodo === 'todos') {
+          result = result.filter(c => ['COMPLETADA', 'CANCELADA'].includes(c.estado));
+        } else {
+          result = result.filter(c => c.estado === 'COMPLETADA');
+          if (filtroHistorialPeriodo === 'diario') {
+            result = result.filter(c => c.fecha.split('T')[0] === todayStr);
+          } else if (filtroHistorialPeriodo === 'semanal') {
+            result = result.filter(c => isSameBusinessWeek(c.fecha.split('T')[0]));
+          } else if (filtroHistorialPeriodo === 'quincenal') {
+            result = result.filter(c => isWithinBusinessQuincena(c.fecha.split('T')[0]));
+          } else if (filtroHistorialPeriodo === 'mensual') {
+            result = result.filter(c => isSameBusinessMonth(c.fecha.split('T')[0]));
+          }
+        }
         isAscending = false;
+
       } else if (filtroSmart === 'todas') {
         isAscending = false;
       }
@@ -477,6 +508,40 @@ export default function Citas() {
                 );
               })}
             </div>
+
+            {/* Sub-filtros para el Historial de Citas Completadas */}
+            {filtroSmart === 'historial' && (
+              <div className="flex flex-wrap gap-1 p-1 bg-secondary/15 rounded-lg border border-border/30 w-full md:w-auto self-start">
+                {[
+                  { id: 'todos', label: 'Todos' },
+                  { id: 'diario', label: 'Diario (Hoy)' },
+                  { id: 'semanal', label: 'Semanal' },
+                  { id: 'quincenal', label: 'Quincenal (15 días)' },
+                  { id: 'mensual', label: 'Mensual' },
+                ].map(p => {
+                  const isActive = filtroHistorialPeriodo === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setFiltroHistorialPeriodo(p.id);
+                        setPage(1);
+                      }}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer",
+                        isActive
+                          ? "bg-card text-foreground shadow-sm border border-border/30"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
 
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">

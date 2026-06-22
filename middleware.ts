@@ -12,6 +12,8 @@ export async function middleware(req: NextRequest) {
   // Rutas y APIs públicas excluidas de protección por token
   const isPublicPath = 
     path === '/login' ||
+    path === '/olvide-contrasena' ||
+    path === '/restablecer-contrasena' ||
     path.startsWith('/api/auth') ||
     path.startsWith('/api/cron') || // Permitir Crons (ej. Vercel Cron) con firma propia
     path.startsWith('/_next') || 
@@ -20,6 +22,7 @@ export async function middleware(req: NextRequest) {
     path.startsWith('/icon') ||
     path.startsWith('/apple-icon') ||
     path === '/icon.svg';
+
 
   if (isPublicPath) {
     // Si hay un token válido e intentan ingresar al /login, los enviamos directo al dashboard

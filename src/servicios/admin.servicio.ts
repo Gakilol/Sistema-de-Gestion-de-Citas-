@@ -37,7 +37,14 @@ export class AdminServicio {
       // Completadas totales
       prisma.cita.count({ where: { estado: EstadoCita.COMPLETADA } }),
       // Citas hoy (todas)
-      prisma.cita.count({ where: { fecha: dateToday } }),
+      prisma.cita.count({
+        where: {
+          fecha: {
+            gte: dateToday,
+            lte: dateToday,
+          },
+        },
+      }),
       // Pendientes hoy o futuros
       prisma.cita.count({
         where: {
@@ -58,9 +65,13 @@ export class AdminServicio {
       prisma.cita.count({
         where: {
           estado: EstadoCita.COMPLETADA,
-          fecha: dateToday,
+          fecha: {
+            gte: dateToday,
+            lte: dateToday,
+          },
         },
       }),
+
       // Próximas citas (5)
       prisma.cita.findMany({
         where: {
@@ -92,13 +103,19 @@ export class AdminServicio {
       }),
       // Citas de hoy en detalle
       prisma.cita.findMany({
-        where: { fecha: dateToday },
+        where: {
+          fecha: {
+            gte: dateToday,
+            lte: dateToday,
+          },
+        },
         orderBy: { hora: 'asc' },
         include: {
           empleado: { select: { nombre: true } },
           servicio: { select: { nombre: true, duracion: true } },
         },
       }),
+
       // Productividad por empleado (este mes)
       prisma.cita.groupBy({
         by: ['empleado_id'],

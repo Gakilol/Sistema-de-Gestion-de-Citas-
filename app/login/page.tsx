@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+
 
 export default function Login() {
   const router    = useRouter();
@@ -148,7 +150,13 @@ export default function Login() {
                   {showPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
                 </button>
               </div>
+              <div className="flex justify-end mt-2">
+                <Link href="/olvide-contrasena" className="text-xs text-amber-500 hover:text-amber-400 hover:underline transition-colors">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
             </div>
+
 
             <Button type="submit" className="w-full h-11 text-sm font-semibold glow-gold" disabled={isLoading}>
               {isLoading ? (

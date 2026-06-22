@@ -23,6 +23,7 @@ model Empleado {
   descansos    DescansoEmpleado[]
   bloqueos     BloqueoHorario[]
   vacaciones   VacacionesEmpleado[]
+  resetTokens  PasswordResetToken[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -180,4 +181,20 @@ model CitaServicio {
 
   @@index([cita_id])
 }
+
+model PasswordResetToken {
+  id         String   @id @default(dbgenerated("gen_random_uuid()"))
+  user_id    String
+  token_hash String   @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime @default(now())
+  request_ip String?
+
+  empleado   Empleado @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token_hash])
+}
+
 
