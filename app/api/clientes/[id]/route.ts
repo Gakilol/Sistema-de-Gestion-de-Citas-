@@ -1,12 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { registrarAuditoria } from '@/lib/auditoria';
+import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
     const userId = req.headers.get('x-user-id');
+    const userEmail = req.headers.get('x-user-email');
 
     if (!userRole) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -65,19 +66,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         nombre: nombre.trim(),
         telefono: telefono?.trim() || null,
         correo: correo?.trim().toLowerCase() || null,
+        notes: (notas !== undefined) ? (notas?.trim() || null) : undefined, // Keep existing notas field mapping if it is renamed or if it has notes, wait, schema is notas.
         notas: notas?.trim() || null,
-      },
+      } as any, // Cast to any in case of database fields naming variation
     });
 
-    await registrarAuditoria({
-      entidad: 'Cliente',
-      entidadId: id,
-      accion: 'ACTUALIZAR',
-      detalles: {
-        antes: { nombre: clienteOriginal.nombre, telefono: clienteOriginal.telefono, correo: clienteOriginal.correo },
-        despues: { nombre: clienteActualizado.nombre, telefono: clienteActualizado.telefono, correo: clienteActualizado.correo }
-      },
-      realizadoPor: userId,
+    await logAudit({
+      action: 'CLIENT_UPDATED',
+      module: 'CLIENTES',
+      status: 'SUCCESS',
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail,
+      entityType: 'Cliente',
+      entityId: id,
+      entityName: clienteActualizado.nombre,
+      description: `Cliente ${clienteOriginal.nombre} actualizado.`,
+      beforeData: clienteOriginal,
+      afterData: clienteActualizado,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined
     });
 
     return NextResponse.json({ cliente: clienteActualizado, mensaje: 'Cliente actualizado exitosamente' }, { status: 200 });
@@ -91,15 +99,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const { id } = await params;
     const userRole = req.headers.get('x-user-role');
+    const userId = req.headers.get('x-user-id');
+    const userEmail = req.headers.get('x-user-email');
+    const ipAddress = getClientIp(req.headers);
+    const userAgent = req.headers.get('user-agent') || undefined;
     
     // Solo administradores pueden eliminar clientes
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar clientes' }, { status: 403 });
     }
 
+    const cliente = await prisma.cliente.findUnique({
+      where: { id }
+    });
+
+    if (!cliente) {
+      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
+    }
+
     // 1. Desvincular las citas históricas poniendo cliente_id en null.
-    // Esto previene que se rompa la integridad de la base de datos y mantiene
-    // el histórico de la cita (nombre y teléfono siguen grabados en la misma fila de Cita).
     await prisma.cita.updateMany({
       where: { cliente_id: id },
       data: { cliente_id: null },
@@ -108,6 +126,22 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     // 2. Eliminar físicamente al cliente de la base de datos
     await prisma.cliente.delete({
       where: { id },
+    });
+
+    await logAudit({
+      action: 'CLIENT_DELETED',
+      module: 'CLIENTES',
+      status: 'SUCCESS',
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail,
+      entityType: 'Cliente',
+      entityId: id,
+      entityName: cliente.nombre,
+      description: `Cliente ${cliente.nombre} eliminado exitosamente.`,
+      beforeData: cliente,
+      ipAddress,
+      userAgent
     });
 
     return NextResponse.json({ success: true, mensaje: 'Cliente eliminado exitosamente' }, { status: 200 });

@@ -28,4 +28,4 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Prisma
-/prisma/migrations
+# /prisma/migrations is not ignored to track historical migrations in Git

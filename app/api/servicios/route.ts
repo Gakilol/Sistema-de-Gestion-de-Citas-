@@ -52,12 +52,21 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await registrarAuditoria({
-      entidad: 'Servicio',
-      entidadId: servicio.id,
-      accion: 'CREAR',
-      detalles: { nombre, duracion: Number(duracion), categoria_id },
-      realizadoPor: req.headers.get('x-user-id'),
+    const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+    await logAudit({
+      action: 'SERVICE_CREATED',
+      module: 'SERVICIOS',
+      status: 'SUCCESS',
+      userId: req.headers.get('x-user-id'),
+      userRole: userRole,
+      userEmail: req.headers.get('x-user-email'),
+      entityType: 'Servicio',
+      entityId: servicio.id,
+      entityName: servicio.nombre,
+      description: `Servicio ${servicio.nombre} creado exitosamente.`,
+      afterData: servicio,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined
     });
 
     return NextResponse.json({ servicio, mensaje: 'Servicio creado exitosamente' }, { status: 201 });

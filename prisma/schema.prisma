@@ -146,15 +146,44 @@ model Configuracion {
 
 model AuditLog {
   id           String   @id @default(dbgenerated("gen_random_uuid()"))
-  entidad      String   // Cita, Empleado, Servicio, Configuracion
-  entidadId    String
-  accion       String   // CREAR, ACTUALIZAR, ELIMINAR, CANCELAR
-  detalles     Json?
-  realizadoPor String?
-  fecha        DateTime @default(now())
+  entidad      String   // Cita, Empleado, Servicio, Configuracion (kept for compatibility)
+  entidadId    String   // (kept for compatibility)
+  accion       String   // CREAR, ACTUALIZAR, ELIMINAR, CANCELAR (kept for compatibility)
+  detalles     Json?    // (kept for compatibility)
+  realizadoPor String?  // (kept for compatibility)
+  fecha        DateTime @default(now()) // (kept for compatibility)
+
+  // Nuevos campos de auditoría avanzada (opcionales para no romper registros antiguos)
+  userId       String?
+  userName     String?
+  userEmail    String?
+  userRole     String?
+  action       String?
+  module       String?
+  entityType   String?
+  entityId     String?
+  entityName   String?
+  description  String?
+  status       String?
+  ipAddress    String?
+  userAgent    String?
+  requestId    String?
+  beforeData   Json?
+  afterData    Json?
+  metadata     Json?
+  errorMessage String?
+  createdAt    DateTime @default(now())
 
   @@index([entidad, entidadId])
   @@index([fecha])
+  
+  // Nuevos índices
+  @@index([createdAt])
+  @@index([userId])
+  @@index([module])
+  @@index([action])
+  @@index([status])
+  @@index([entityType, entityId])
 }
 
 model Cliente {

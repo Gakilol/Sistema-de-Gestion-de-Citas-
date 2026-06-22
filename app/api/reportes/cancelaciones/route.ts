@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
       porEmpleado,
       porServicio,
       clientesConMasCancelaciones,
-      nota: 'Si cancelled_at es NULL, las cancelaciones tardías no se pueden calcular con precisión. Aplique la migración migration_analytics.sql.',
+      nota: 'Si cancelled_at es NULL, las cancelaciones tardías no se pueden calcular con precisión. Sincronice el esquema con database/novacita_complete_schema.sql o ejecute prisma migrate deploy.',
       meta: { from: filters.rawFrom, to: filters.rawTo, lateThresholdHours, timezone: 'America/Costa_Rica' },
     });
   } catch (err: any) {

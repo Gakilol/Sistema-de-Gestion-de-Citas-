@@ -62,12 +62,21 @@ export async function POST(req: NextRequest) {
       select: { id: true, nombre: true, correo: true, rol: true }
     });
 
-    await registrarAuditoria({
-      entidad: 'Empleado',
-      entidadId: empleado.id,
-      accion: 'CREAR',
-      detalles: { nombre, correo, rol: rol || 'EMPLEADO' },
-      realizadoPor: req.headers.get('x-user-id'),
+    const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+    await logAudit({
+      action: 'USER_CREATED',
+      module: 'USUARIOS',
+      status: 'SUCCESS',
+      userId: req.headers.get('x-user-id'),
+      userRole: userRole,
+      userEmail: req.headers.get('x-user-email'),
+      entityType: 'Empleado',
+      entityId: empleado.id,
+      entityName: empleado.nombre,
+      description: `Empleado ${empleado.nombre} creado con rol ${empleado.rol}.`,
+      afterData: empleado,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined
     });
 
     return NextResponse.json({ empleado, mensaje: 'Empleado creado exitosamente' }, { status: 201 });

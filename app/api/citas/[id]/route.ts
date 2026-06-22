@@ -154,6 +154,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    // Fetch original appointment before transaction to perform diffing
+    const citaOriginal = await prisma.cita.findUnique({
+      where: { id },
+      include: { citaServicios: true }
+    });
+
+    if (!citaOriginal) {
+      return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
+    }
+
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
     const cita = await prisma.$transaction(async (tx) => {
       let serviciosParaActualizar: { id: string; duracion: number }[] = [];
@@ -234,12 +244,49 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return c;
     });
 
-    await registrarAuditoria({
-      entidad: 'Cita',
-      entidadId: id,
-      accion: esForzado ? 'FORZAR' : 'ACTUALIZAR',
-      detalles: { cambios: dataToUpdate, forzado: esForzado },
-      realizadoPor: userId,
+    // Detectar acción y descripción
+    let finalAction = 'APPOINTMENT_UPDATED';
+    let finalDesc = `Cita de ${cita.cliente_nombre} actualizada.`;
+    
+    if (estado) {
+      if (estado === 'CANCELADA') {
+        finalAction = 'APPOINTMENT_CANCELLED';
+        finalDesc = `Cita de ${cita.cliente_nombre} cancelada. Motivo: ${cancel_reason || 'No especificado'}`;
+      } else if (estado === 'COMPLETADA') {
+        finalAction = 'APPOINTMENT_COMPLETED';
+        finalDesc = `Cita de ${cita.cliente_nombre} marcada como completada.`;
+      } else if (estado === 'NO_SHOW') {
+        finalAction = 'APPOINTMENT_NO_SHOW';
+        finalDesc = `Cita de ${cita.cliente_nombre} marcada como no presentado.`;
+      } else if (estado === 'CONFIRMADA') {
+        finalAction = 'APPOINTMENT_CONFIRMED';
+        finalDesc = `Cita de ${cita.cliente_nombre} confirmada.`;
+      } else if (estado === 'REPROGRAMADA') {
+        finalAction = 'APPOINTMENT_RESCHEDULED';
+        finalDesc = `Cita de ${cita.cliente_nombre} reprogramada.`;
+      }
+    } else if (hora || fecha) {
+      finalAction = 'APPOINTMENT_RESCHEDULED';
+      finalDesc = `Cita de ${cita.cliente_nombre} reprogramada a la fecha ${fecha || ''} ${hora || ''}.`;
+    }
+
+    const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+    await logAudit({
+      action: finalAction,
+      module: 'CITAS',
+      status: 'SUCCESS',
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail: req.headers.get('x-user-email'),
+      entityType: 'Cita',
+      entityId: id,
+      entityName: cita.cliente_nombre,
+      description: finalDesc,
+      beforeData: citaOriginal,
+      afterData: cita,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined,
+      metadata: { cambios: dataToUpdate, forzado: esForzado }
     });
 
     return NextResponse.json({ cita, mensaje: 'Cita actualizada exitosamente con sus servicios' }, { status: 200 });
@@ -258,14 +305,31 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar citas' }, { status: 403 });
     }
 
+    const cita = await prisma.cita.findUnique({
+      where: { id }
+    });
+
+    if (!cita) {
+      return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
+    }
+
     await prisma.cita.delete({ where: { id } });
 
-    await registrarAuditoria({
-      entidad: 'Cita',
-      entidadId: id,
-      accion: 'ELIMINAR',
-      detalles: { eliminadoPor: userRole },
-      realizadoPor: userId,
+    const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+    await logAudit({
+      action: 'APPOINTMENT_DELETED',
+      module: 'CITAS',
+      status: 'SUCCESS',
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail: req.headers.get('x-user-email'),
+      entityType: 'Cita',
+      entityId: id,
+      entityName: cita.cliente_nombre,
+      description: `Cita de ${cita.cliente_nombre} eliminada permanentemente.`,
+      beforeData: cita,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined
     });
 
     return NextResponse.json({ mensaje: 'Cita eliminada' }, { status: 200 });

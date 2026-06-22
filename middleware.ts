@@ -71,6 +71,15 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
+    // ─── Protección adicional: /auditoria y /api/auditoria solo para ADMIN y TECH_SUPPORT
+    const isAuditoriaPath = path.startsWith('/auditoria') || path.startsWith('/api/auditoria');
+    if (isAuditoriaPath && !reportesRestringidos.includes(userRole)) {
+      if (path.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Acceso denegado. Solo ADMIN y TECH_SUPPORT pueden acceder a la auditoría.' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+
     // Inyectar datos del usuario en los headers para que las rutas de API internas los lean de forma segura
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set('x-user-id', payload.id as string);

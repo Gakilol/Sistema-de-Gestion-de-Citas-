@@ -193,6 +193,12 @@ const menuGroups: MenuGroup[] = [
         icon: Settings,
         roles: ['ADMIN', 'TECH_SUPPORT'],
       },
+      {
+        title: 'Auditoría del Sistema',
+        href: '/auditoria',
+        icon: Clock,
+        roles: ['ADMIN', 'TECH_SUPPORT'],
+      },
     ],
   },
 ];
@@ -345,6 +351,7 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/empleados': 'Personal',
     '/reportes': 'Reportes',
     '/configuracion': 'Configuración',
+    '/auditoria': 'Auditoría del Sistema',
   };
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';
 

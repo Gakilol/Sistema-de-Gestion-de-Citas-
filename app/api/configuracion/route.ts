@@ -42,12 +42,35 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    await registrarAuditoria({
-      entidad: 'Configuracion',
-      entidadId: 'default',
-      accion: 'ACTUALIZAR',
-      detalles: { secciones: Object.keys(body).filter(k => body[k] !== undefined) },
-      realizadoPor: req.headers.get('x-user-id'),
+    // Detectar tipo de acción
+    let finalAction = 'SETTINGS_UPDATED';
+    let finalDesc = 'Configuración general del negocio actualizada.';
+    
+    if (apariencia && !negocio && !horarios && !whatsapp) {
+      finalAction = 'THEME_SETTINGS_UPDATED';
+      finalDesc = 'Configuración de apariencia y tema visual actualizada.';
+    } else if (horarios && !negocio && !whatsapp && !apariencia) {
+      finalAction = 'BUSINESS_HOURS_UPDATED';
+      finalDesc = 'Horarios comerciales del negocio actualizados.';
+    }
+
+    const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+    await logAudit({
+      action: finalAction,
+      module: 'CONFIGURACION',
+      status: 'SUCCESS',
+      userId: req.headers.get('x-user-id'),
+      userRole: userRole,
+      userEmail: req.headers.get('x-user-email'),
+      entityType: 'Configuracion',
+      entityId: 'default',
+      entityName: 'Configuración General',
+      description: finalDesc,
+      beforeData: current,
+      afterData: updated,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined,
+      metadata: { seccionesModificadas: Object.keys(body).filter(k => body[k] !== undefined) }
     });
 
     return NextResponse.json({ config: updated, mensaje: 'Configuración guardada exitosamente' });

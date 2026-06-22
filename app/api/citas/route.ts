@@ -202,20 +202,22 @@ export async function POST(req: NextRequest) {
       return c;
     });
 
-    await registrarAuditoria({
-      entidad: 'Cita',
-      entidadId: cita.id,
-      accion: esForzado ? 'FORZAR' : 'CREAR',
-      detalles: {
-        cliente: cliente_nombre,
-        empleado_id,
-        fecha,
-        hora,
-        duracion: duracionCalculada,
-        servicios: serviciosParaCita.map(s => s.id),
-        forzado: esForzado,
-      },
-      realizadoPor: userId,
+    const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+    await logAudit({
+      action: 'APPOINTMENT_CREATED',
+      module: 'CITAS',
+      status: 'SUCCESS',
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail: req.headers.get('x-user-email'),
+      entityType: 'Cita',
+      entityId: cita.id,
+      entityName: cliente_nombre,
+      description: `Cita creada para ${cliente_nombre}.${esForzado ? ' (Acción forzada)' : ''}`,
+      afterData: cita,
+      ipAddress: getClientIp(req.headers),
+      userAgent: req.headers.get('user-agent') || undefined,
+      metadata: { forzado: esForzado }
     });
 
     return NextResponse.json({ cita, mensaje: 'Cita creada exitosamente con sus servicios' }, { status: 201 });
