@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       intervalos AS (
         SELECT
           "cliente_id",
-          EXTRACT(DAY FROM ("fecha" - "prev_fecha"))::FLOAT AS dias
+          ("fecha" - "prev_fecha")::FLOAT AS dias
         FROM visitas
         WHERE "prev_fecha" IS NOT NULL AND "fecha" > "prev_fecha"
       )
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       intervalos AS (
         SELECT
           "cliente_id",
-          AVG(EXTRACT(DAY FROM ("fecha" - "prev_fecha"))) AS avg_dias
+          AVG("fecha" - "prev_fecha") AS avg_dias
         FROM visitas
         WHERE "prev_fecha" IS NOT NULL AND "fecha" > "prev_fecha"
         GROUP BY "cliente_id"
@@ -129,9 +129,9 @@ export async function GET(req: NextRequest) {
           AND "fecha" <= ${filters.to}
       )
       SELECT
-        COUNT(DISTINCT "cliente_id") FILTER (WHERE EXTRACT(DAY FROM (next_fecha - "fecha")) <= 30) AS retorno_30,
-        COUNT(DISTINCT "cliente_id") FILTER (WHERE EXTRACT(DAY FROM (next_fecha - "fecha")) <= 60) AS retorno_60,
-        COUNT(DISTINCT "cliente_id") FILTER (WHERE EXTRACT(DAY FROM (next_fecha - "fecha")) <= 90) AS retorno_90
+        COUNT(DISTINCT "cliente_id") FILTER (WHERE (next_fecha - "fecha") <= 30) AS retorno_30,
+        COUNT(DISTINCT "cliente_id") FILTER (WHERE (next_fecha - "fecha") <= 60) AS retorno_60,
+        COUNT(DISTINCT "cliente_id") FILTER (WHERE (next_fecha - "fecha") <= 90) AS retorno_90
       FROM visitas
       WHERE next_fecha IS NOT NULL
     `;
