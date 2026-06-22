@@ -131,28 +131,30 @@ export default function AuditoriaPage() {
       setLoading(false);
     }
   }, [tab, page, limit, desde, hasta, search, moduleFilter, actionFilter, statusFilter, roleFilter, errorsOnly]);
+  // Reset page to 1 when filters, search terms, or tabs change
+  useEffect(() => {
+    setPage(1);
+  }, [tab, search, moduleFilter, actionFilter, statusFilter, roleFilter, errorsOnly, desde, hasta]);
 
-  // Handle Tab Change and reload corresponding data
+  // Fetch summaries or security data when tab changes
   useEffect(() => {
     if (user && (user.rol === 'ADMIN' || user.rol === 'TECH_SUPPORT')) {
       if (tab === 'resumen') {
         fetchSummary();
       } else if (tab === 'seguridad') {
         fetchSecurity();
-      } else {
-        setPage(1);
+      }
+    }
+  }, [tab, fetchSummary, fetchSecurity, user]);
+
+  // Fetch logs when relevant query parameters or page change
+  useEffect(() => {
+    if (user && (user.rol === 'ADMIN' || user.rol === 'TECH_SUPPORT')) {
+      if (tab !== 'resumen' && tab !== 'seguridad' && tab !== 'exportar') {
         fetchLogs();
       }
     }
-  }, [tab, fetchSummary, fetchSecurity, fetchLogs, user]);
-
-  // Keep logs table updated on filters change
-  useEffect(() => {
-    if (tab !== 'resumen' && tab !== 'seguridad') {
-      fetchLogs();
-    }
-  }, [page, limit, desde, hasta, moduleFilter, actionFilter, statusFilter, roleFilter, errorsOnly, fetchLogs]);
-
+  }, [tab, page, limit, desde, hasta, search, moduleFilter, actionFilter, statusFilter, roleFilter, errorsOnly, fetchLogs, user]);
   // Export Data Handler (CSV / XLSX / PDF)
   const handleExport = async (formato: 'csv' | 'xlsx' | 'pdf') => {
     setExportLoading(true);
