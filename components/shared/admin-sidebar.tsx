@@ -22,7 +22,6 @@ import {
   Menu,
   X,
   Tag,
-  Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -189,12 +188,6 @@ const menuGroups: MenuGroup[] = [
         isNew: true,
       },
       {
-        title: 'Copias de seguridad',
-        href: '/backups',
-        icon: Database,
-        roles: ['ADMIN', 'TECH_SUPPORT'],
-      },
-      {
         title: 'Configuración',
         href: '/configuracion',
         icon: Settings,
@@ -351,7 +344,6 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/categorias': 'Categorías',
     '/empleados': 'Personal',
     '/reportes': 'Reportes',
-    '/backups': 'Copias de Seguridad',
     '/configuracion': 'Configuración',
   };
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';

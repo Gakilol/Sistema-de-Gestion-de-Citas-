@@ -124,16 +124,12 @@ model VacacionesEmpleado {
 }
 
 model Configuracion {
-  id                  String    @id @default("default")
-  negocio             Json?     // { nombre, subtitulo, telefono, whatsapp, direccion, web, moneda, zona_horaria }
-  horarios            Json?     // Default general schedule
-  whatsapp            Json?     // { numero, confirmar, recordatorio, cancelacion, msgExtra }
-  apariencia          Json?     // { tema, branding }
-  mantenimientoActivo Boolean   @default(false)
-  mensajeMantenimiento String?
-  mantenimientoDesde   DateTime?
-  backups             Json?     // Configuración de backups automáticos y retención
-  updatedAt           DateTime  @updatedAt
+  id           String   @id @default("default")
+  negocio      Json?    // { nombre, subtitulo, telefono, whatsapp, direccion, web, moneda, zona_horaria }
+  horarios     Json?    // Default general schedule
+  whatsapp     Json?    // { numero, confirmar, recordatorio, cancelacion, msgExtra }
+  apariencia   Json?    // { tema, branding }
+  updatedAt    DateTime @updatedAt
 }
 
 model AuditLog {
@@ -199,55 +195,6 @@ model PasswordResetToken {
 
   @@index([user_id])
   @@index([token_hash])
-}
-
-model HistorialBackup {
-  id              String    @id @default(dbgenerated("gen_random_uuid()"))
-  fileName        String
-  storageProvider String
-  storageBucket   String
-  storageKey      String
-  sizeBytes       BigInt
-  checksumSha256  String
-  status          String    // PENDING, PROCESSING, COMPLETED, FAILED, DELETED
-  type            String    // MANUAL, AUTOMATIC, PRE_RESTORE
-  createdById     String?
-  createdByRole   String?
-  createdAt       DateTime  @default(now())
-  completedAt     DateTime?
-  deletedAt       DateTime?
-  deletedById     String?
-  deleteReason    String?
-  errorMessage    String?
-  metadata        Json?
-
-  @@index([createdAt])
-  @@index([status])
-}
-
-model TrabajoBackup {
-  id               String    @id @default(dbgenerated("gen_random_uuid()"))
-  tipo             String    // BACKUP, RESTORE, DELETE, SIGN_DOWNLOAD_URL, BACKUP_PRE_RESTORE
-  estado           String    // PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED
-  backupId         String?
-  solicitadoPorId  String?
-  solicitadoPorRol String?
-  payload          Json?
-  intentos         Int       @default(0)
-  maxIntentos      Int       @default(3)
-  lockedAt         DateTime?
-  lockedBy         String?
-  startedAt        DateTime?
-  completedAt      DateTime?
-  errorMessage     String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  @@index([estado])
-  @@index([tipo])
-  @@index([createdAt])
-  @@index([backupId])
-  @@index([solicitadoPorId])
 }
 
 
