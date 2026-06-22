@@ -44,6 +44,7 @@ const ESTADO_BADGE: Record<string, string> = {
   COMPLETADA: 'badge-completada',
   CANCELADA: 'badge-cancelada',
   EN_PROGRESO: 'badge-en_progreso',
+  NO_SHOW: 'badge-cancelada',
   REPROGRAMADA: 'badge-reprogramada',
 };
 const ESTADO_LABEL: Record<string, string> = {
@@ -52,6 +53,7 @@ const ESTADO_LABEL: Record<string, string> = {
   COMPLETADA: 'Completada',
   CANCELADA: 'Cancelada',
   EN_PROGRESO: 'En Progreso',
+  NO_SHOW: 'No se presentó',
   REPROGRAMADA: 'Reprogramada',
 };
 

@@ -24,6 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       cliente_nombre,
       cliente_telefono,
       forzar,
+      cancel_reason,
     } = body;
 
     const dataToUpdate: any = {};
@@ -34,6 +35,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (hora)                 dataToUpdate.hora        = hora;
     if (servicio_id)          dataToUpdate.servicio_id = servicio_id;
     if (duracion !== undefined) dataToUpdate.duracion  = Number(duracion);
+
+    // ─── ANALYTICS TIMESTAMP TRACKING ──────────────────────────────────────
+    if (estado === 'CANCELADA') {
+      dataToUpdate.cancelled_at = new Date();
+      if (cancel_reason !== undefined) dataToUpdate.cancel_reason = cancel_reason || null;
+    } else if (estado === 'COMPLETADA') {
+      dataToUpdate.completed_at = new Date();
+    } else if (estado === 'NO_SHOW') {
+      dataToUpdate.no_show_at = new Date();
+    }
 
     // ─── GESTIÓN DE CLIENTE EN EDICIÓN ──────────────────────────────────────
     let idClienteFinal = cliente_id;

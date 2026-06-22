@@ -59,6 +59,12 @@ model Cita {
   updated_at       DateTime @updatedAt
   created_by       String
 
+  // Analytics tracking fields
+  cancelled_at     DateTime? // Set when estado changes to CANCELADA
+  completed_at     DateTime? // Set when estado changes to COMPLETADA
+  no_show_at       DateTime? // Set when estado changes to NO_SHOW
+  cancel_reason    String?   // Optional reason for cancellation
+
   cliente          Cliente? @relation(fields: [cliente_id], references: [id])
   servicio         Servicio @relation(fields: [servicio_id], references: [id])
   empleado         Empleado @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
@@ -71,6 +77,11 @@ model Cita {
   @@index([empleado_id])
   @@index([estado])
   @@index([fecha])
+  @@index([cliente_id])
+  @@index([servicio_id])
+  @@index([created_at])
+  @@index([cancelled_at])
+  @@index([completed_at])
   @@index([whatsapp_reminder_sent, fecha, estado])
 }
 
@@ -86,6 +97,7 @@ enum EstadoCita {
   EN_PROGRESO
   COMPLETADA
   CANCELADA
+  NO_SHOW
   REPROGRAMADA
 }
 

@@ -40,7 +40,16 @@ export async function syncCitaEstados(): Promise<void> {
         estado: {
           in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO]
         }
-      }
+      },
+      select: {
+        id: true,
+        fecha: true,
+        hora: true,
+        duracion: true,
+        estado: true,
+        cliente_nombre: true,
+        completed_at: true,
+      },
     });
 
     if (citasActivas.length === 0) {
@@ -76,10 +85,15 @@ export async function syncCitaEstados(): Promise<void> {
 
       if (targetEstado !== cita.estado) {
         console.log(`[AUTOMATIZACIÓN] ${cita.id} "${cita.cliente_nombre}" ${fechaStr} ${cita.hora}: ${cita.estado} → ${targetEstado}`);
+        const updateData: any = { estado: targetEstado };
+        // Set tracking timestamps for analytics
+        if (targetEstado === EstadoCita.COMPLETADA && !cita.completed_at) {
+          updateData.completed_at = endOfCita;
+        }
         updates.push(
           prisma.cita.update({
             where: { id: cita.id },
-            data: { estado: targetEstado }
+            data: updateData,
           })
         );
       }

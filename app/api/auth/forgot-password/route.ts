@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener IP del cliente (si está disponible)
-    const clientIp = req.headers.get('x-forwarded-for') || req.ip || null;
+    const clientIp = req.headers.get('x-forwarded-for') || (req as any).ip || null;
 
     // 3. Generar código de verificación de 6 dígitos
     const code = Math.floor(100000 + Math.random() * 900000).toString();

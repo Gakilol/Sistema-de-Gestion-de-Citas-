@@ -27,13 +27,14 @@ const getEmptyForm = () => ({
   notas: '',
 });
 
-const ESTADOS = ['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA', 'REPROGRAMADA'];
+const ESTADOS = ['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA', 'NO_SHOW', 'REPROGRAMADA'];
 const ESTADO_LABEL: Record<string, string> = {
   PENDIENTE: 'Pendiente',
   CONFIRMADA: 'Confirmada',
   EN_PROGRESO: 'En Progreso',
   COMPLETADA: 'Completada',
   CANCELADA: 'Cancelada',
+  NO_SHOW: 'No se presentó',
   REPROGRAMADA: 'Reprogramada',
 };
 const ESTADO_BADGE: Record<string, string> = {
@@ -42,6 +43,7 @@ const ESTADO_BADGE: Record<string, string> = {
   EN_PROGRESO: 'badge-en_progreso',
   COMPLETADA: 'badge-completada',
   CANCELADA: 'badge-cancelada',
+  NO_SHOW: 'badge-cancelada',
   REPROGRAMADA: 'badge-reprogramada',
 };
 
