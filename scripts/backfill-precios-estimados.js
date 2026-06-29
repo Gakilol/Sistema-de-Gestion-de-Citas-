@@ -41,10 +41,7 @@ async function main() {
   console.log('Buscando citas históricas sin facturación...');
   const citas = await prisma.cita.findMany({
     where: {
-      OR: [
-        { monto: null },
-        { monto: 0 }
-      ]
+      monto: 0
     },
     include: {
       citaServicios: true
