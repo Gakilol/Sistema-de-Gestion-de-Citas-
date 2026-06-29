@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatColones } from '@/lib/utils';
 
-const emptyForm = { nombre: '', descripcion: '', duracion: '', categoria_id: '' };
+const emptyForm = { nombre: '', descripcion: '', duracion: '', categoria_id: '', precio: '' };
 
 export default function Servicios() {
   const { user } = useAuth();
@@ -81,6 +81,7 @@ export default function Servicios() {
       descripcion: s.descripcion || '',
       duracion: String(s.duracion),
       categoria_id: s.categoria_id || '',
+      precio: String(s.precio || 0),
     });
     setEditingId(s.id);
     setShowModal(true);
@@ -103,12 +104,18 @@ export default function Servicios() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const precioNum = Number(form.precio);
+    if (form.precio === '' || isNaN(precioNum) || precioNum < 0) {
+      toast.error('El precio debe ser un número válido no negativo');
+      return;
+    }
     setSaving(true);
     const payload = {
       nombre: form.nombre,
       descripcion: form.descripcion,
       duracion: Number(form.duracion),
       categoria_id: form.categoria_id || null,
+      precio: precioNum,
     };
     try {
       const url = editingId ? `/api/servicios/${editingId}` : '/api/servicios';
@@ -206,10 +213,14 @@ export default function Servicios() {
                       </button>
                     </div>
 
-                    <div className="bg-secondary/50 rounded-lg p-2.5 text-center mb-3">
+                    <div className="bg-secondary/50 rounded-lg p-2.5 flex items-center justify-around mb-3">
                       <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
                         <Clock className="w-3.5 h-3.5" />
                         <span className="text-xs font-semibold">{serv.duracion} min</span>
+                      </div>
+                      <div className="w-px h-4 bg-border/60" />
+                      <div className="flex items-center justify-center gap-1.5 text-foreground font-bold">
+                        <span className="text-xs">{formatColones(serv.precio)}</span>
                       </div>
                     </div>
                   </div>
@@ -270,16 +281,20 @@ export default function Servicios() {
                   <Input type="number" min="5" value={form.duracion} onChange={e => setForm({ ...form, duracion: e.target.value })} required placeholder="30" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Categoría</label>
-                  <select
-                    value={form.categoria_id}
-                    onChange={e => setForm({ ...form, categoria_id: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">Sin categoría</option>
-                    {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                  </select>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Precio (₡) *</label>
+                  <Input type="number" min="0" step="500" value={form.precio} onChange={e => setForm({ ...form, precio: e.target.value })} required placeholder="5000" />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Categoría</label>
+                <select
+                  value={form.categoria_id}
+                  onChange={e => setForm({ ...form, categoria_id: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="">Sin categoría</option>
+                  {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>

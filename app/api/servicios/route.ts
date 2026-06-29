@@ -32,7 +32,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, categoria_id } = body;
+    const { nombre, descripcion, duracion, categoria_id, precio } = body;
+
+    // Validaciones de precio
+    const precioNum = Number(precio);
+    if (precio === undefined || precio === null || isNaN(precioNum) || precioNum < 0) {
+      return NextResponse.json({ error: 'El precio debe ser un número válido no negativo' }, { status: 400 });
+    }
 
     let legacyCategoria = body.categoria || null;
     if (categoria_id) {
@@ -49,6 +55,7 @@ export async function POST(req: NextRequest) {
         duracion: Number(duracion),
         categoria: legacyCategoria,
         categoria_id: categoria_id || null,
+        precio: precioNum,
       },
     });
 

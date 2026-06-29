@@ -7,7 +7,7 @@ import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, formatColones } from '@/lib/utils';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -16,14 +16,15 @@ import {
   BarChart3, Users, Calendar, TrendingUp, TrendingDown, Minus,
   Download, Loader2, AlertCircle, Clock, ArrowLeft, ArrowRight,
   UserX, Star, Briefcase, Activity, Filter, RefreshCw, ChevronDown,
-  CheckCircle, XCircle, AlertTriangle, Info,
+  CheckCircle, XCircle, AlertTriangle, Info, Coins,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = 'resumen' | 'demanda' | 'asistencia' | 'cancelaciones' | 'clientes' | 'fidelizacion' | 'profesionales';
+type Tab = 'resumen' | 'finanzas' | 'demanda' | 'asistencia' | 'cancelaciones' | 'clientes' | 'fidelizacion' | 'profesionales';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'resumen',       label: 'Resumen',        icon: BarChart3    },
+  { id: 'finanzas',      label: 'Finanzas',       icon: Coins        },
   { id: 'demanda',       label: 'Demanda',         icon: Activity     },
   { id: 'asistencia',    label: 'Asistencia',      icon: CheckCircle  },
   { id: 'cancelaciones', label: 'Cancelaciones',   icon: XCircle      },
@@ -99,7 +100,7 @@ function KpiCard({
             </div>
           </div>
           <p className="text-2xl font-bold text-foreground tabular-nums">
-            {typeof value === 'number' ? value.toLocaleString('es-NI') : value}
+            {typeof value === 'number' ? value.toLocaleString('es-CR') : value}
             {unit && <span className="text-sm font-normal text-muted-foreground ml-1">{unit}</span>}
           </p>
           {delta && (
@@ -139,7 +140,7 @@ function ChartTip({ active, payload, label }: any) {
         <div key={i} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
           <span className="text-muted-foreground">{p.name}:</span>
-          <span className="font-medium text-foreground">{typeof p.value === 'number' ? p.value.toLocaleString('es-NI') : p.value}</span>
+          <span className="font-medium text-foreground">{typeof p.value === 'number' ? p.value.toLocaleString('es-CR') : p.value}</span>
         </div>
       ))}
     </div>
@@ -229,6 +230,7 @@ function ReportesContent() {
     });
     const endpoints: Record<Tab, string> = {
       resumen:       `/api/reportes/resumen?${params}`,
+      finanzas:      `/api/reportes/resumen?${params}`,
       demanda:       `/api/reportes/demanda?${params}`,
       asistencia:    `/api/reportes/asistencia?${params}`,
       cancelaciones: `/api/reportes/cancelaciones?${params}`,
@@ -245,10 +247,23 @@ function ReportesContent() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(buildUrl(currentTab), { signal: abortRef.current.signal });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Error al cargar datos'); return; }
-      setData(json);
+      if (currentTab === 'finanzas') {
+        const paramsStr = buildUrl('resumen').split('?')[1];
+        const [resResumen, resProf] = await Promise.all([
+          fetch(`/api/reportes/resumen?${paramsStr}`, { signal: abortRef.current.signal }),
+          fetch(`/api/reportes/profesionales?${paramsStr}`, { signal: abortRef.current.signal })
+        ]);
+        const jsonResumen = await resResumen.json();
+        const jsonProf = await resProf.json();
+        if (!resResumen.ok) { setError(jsonResumen.error || 'Error al cargar resumen'); return; }
+        if (!resProf.ok) { setError(jsonProf.error || 'Error al cargar rendimiento'); return; }
+        setData({ ...jsonResumen, ...jsonProf });
+      } else {
+        const res  = await fetch(buildUrl(currentTab), { signal: abortRef.current.signal });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error || 'Error al cargar datos'); return; }
+        setData(json);
+      }
     } catch (e: any) {
       if (e.name !== 'AbortError') setError('Error de conexión con el servidor.');
     } finally {
@@ -819,6 +834,135 @@ function ReportesContent() {
     );
   };
 
+  const renderFinanzas = () => {
+    if (!data) return null;
+    const { kpis, deltas, porEmpleado, porServicio } = data;
+
+    const comparisonData = [
+      { name: 'Reales', valor: kpis.ingresosReales, color: '#10b981' },
+      { name: 'Proyectados', valor: kpis.ingresosProyectados, color: '#3b82f6' },
+      { name: 'Pérdida (Canc.)', valor: kpis.perdidasCancelacion, color: '#ef4444' },
+      { name: 'Pérdida (No Show)', valor: kpis.perdidasNoShow, color: '#f97316' },
+    ];
+
+    return (
+      <div className="space-y-5">
+        <SectionTitle icon={Coins} title="Resumen Financiero" subtitle="Métricas económicas en colones costarricenses (₡)" />
+        
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <KpiCard title="Ingresos Reales" value={formatColones(kpis.ingresosReales)} delta={deltas?.ingresosReales} icon={CheckCircle} colorClass="bg-emerald-500/10" tooltip="Ingresos de citas finalizadas con éxito." />
+          <KpiCard title="Ingresos Proyectados" value={formatColones(kpis.ingresosProyectados)} icon={Clock} colorClass="bg-blue-500/10" tooltip="Ingresos estimados de citas pendientes, confirmadas, en progreso o reprogramadas." />
+          <KpiCard title="Pérdidas por Cancelación" value={formatColones(kpis.perdidasCancelacion)} delta={deltas?.perdidasCancelacion} icon={XCircle} colorClass="bg-red-500/10" tooltip="Ingresos no realizados por citas canceladas." />
+          <KpiCard title="Pérdidas por No Show" value={formatColones(kpis.perdidasNoShow)} delta={deltas?.perdidasNoShow} icon={AlertTriangle} colorClass="bg-orange-500/10" tooltip="Ingresos no realizados porque el cliente no asistió." />
+          <KpiCard title="Ticket Promedio" value={formatColones(kpis.ticketPromedio)} delta={deltas?.ticketPromedio} icon={TrendingUp} colorClass="bg-primary/10" tooltip="Ingreso promedio por cada cita completada." />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <Card className="p-5 border-border/50 lg:col-span-2">
+            <SectionTitle icon={BarChart3} title="Comparación de Ingresos y Pérdidas" />
+            {comparisonData.some(d => d.valor > 0) ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={(v) => `₡${v >= 1000 ? (v / 1000) + 'k' : v}`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(value) => formatColones(value)} />
+                  <Bar dataKey="valor" name="Monto" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                    {comparisonData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <EmptyState />}
+          </Card>
+
+          <Card className="p-5 border-border/50 bg-gradient-to-br from-primary/5 to-transparent flex flex-col justify-between">
+            <div>
+              <SectionTitle icon={Star} title="Rendimiento Financiero" />
+              <div className="space-y-4 mt-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Efectividad de Cobro</p>
+                  <p className="text-2xl font-bold text-emerald-500 tabular-nums">
+                    {(kpis.ingresosReales + kpis.perdidasCancelacion + kpis.perdidasNoShow) > 0
+                      ? Math.round((kpis.ingresosReales / (kpis.ingresosReales + kpis.perdidasCancelacion + kpis.perdidasNoShow)) * 100)
+                      : 0}%
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Porcentaje de ingresos cobrados sobre el total agendado pasados.</p>
+                </div>
+                <div className="pt-2 border-t border-border/30">
+                  <p className="text-xs text-muted-foreground">Pérdida Total Estimada</p>
+                  <p className="text-lg font-bold text-red-500 tabular-nums">
+                    {formatColones(kpis.perdidasCancelacion + kpis.perdidasNoShow)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Ingresos no percibidos por cancelaciones y no-shows.</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {porEmpleado?.length > 0 && (
+            <Card className="p-5 border-border/50">
+              <SectionTitle icon={Users} title="Ingresos por Profesional" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Profesional</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Ingresos Reales</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Proyectados</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Pérdidas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {porEmpleado.map((e: any, i: number) => (
+                      <tr key={i} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
+                        <td className="px-3 py-2.5 font-medium text-foreground whitespace-nowrap">{e.nombre}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">{formatColones(e.ingresosReales)}</td>
+                        <td className="px-3 py-2.5 text-right text-blue-500 tabular-nums">{formatColones(e.ingresosProyectados)}</td>
+                        <td className="px-3 py-2.5 text-right text-red-500 tabular-nums">{formatColones(e.perdidasEstimadas)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {porServicio?.length > 0 && (
+            <Card className="p-5 border-border/50">
+              <SectionTitle icon={Briefcase} title="Ingresos por Servicio" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Servicio</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Ingresos Reales</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Proyectados</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Pérdidas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {porServicio.map((s: any, i: number) => (
+                      <tr key={i} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
+                        <td className="px-3 py-2.5 font-medium text-foreground whitespace-nowrap">{s.nombre}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">{formatColones(s.ingresosReales)}</td>
+                        <td className="px-3 py-2.5 text-right text-blue-500 tabular-nums">{formatColones(s.ingresosProyectados)}</td>
+                        <td className="px-3 py-2.5 text-right text-red-500 tabular-nums">{formatColones(s.perdidasEstimadas)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderTabContent = () => {
     if (loading) {
       return (
@@ -848,6 +992,7 @@ function ReportesContent() {
 
     switch (tab) {
       case 'resumen':       return renderResumen();
+      case 'finanzas':      return renderFinanzas();
       case 'demanda':       return renderDemanda();
       case 'asistencia':    return renderAsistencia();
       case 'cancelaciones': return renderCancelaciones();

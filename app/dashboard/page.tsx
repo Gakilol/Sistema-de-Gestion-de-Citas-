@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, TrendingUp, Users, CheckCircle2,
   Clock, ArrowUpRight, ArrowDownRight, RefreshCcw, Loader2,
-  Scissors, ChevronRight, Activity,
+  Scissors, ChevronRight, Activity, Coins
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -14,7 +14,7 @@ import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
-import { cn } from '@/lib/utils';
+import { cn, formatColones } from '@/lib/utils';
 import Link from 'next/link';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
 
 function fmtDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d;
-  return date.toLocaleDateString('es-NI', { day: '2-digit', month: 'short', timeZone: 'UTC' }).replace(/\./g, '');
+  return date.toLocaleDateString('es-CR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).replace(/\./g, '');
 }
 
 // ─── Skeleton ───────────────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ export default function Dashboard() {
                 Bienvenido, <span className="text-gold-gradient">{user?.nombre?.split(' ')[0]}</span> 👋
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {new Date().toLocaleDateString('es-NI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                {new Date().toLocaleDateString('es-CR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
             <Button
@@ -234,36 +234,69 @@ export default function Dashboard() {
 
           {/* ── KPI Cards ──────────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <KpiCard
-              title="Citas Hoy"
-              value={String(stats?.citasHoy ?? 0)}
-              sub={`${stats?.citasPendientes ?? 0} pendientes`}
-              icon={Calendar}
-              accent="gold"
-            />
-            <KpiCard
-              title="Completadas Hoy"
-              value={String(stats?.citasCompletadasHoy ?? 0)}
-              sub={`${stats?.tasaCompletadas ?? 0}% tasa éxito`}
-              icon={CheckCircle2}
-              accent="emerald"
-            />
-            {isAdmin && (
-              <KpiCard
-                title="Completadas Mes"
-                value={String(stats?.citasCompletadasMes ?? 0)}
-                sub="Citas finalizadas este mes"
-                icon={Calendar}
-                accent="blue"
-              />
+            {isAdmin ? (
+              <>
+                <KpiCard
+                  title="Citas Hoy"
+                  value={String(stats?.citasHoy ?? 0)}
+                  sub={`${stats?.citasPendientes ?? 0} pendientes`}
+                  icon={Calendar}
+                  accent="gold"
+                />
+                <KpiCard
+                  title="Ingresos Hoy"
+                  value={formatColones(stats?.ingresosHoy ?? 0)}
+                  sub={`${stats?.citasCompletadasHoy ?? 0} completadas`}
+                  icon={CheckCircle2}
+                  accent="emerald"
+                />
+                <KpiCard
+                  title="Ingresos Mes"
+                  value={formatColones(stats?.ingresosMes ?? 0)}
+                  sub={`${stats?.citasCompletadasMes ?? 0} citas este mes`}
+                  icon={Coins}
+                  accent="blue"
+                />
+                <KpiCard
+                  title="Ingresos Proyectados"
+                  value={formatColones(stats?.ingresosProyectados ?? 0)}
+                  sub="Agendas pendientes y activas"
+                  icon={Clock}
+                  accent="purple"
+                />
+              </>
+            ) : (
+              <>
+                <KpiCard
+                  title="Citas Hoy"
+                  value={String(stats?.citasHoy ?? 0)}
+                  sub={`${stats?.citasPendientes ?? 0} pendientes`}
+                  icon={Calendar}
+                  accent="gold"
+                />
+                <KpiCard
+                  title="Completadas Hoy"
+                  value={String(stats?.citasCompletadasHoy ?? 0)}
+                  sub={`${stats?.tasaCompletadas ?? 0}% tasa éxito`}
+                  icon={CheckCircle2}
+                  accent="emerald"
+                />
+                <KpiCard
+                  title="Completadas Mes"
+                  value={String(stats?.citasCompletadasMes ?? 0)}
+                  sub="Citas finalizadas este mes"
+                  icon={Calendar}
+                  accent="blue"
+                />
+                <KpiCard
+                  title="Personal Activo"
+                  value={String(stats?.empleadosActivos ?? 0)}
+                  sub="Empleados en sistema"
+                  icon={Users}
+                  accent="purple"
+                />
+              </>
             )}
-            <KpiCard
-              title="Personal Activo"
-              value={String(stats?.empleadosActivos ?? 0)}
-              sub="Empleados en sistema"
-              icon={Users}
-              accent="purple"
-            />
           </div>
 
           {/* ── Gráficas ────────────────────────────────────────── */}
@@ -338,6 +371,12 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
+                    {stats?.servicioMasGenerador && (
+                      <div className="mt-3 pt-3 border-t border-border/40 text-xs text-muted-foreground flex items-center justify-between">
+                        <span className="font-semibold text-primary">Top Facturación:</span>
+                        <span className="text-foreground font-medium">{stats.servicioMasGenerador}</span>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="h-[180px] flex items-center justify-center text-muted-foreground text-xs">Sin datos suficientes</div>

@@ -21,13 +21,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, categoria, categoria_id, activo } = body;
+    const { nombre, descripcion, duracion, categoria, categoria_id, activo, precio } = body;
 
     const dataToUpdate: any = {};
     if (nombre) dataToUpdate.nombre = nombre;
     if (descripcion !== undefined) dataToUpdate.descripcion = descripcion;
     if (duracion !== undefined) dataToUpdate.duracion = Number(duracion);
     if (activo !== undefined) dataToUpdate.activo = activo;
+
+    if (precio !== undefined) {
+      const precioNum = Number(precio);
+      if (precio === null || isNaN(precioNum) || precioNum < 0) {
+        return NextResponse.json({ error: 'El precio debe ser un número válido no negativo' }, { status: 400 });
+      }
+      dataToUpdate.precio = precioNum;
+    }
 
     if (categoria_id !== undefined) {
       dataToUpdate.categoria_id = categoria_id;

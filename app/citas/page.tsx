@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatColones } from '@/lib/utils';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -589,7 +589,7 @@ export default function Citas() {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-secondary/70 text-secondary-foreground border-b border-border/50">
                     <tr>
-                      {['Cliente', 'Servicios', 'Empleado', 'Fecha y Hora', 'Estado', 'Acciones'].map(h => (
+                      {['Cliente', 'Servicios', 'Empleado', 'Fecha y Hora', 'Monto', 'Estado', 'Acciones'].map(h => (
                         <th key={h} className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -615,6 +615,9 @@ export default function Citas() {
                             <div className="skeleton h-3 w-16" />
                           </td>
                           <td className="px-4 py-4">
+                            <div className="skeleton h-4 w-16" />
+                          </td>
+                          <td className="px-4 py-4">
                             <div className="skeleton h-6 w-20 rounded-full" />
                           </td>
                           <td className="px-4 py-4">
@@ -627,7 +630,7 @@ export default function Citas() {
                       ))
                     ) : paginated.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                        <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
                           {busqueda || filtroEstado || filtroEmpleado ? 'Sin resultados para los filtros aplicados' : 'No hay citas registradas'}
                         </td>
                       </tr>
@@ -707,6 +710,9 @@ export default function Citas() {
                                 </span>
                               )}
                             </p>
+                          </td>
+                          <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
+                            {formatColones(cita.monto)}
                           </td>
                           <td className="px-4 py-3.5">
                             <select
@@ -849,9 +855,10 @@ export default function Citas() {
                       </div>
 
                       <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
-                        <div className="text-xs">
+                        <div className="text-xs flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
-                          <span className="text-muted-foreground ml-1.5">· {cita.hora}</span>
+                          <span className="text-muted-foreground">· {cita.hora}</span>
+                          <span className="font-semibold text-foreground ml-1">{formatColones(cita.monto)}</span>
                         </div>
                         <div className="flex gap-1.5">
                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
@@ -1207,12 +1214,23 @@ export default function Citas() {
                 </div>
               )}
               {form.servicio_ids.length > 0 && (
-                <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-primary/5 border border-primary/20 rounded-xl p-3.5 text-sm">
                   <p>
-                    <span className="text-muted-foreground">Duración total estimada:</span>{' '}
-                    <strong>
+                    <span className="text-muted-foreground">Duración total:</span>{' '}
+                    <strong className="text-foreground">
                       {form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}{' '}
                       minutos
+                    </strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Precio estimado:</span>{' '}
+                    <strong className="text-primary text-base font-bold">
+                      {formatColones(
+                        form.servicio_ids.reduce((sum: number, id: string) => {
+                          const s = servicios.find(srv => srv.id === id);
+                          return sum + (s?.precio ? Number(s.precio) : 0);
+                        }, 0)
+                      )}
                     </strong>
                   </p>
                 </div>

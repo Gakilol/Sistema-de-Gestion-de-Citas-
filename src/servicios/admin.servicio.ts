@@ -17,6 +17,15 @@ export class AdminServicio {
     const lastDay = new Date(year, month, 0).getDate();
     const finMes = new Date(Date.UTC(year, month - 1, lastDay, 23, 59, 59, 999));
 
+    // Calcular inicio y fin de la semana actual
+    const dayOfWeek = dateToday.getUTCDay();
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const inicioSemana = new Date(dateToday);
+    inicioSemana.setUTCDate(dateToday.getUTCDate() - diffToMonday);
+    const finSemana = new Date(inicioSemana);
+    finSemana.setUTCDate(inicioSemana.getUTCDate() + 6);
+    finSemana.setUTCHours(23, 59, 59, 999);
+
     // ── Conteos paralelos ───────────────────────────────────────────────
     const [
       totalCitas,
@@ -31,6 +40,12 @@ export class AdminServicio {
       actividadReciente,
       citasHoyDetalle,
       productividadEmpleados,
+      ingresosHoyRaw,
+      ingresosSemanaRaw,
+      ingresosMesRaw,
+      ingresosProyectadosRaw,
+      ingresosRealesRaw,
+      servicioMasGeneradorRaw,
     ] = await Promise.all([
       // Total citas
       prisma.cita.count(),
@@ -127,7 +142,51 @@ export class AdminServicio {
         orderBy: { _count: { id: 'desc' } },
         take: 5,
       }),
+
+      // Ingresos de Hoy (Sumatoria de montos de citas COMPLETADA hoy)
+      prisma.cita.aggregate({
+        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: dateToday, lte: dateToday } },
+        _sum: { monto: true }
+      }),
+      // Ingresos de la Semana (Sumatoria de montos de citas COMPLETADA esta semana)
+      prisma.cita.aggregate({
+        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioSemana, lte: finSemana } },
+        _sum: { monto: true }
+      }),
+      // Ingresos del Mes (Sumatoria de montos de citas COMPLETADA este mes)
+      prisma.cita.aggregate({
+        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioMes, lte: finMes } },
+        _sum: { monto: true }
+      }),
+      // Ingresos Proyectados (Sumatoria de montos de citas activas: PENDIENTE, CONFIRMADA, REPROGRAMADA, EN_PROGRESO)
+      prisma.cita.aggregate({
+        where: { estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO, EstadoCita.REPROGRAMADA] } },
+        _sum: { monto: true }
+      }),
+      // Ingresos Reales Totales (Sumatoria de montos de todas las citas completadas)
+      prisma.cita.aggregate({
+        where: { estado: EstadoCita.COMPLETADA },
+        _sum: { monto: true }
+      }),
+      // Servicio que más dinero genera (Top 1)
+      prisma.citaServicio.groupBy({
+        by: ['servicio_id'],
+        where: { cita: { estado: EstadoCita.COMPLETADA } },
+        _sum: { precio: true },
+        orderBy: { _sum: { precio: 'desc' } },
+        take: 1
+      }),
     ]);
+
+    // Resolver nombre del servicio que más genera
+    let servicioMasGeneradorNombre = 'N/A';
+    if (servicioMasGeneradorRaw.length > 0) {
+      const s = await prisma.servicio.findUnique({
+        where: { id: servicioMasGeneradorRaw[0].servicio_id },
+        select: { nombre: true }
+      });
+      servicioMasGeneradorNombre = s?.nombre || 'N/A';
+    }
 
     // ── Resolver nombres de servicios populares ───────────────────────
     const servicioIds = serviciosPopularesRaw.map((s) => s.servicio_id);
@@ -171,6 +230,12 @@ export class AdminServicio {
         citasCompletadasMes,
         citasCompletadasHoy,
         tasaCompletadas,
+        ingresosHoy: ingresosHoyRaw._sum.monto ? Number(ingresosHoyRaw._sum.monto) : 0,
+        ingresosSemana: ingresosSemanaRaw._sum.monto ? Number(ingresosSemanaRaw._sum.monto) : 0,
+        ingresosMes: ingresosMesRaw._sum.monto ? Number(ingresosMesRaw._sum.monto) : 0,
+        ingresosProyectados: ingresosProyectadosRaw._sum.monto ? Number(ingresosProyectadosRaw._sum.monto) : 0,
+        ingresosReales: ingresosRealesRaw._sum.monto ? Number(ingresosRealesRaw._sum.monto) : 0,
+        servicioMasGenerador: servicioMasGeneradorNombre,
         // Legado
         totalAppointments: totalCitas,
         completedAppointments: citasCompletadas,

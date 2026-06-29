@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Resolver servicios
-    let serviciosParaCita: { id: string; duracion: number }[] = [];
+    let serviciosParaCita: { id: string; duracion: number; precio: number }[] = [];
     if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
       const ids = servicios_seleccionados.map((s: any) => s.id);
       const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
@@ -91,7 +91,8 @@ export async function POST(req: NextRequest) {
         const sDb = serviciosDb.find(s => s.id === sel.id);
         return {
           id: sel.id,
-          duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30)
+          duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30),
+          precio: sDb?.precio ? Number(sDb.precio) : 0
         };
       }).filter((s: any) => s.id);
     } else {
@@ -104,10 +105,15 @@ export async function POST(req: NextRequest) {
       if (serviciosDbOrdenados.length === 0) {
         return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
       }
-      serviciosParaCita = serviciosDbOrdenados.map((s: any) => ({ id: s.id, duracion: s.duracion }));
+      serviciosParaCita = serviciosDbOrdenados.map((s: any) => ({
+        id: s.id,
+        duracion: s.duracion,
+        precio: s.precio ? Number(s.precio) : 0
+      }));
     }
 
     const duracionCalculada = serviciosParaCita.reduce((sum, s) => sum + s.duracion, 0);
+    const montoCalculado = serviciosParaCita.reduce((sum, s) => sum + s.precio, 0);
     const primerServicioId  = serviciosParaCita[0].id;
 
     // ─── VALIDACIÓN DE DISPONIBILIDAD ───────────────────────────────────────
@@ -186,6 +192,7 @@ export async function POST(req: NextRequest) {
           hora,
           duracion:         duracionCalculada,
           notas,
+          monto:            montoCalculado,
           created_by:       userId,
         },
       });
@@ -196,6 +203,7 @@ export async function POST(req: NextRequest) {
           servicio_id: s.id,
           duracion:    s.duracion,
           orden:       index,
+          precio:      s.precio,
         }))
       });
 

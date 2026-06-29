@@ -20,3 +20,14 @@ export function formatCurrency(amount: number, moneda: string = 'USD', tipoCambi
     .replace(/[a-zA-Z]+/, simbolo) // Replace default currency code with our symbol if needed
     .trim();
 }
+
+export function formatColones(amount: number | string | any): string {
+  if (amount === null || amount === undefined) return '₡0';
+  const num = typeof amount === 'number' ? amount : Number(amount);
+  if (isNaN(num)) return '₡0';
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+  return `₡${formatted}`;
+}

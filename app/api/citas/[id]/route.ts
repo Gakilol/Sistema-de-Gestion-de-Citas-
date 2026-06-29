@@ -166,7 +166,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
     const cita = await prisma.$transaction(async (tx) => {
-      let serviciosParaActualizar: { id: string; duracion: number }[] = [];
+      let serviciosParaActualizar: { id: string; duracion: number; precio: number }[] = [];
       let flagActualizarServicios = false;
 
       if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
@@ -180,7 +180,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const sDb = serviciosDb.find(s => s.id === sel.id);
           return {
             id:       sel.id,
-            duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30)
+            duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30),
+            precio:   sDb?.precio ? Number(sDb.precio) : 0,
           };
         }).filter((s: any) => s.id);
 
@@ -190,18 +191,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const serviciosDb = await tx.servicio.findMany({ where: { id: { in: idsUnicos } } });
 
         // Preservar duplicados usando el array original
-        serviciosParaActualizar = finalServicioIds.map((sid: string, i: number) => {
+        serviciosParaActualizar = finalServicioIds.map((sid: string) => {
           const sDb = serviciosDb.find(s => s.id === sid);
-          return { id: sid, duracion: sDb?.duracion || 30 };
+          return {
+            id:       sid,
+            duracion: sDb?.duracion || 30,
+            precio:   sDb?.precio ? Number(sDb.precio) : 0,
+          };
         }).filter((s: any) => s.id);
       }
 
       if (flagActualizarServicios && serviciosParaActualizar.length > 0) {
         const duracionCalculada = serviciosParaActualizar.reduce((sum, s) => sum + s.duracion, 0);
         const primerServicioId  = serviciosParaActualizar[0].id;
+        const montoCalculado    = serviciosParaActualizar.reduce((sum, s) => sum + s.precio, 0);
 
         dataToUpdate.servicio_id = primerServicioId;
         dataToUpdate.duracion    = duracionCalculada;
+        dataToUpdate.monto       = montoCalculado;
 
         await tx.citaServicio.deleteMany({ where: { cita_id: id } });
 
@@ -211,6 +218,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             servicio_id: s.id,
             duracion:    s.duracion,
             orden:       index,
+            precio:      s.precio,
           }))
         });
       }
