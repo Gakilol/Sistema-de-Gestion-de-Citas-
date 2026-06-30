@@ -1076,6 +1076,7 @@ export default function Citas() {
                 onEditCita={openEdit}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
+                isLoading={isLoading}
               />
             </div>
           )}

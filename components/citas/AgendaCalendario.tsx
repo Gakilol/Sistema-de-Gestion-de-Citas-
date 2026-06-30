@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn, formatColones } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface AgendaCalendarioProps {
   citas: any[];
@@ -15,6 +15,7 @@ interface AgendaCalendarioProps {
   onEditCita: (cita: any) => void;
   selectedDateStr: string;
   setSelectedDateStr: (date: string) => void;
+  isLoading?: boolean;
 }
 
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -28,7 +29,8 @@ const MESES = [
 const HORA_INICIO = 7; // 7 AM
 const HORA_FIN = 20;   // 8 PM
 const TOTAL_HORAS = HORA_FIN - HORA_INICIO + 1;
-const ALTURA_HORA_PX = 60; // 1 hora = 60px -> 1 minuto = 1px
+const HOUR_HEIGHT = 80; // 1 hora = 80px
+const MIN_HEIGHT = 42;  // 42px min height to prevent tiny text
 
 export function AgendaCalendario({
   citas,
@@ -39,6 +41,7 @@ export function AgendaCalendario({
   onEditCita,
   selectedDateStr,
   setSelectedDateStr,
+  isLoading = false,
 }: AgendaCalendarioProps) {
   const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('3dias');
 
@@ -116,6 +119,7 @@ export function AgendaCalendario({
 
   // Convertir "HH:MM" a minutos desde la medianoche
   const timeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
     const [h, m] = timeStr.split(':').map(Number);
     return h * 60 + (m || 0);
   };
@@ -126,7 +130,7 @@ export function AgendaCalendario({
     const [hStr, mStr] = timeStr.split(':');
     let h = parseInt(hStr, 10);
     const m = mStr || '00';
-    const ampm = h >= 12 ? 'p. m.' : 'a. m.';
+    const ampm = h >= 12 ? 'PM' : 'AM';
     h = h % 12;
     h = h ? h : 12;
     return `${h}:${m} ${ampm}`;
@@ -163,32 +167,131 @@ export function AgendaCalendario({
     return mapa;
   }, [citas, diasAMostrar]);
 
+  // Contar citas visibles en el periodo
+  const totalCitasVisibles = useMemo(() => {
+    let count = 0;
+    Object.values(citasPorDia).forEach((lista) => {
+      count += lista.length;
+    });
+    return count;
+  }, [citasPorDia]);
+
+  // Algoritmo de posicionamiento de bloques superpuestos (Google Calendar)
+  const procesarCitasDia = (citasDia: any[]) => {
+    if (!citasDia || citasDia.length === 0) return [];
+
+    // Parsear tiempos y duraciones
+    const parsed = citasDia.map(cita => {
+      const minInicio = timeToMinutes(cita.hora);
+      const minFin = minInicio + (cita.duracion || 30);
+      return {
+        ...cita,
+        minInicio,
+        minFin,
+      };
+    });
+
+    // Ordenar por hora de inicio, luego duración descendente (más largas primero)
+    parsed.sort((a, b) => {
+      if (a.minInicio !== b.minInicio) {
+        return a.minInicio - b.minInicio;
+      }
+      return b.duracion - a.duracion;
+    });
+
+    // Agrupar en clusters que se traslapan temporalmente
+    const clusters: any[][] = [];
+    let currentCluster: any[] = [];
+    let maxEnd = 0;
+
+    parsed.forEach((cita) => {
+      if (cita.minInicio >= maxEnd) {
+        if (currentCluster.length > 0) {
+          clusters.push(currentCluster);
+        }
+        currentCluster = [cita];
+        maxEnd = cita.minFin;
+      } else {
+        currentCluster.push(cita);
+        if (cita.minFin > maxEnd) {
+          maxEnd = cita.minFin;
+        }
+      }
+    });
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster);
+    }
+
+    // Posicionar las citas en columnas dentro de cada cluster
+    const result: any[] = [];
+
+    clusters.forEach((cluster) => {
+      const columns: any[][] = [];
+
+      cluster.forEach((cita) => {
+        let colIndex = 0;
+        while (true) {
+          if (!columns[colIndex]) {
+            columns[colIndex] = [];
+          }
+          const col = columns[colIndex];
+          const lastInCol = col[col.length - 1];
+          // Si no hay traslape con la última cita de esta columna
+          if (!lastInCol || cita.minInicio >= lastInCol.minFin) {
+            col.push(cita);
+            cita.colIndex = colIndex;
+            break;
+          }
+          colIndex++;
+        }
+      });
+
+      const totalColumns = columns.length;
+      cluster.forEach((cita) => {
+        cita.totalColumns = totalColumns;
+        
+        // Calcular posiciones verticales y alturas
+        const minCero = HORA_INICIO * 60;
+        const topPx = Math.max(0, (cita.minInicio - minCero) * (HOUR_HEIGHT / 60));
+        const heightPx = Math.max(MIN_HEIGHT, (cita.duracion || 30) * (HOUR_HEIGHT / 60));
+
+        result.push({
+          ...cita,
+          topPx,
+          heightPx,
+        });
+      });
+    });
+
+    return result;
+  };
+
   return (
-    <div className="flex flex-col h-[700px] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none">
+    <div className="flex flex-col h-[750px] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative">
       
-      {/* CABECERA DEL CALENDARIO */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border-b border-border/50 bg-secondary/10">
+      {/* CABECERA DEL CALENDARIO (CONTROLES) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b border-border/50 bg-secondary/15 z-30">
         
         {/* Controles de Navegación */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={irAHoy} className="font-semibold gap-1 text-xs">
+          <Button variant="outline" size="sm" onClick={irAHoy} className="font-semibold gap-1 text-xs hover-lift cursor-pointer h-9">
             <CalendarIcon className="w-3.5 h-3.5" /> Hoy
           </Button>
-          <div className="flex items-center border border-border rounded-lg bg-background">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none" onClick={() => cambiarFecha(-1)}>
+          <div className="flex items-center border border-border rounded-lg bg-background shadow-sm h-9">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span className="text-xs font-bold px-3 border-x border-border py-1 text-foreground min-w-[130px] text-center">
               {tituloCabecera}
             </span>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none" onClick={() => cambiarFecha(1)}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
         {/* Toggles de Vista */}
-        <div className="flex bg-secondary/40 p-1 rounded-xl border border-border/40 self-start md:self-auto">
+        <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/40 self-start sm:self-auto shadow-inner h-10 items-center">
           {[
             { id: 'dia', label: 'Día' },
             { id: '3dias', label: '3 Días' },
@@ -198,10 +301,10 @@ export function AgendaCalendario({
               key={tab.id}
               onClick={() => setVista(tab.id as any)}
               className={cn(
-                "px-3 py-1 text-xs font-semibold rounded-lg transition-all",
+                "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
                 vista === tab.id
                   ? "bg-primary text-primary-foreground shadow-sm font-bold scale-[1.02]"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               )}
             >
               {tab.label}
@@ -210,159 +313,224 @@ export function AgendaCalendario({
         </div>
       </div>
 
-      {/* CUERPO DEL CALENDARIO CON SCROLL */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* CONTENEDOR DE GRID Y HORAS (SCROLL) */}
+      <div className="flex-1 overflow-auto relative custom-scrollbar bg-background/5">
         
-        {/* Encabezado de Columnas del Calendario */}
-        <div className="flex border-b border-border/40 bg-secondary/5">
-          {/* Espacio para la columna de horas */}
-          <div className="w-16 md:w-20 shrink-0 border-r border-border/40" />
-          
-          {/* Columnas de los días */}
-          <div className="flex-1 grid grid-flow-col auto-cols-fr overflow-x-auto select-none">
-            {diasAMostrar.map((dia, idx) => {
-              const esHoy = formatLocalDate(dia) === formatLocalDate(new Date());
-              return (
-                <div
-                  key={idx}
-                  className={cn(
-                    "py-2.5 text-center border-r border-border/30 last:border-r-0 flex flex-col items-center justify-center min-w-[90px]",
-                    esHoy && "bg-primary/5 text-primary"
-                  )}
-                >
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                    {DIAS_SEMANA_ABR[dia.getDay()]}
-                  </span>
-                  <span
+        {/* Envoltorio con Ancho Mínimo para Evitar Columnas Apretadas */}
+        <div
+          className="flex flex-col h-full min-h-[850px]"
+          style={{
+            minWidth:
+              vista === 'dia'
+                ? '100%'
+                : vista === '3dias'
+                ? '650px'
+                : '1000px',
+          }}
+        >
+          {/* CABECERA DE DÍAS (Sticky top & z-30 para quedar sobre el grid) */}
+          <div className="flex sticky top-0 bg-card border-b border-border/40 z-30 shadow-sm">
+            {/* Esquina superior izquierda (horas header spacer, sticky top & left, z-40) */}
+            <div className="w-16 md:w-20 shrink-0 sticky left-0 bg-card border-r border-border/40 z-40 flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" />
+            
+            {/* Columnas de nombres de días */}
+            <div className="flex-1 flex">
+              {diasAMostrar.map((dia, idx) => {
+                const esHoy = formatLocalDate(dia) === formatLocalDate(new Date());
+                return (
+                  <div
+                    key={idx}
                     className={cn(
-                      "text-lg font-extrabold w-8 h-8 flex items-center justify-center rounded-full mt-0.5",
-                      esHoy && "bg-primary text-primary-foreground shadow-md"
+                      "flex-1 py-3 text-center border-r border-border/20 last:border-r-0 flex flex-col items-center justify-center min-w-[90px] transition-colors",
+                      esHoy && "bg-primary/5 text-primary"
                     )}
                   >
-                    {dia.getDate()}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Cuadrícula de Tiempo con Scrollbar */}
-        <div className="flex-1 overflow-y-auto relative flex">
-          
-          {/* Columna lateral de Horas */}
-          <div className="w-16 md:w-20 shrink-0 border-r border-border/40 bg-secondary/5 select-none relative z-10">
-            {horasRegla.map((hora, idx) => (
-              <div
-                key={idx}
-                className="relative text-right pr-2 text-[10px] font-bold text-muted-foreground"
-                style={{ height: `${ALTURA_HORA_PX}px` }}
-              >
-                {/* Posición vertical centrada de la etiqueta de la hora */}
-                <span className="absolute -top-2 right-2.5 bg-card/90 px-1 rounded">
-                  {hora.label.replace(':00', '').replace(' p. m.', ' PM').replace(' a. m.', ' AM')}
-                </span>
-              </div>
-            ))}
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                      {DIAS_SEMANA_ABR[dia.getDay()]}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-base font-extrabold w-7 h-7 flex items-center justify-center rounded-full mt-0.5 transition-all",
+                        esHoy && "bg-primary text-primary-foreground shadow-md scale-105"
+                      )}
+                    >
+                      {dia.getDate()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Cuadrícula de días y citas */}
-          <div className="flex-1 grid grid-flow-col auto-cols-fr relative min-h-[780px]">
+          {/* GRID DEL CALENDARIO: HORAS A LA IZQUIERDA Y CITAS A LA DERECHA */}
+          <div className="flex relative flex-1" style={{ height: `${TOTAL_HORAS * HOUR_HEIGHT}px` }}>
             
-            {/* Líneas horizontales de fondo de cada hora */}
-            <div className="absolute inset-0 pointer-events-none select-none">
-              {Array.from({ length: TOTAL_HORAS }).map((_, idx) => (
+            {/* Columna lateral de Horas (sticky left, z-20 para que los bloques de citas deslicen debajo de ella al hacer scroll horizontal) */}
+            <div className="w-16 md:w-20 shrink-0 border-r border-border/40 bg-card/90 select-none relative z-20">
+              {horasRegla.map((hora, idx) => (
                 <div
                   key={idx}
-                  className="border-b border-border/30 w-full"
-                  style={{ height: `${ALTURA_HORA_PX}px` }}
-                />
+                  className="relative text-right pr-2 text-[10px] font-bold text-muted-foreground"
+                  style={{ height: `${HOUR_HEIGHT}px` }}
+                >
+                  <span className="absolute -top-2.5 right-2 bg-background px-1 rounded shadow-sm border border-border/10 text-[9px] font-bold">
+                    {hora.label.replace(':00', '').replace(' p. m.', ' PM').replace(' a. m.', ' AM')}
+                  </span>
+                </div>
               ))}
             </div>
 
-            {/* Renderizado de Columnas de Citas por Día */}
-            {diasAMostrar.map((dia, dIdx) => {
-              const diaStr = formatLocalDate(dia);
-              const citasDia = citasPorDia[diaStr] || [];
-              const esHoy = diaStr === formatLocalDate(new Date());
+            {/* Grid principal para columnas de días y líneas horizontales */}
+            <div className="flex-1 flex relative">
+              
+              {/* Líneas horizontales de fondo de cada hora (z-0) */}
+              <div className="absolute inset-0 pointer-events-none select-none z-0">
+                {Array.from({ length: TOTAL_HORAS }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="border-b border-border/20 w-full"
+                    style={{ height: `${HOUR_HEIGHT}px` }}
+                  />
+                ))}
+              </div>
 
-              return (
-                <div
-                  key={dIdx}
-                  className={cn(
-                    "relative border-r border-border/30 last:border-r-0 h-full min-w-[90px]",
-                    esHoy && "bg-primary/[0.01]"
-                  )}
-                  style={{ height: `${TOTAL_HORAS * ALTURA_HORA_PX}px` }}
-                >
-                  
-                  {/* Citas de este día */}
-                  {citasDia.map((cita) => {
-                    // Calcular posición vertical de la cita
-                    const minInicio = timeToMinutes(cita.hora);
-                    const minCero = HORA_INICIO * 60;
-                    
-                    // Si la cita empieza antes de la hora inicio o después de la hora fin
-                    const topPx = Math.max(0, (minInicio - minCero) * (ALTURA_HORA_PX / 60));
-                    const heightPx = Math.max(35, cita.duracion * (ALTURA_HORA_PX / 60));
+              {/* Renderizado de Columnas de Citas por Día */}
+              {diasAMostrar.map((dia, dIdx) => {
+                const diaStr = formatLocalDate(dia);
+                const citasDiaRaw = citasPorDia[diaStr] || [];
+                const citasDia = procesarCitasDia(citasDiaRaw);
+                const esHoy = diaStr === formatLocalDate(new Date());
 
-                    // Color de la tarjeta de la cita
-                    const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
-                    
-                    return (
-                      <div
-                        key={cita.id}
-                        onClick={() => onEditCita(cita)}
-                        className="absolute left-1 right-1 p-1.5 rounded-lg border text-left cursor-pointer hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col group active:scale-[0.98]"
-                        style={{
-                          top: `${topPx}px`,
-                          height: `${heightPx}px`,
-                          backgroundColor: `${catColor}15`,
-                          borderColor: `${catColor}35`,
-                          color: catColor,
-                        }}
-                      >
-                        {/* Indicador de color lateral */}
+                return (
+                  <div
+                    key={dIdx}
+                    className={cn(
+                      "flex-1 relative border-r border-border/20 last:border-r-0 h-full min-w-[90px] transition-colors z-10",
+                      esHoy && "bg-primary/[0.01]"
+                    )}
+                  >
+                    {/* Citas de este día */}
+                    {citasDia.map((cita) => {
+                      const { topPx, heightPx, colIndex, totalColumns } = cita;
+                      const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
+                      
+                      const widthPct = 100 / totalColumns;
+                      const leftPct = colIndex * widthPct;
+                      const gapPx = 1.5;
+
+                      const isSmall = heightPx < 48;
+                      const isMedium = heightPx >= 48 && heightPx < 78;
+                      const isLarge = heightPx >= 78;
+
+                      // Tooltip nativo multilínea completo
+                      const tooltipText = `${cita.cliente_nombre}\nHora: ${formatTime12h(cita.hora)} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
+
+                      return (
                         <div
-                          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
-                          style={{ backgroundColor: catColor }}
-                        />
+                          key={cita.id}
+                          onClick={() => onEditCita(cita)}
+                          title={tooltipText}
+                          className="absolute p-2 rounded-xl border text-left cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:shadow-lg hover:scale-[1.01] hover:z-30 select-none active:scale-[0.99]"
+                          style={{
+                            top: `${topPx}px`,
+                            height: `${heightPx}px`,
+                            left: `calc(${leftPct}% + ${gapPx}px)`,
+                            width: `calc(${widthPct}% - ${gapPx * 2}px)`,
+                            // Mezcla adaptativa: color de categoría al 10% sobre el fondo bg-card de Tailwind
+                            backgroundColor: `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
+                            borderColor: `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
+                          }}
+                        >
+                          {/* Indicador de color lateral sólido */}
+                          <div
+                            className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-all group-hover:w-1.5"
+                            style={{ backgroundColor: catColor }}
+                          />
 
-                        {/* Contenido de la Tarjeta de la Cita */}
-                        <div className="pl-1.5 flex flex-col h-full justify-between overflow-hidden">
-                          <div>
-                            <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
-                              {cita.cliente_nombre}
-                            </p>
-                            <p className="text-[9px] font-semibold opacity-90 truncate mt-0.5">
-                              {formatTime12h(cita.hora)} · {cita.duracion} min
-                            </p>
-                          </div>
-                          
-                          {/* Detalles adicionales si hay altura suficiente */}
-                          {heightPx > 45 && (
-                            <div className="flex flex-col gap-0.5 mt-0.5 opacity-80 text-[8px] font-medium truncate">
-                              <span className="flex items-center gap-0.5 text-foreground/80 truncate">
-                                <Scissors className="w-2.5 h-2.5 shrink-0" />
-                                {cita.servicio?.nombre}
-                              </span>
-                              {scope === 'all' && (
-                                <span className="flex items-center gap-0.5 text-foreground/75 truncate">
-                                  <User className="w-2.5 h-2.5 shrink-0" />
-                                  {cita.empleado?.nombre}
-                                </span>
+                          {/* Contenido de la Tarjeta */}
+                          <div className="pl-1.5 flex flex-col h-full justify-between overflow-hidden">
+                            <div className="overflow-hidden">
+                              <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
+                                {cita.cliente_nombre}
+                              </p>
+                              
+                              {/* Citas pequeñas: solo nombre y hora */}
+                              {isSmall && (
+                                <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
+                                  {formatTime12h(cita.hora)}
+                                </p>
+                              )}
+
+                              {/* Citas medianas: nombre, hora, duración y servicio */}
+                              {isMedium && (
+                                <>
+                                  <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
+                                    {formatTime12h(cita.hora)} · {cita.duracion}m
+                                  </p>
+                                  <span className="flex items-center gap-1 mt-1 text-[8px] font-bold text-foreground/70 truncate">
+                                    <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                    {cita.servicio?.nombre}
+                                  </span>
+                                </>
+                              )}
+
+                              {/* Citas grandes: nombre, hora, duración, servicio y estilista */}
+                              {isLarge && (
+                                <>
+                                  <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
+                                    {formatTime12h(cita.hora)} · {cita.duracion} min
+                                  </p>
+                                  <div className="flex flex-col gap-1 mt-1.5 opacity-90 text-[8px] font-medium truncate">
+                                    <span className="flex items-center gap-1 text-foreground/80 truncate font-semibold">
+                                      <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                      {cita.servicio?.nombre}
+                                    </span>
+                                    {scope === 'all' && (
+                                      <span className="flex items-center gap-1 text-foreground/75 truncate font-semibold">
+                                        <User className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                        {cita.empleado?.nombre}
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
                               )}
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        {/* ESTADO VACÍO: NO HAY CITAS EN EL RANGO VISIBLE */}
+        {!isLoading && totalCitasVisibles === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center p-6 bg-background/5 pointer-events-none z-10">
+            <div className="text-center p-6 max-w-sm bg-card/90 backdrop-blur-[3px] border border-border/80 rounded-2xl shadow-xl pointer-events-auto flex flex-col items-center">
+              <CalendarIcon className="w-8 h-8 text-muted-foreground mb-3 animate-bounce" />
+              <h3 className="text-sm font-bold text-foreground mb-1">Sin citas programadas</h3>
+              <p className="text-xs text-muted-foreground max-w-[250px] leading-relaxed">
+                {vista === 'dia' 
+                  ? 'No hay citas registradas para este día.' 
+                  : `No hay citas registradas para esta ${vista === 'semana' ? 'semana' : 'agenda de 3 días'}.`}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* OVERLAY DE CARGA (BLUR Y SPINNER) */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-background/40 backdrop-blur-[1px] z-50 flex items-center justify-center transition-all duration-300 animate-in fade-in">
+            <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-card border border-border shadow-2xl">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-bold text-muted-foreground tracking-wide">Cargando agenda...</p>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
