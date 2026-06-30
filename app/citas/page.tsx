@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus } from 'lucide-react';
+import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -13,6 +13,7 @@ import { cn, formatColones } from '@/lib/utils';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
+import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
 
 const getEmptyForm = () => ({
   cliente_id: '',
@@ -57,6 +58,19 @@ function getBusinessTomorrowString(): string {
   const d = new Date(Date.UTC(year, month - 1, day));
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().split('T')[0];
+}
+
+// Helper local para convertir "HH:MM" a formato 12 horas AM/PM
+function to12h(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  if (isNaN(h)) return timeStr;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${m} ${ampm}`;
 }
 
 function isSameBusinessWeek(dateStr: string): boolean {
@@ -132,15 +146,25 @@ export default function Citas() {
   const [filtroHistorialPeriodo, setFiltroHistorialPeriodo] = useState('todos');
   const [page, setPage]           = useState(1);
 
-  const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Modos de Vista y Scopes
+  const [vistaModo, setVistaModo] = useState<'lista' | 'agenda' | 'disponibilidad'>('lista');
+  const [scope, setScope] = useState<'mine' | 'all'>('mine');
+  const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
+
+  // Estado local para disponibilidad integrada (Bloques de horario)
+  const [empleadosDispData, setEmpleadosDispData] = useState<any[]>([]);
+  const [loadingDisp, setLoadingDisp] = useState(false);
+
   const { user }                  = useAuth();
   const isAdmin                   = user?.rol === 'ADMIN';
+  const isTechSupport             = user?.rol === 'TECH_SUPPORT';
+  const canSeeAll                 = isAdmin || isTechSupport;
 
   // ─── Estado para modal inline de nuevo cliente ─────────────────────────
   const [showCrearCliente, setShowCrearCliente] = useState(false);
   const [formNuevoCliente, setFormNuevoCliente] = useState({ nombre: '', telefono: '', correo: '', notas: '' });
   const [savingCliente, setSavingCliente]       = useState(false);
-  const [phoneValidCliente, setPhoneValidCliente] = useState(false);
+  const [phoneValidCliente, setPhoneValidCliente] = useState(true);
 
   // Estado para el buscador inteligente de clientes
   const [clienteBusqueda, setClienteBusqueda] = useState('');
@@ -163,17 +187,43 @@ export default function Citas() {
     };
   }, []);
 
-  const fetchCitas = async (q?: string, estado?: string, empleado?: string) => {
+  const fetchCitas = async (scopeParam?: string, empParam?: string) => {
     setIsLoading(true);
     try {
-      const res  = await fetch('/api/citas');
+      const activeScope = scopeParam || scope;
+      const activeEmp = empParam !== undefined ? empParam : filtroEmpleado;
+      const res  = await fetch(`/api/citas?scope=${activeScope}&empleado_id=${activeEmp}`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al obtener citas');
       setCitas(data.citas || []);
       setPage(1);
-    } catch {
-      toast.error('Error al cargar citas');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al cargar citas');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchBloques = async (selectedDate: string, empId?: string) => {
+    setLoadingDisp(true);
+    try {
+      let url = `/api/bloques-horario?fecha=${selectedDate}`;
+      if (empId) {
+        url += `&empleado_id=${empId}`;
+      } else if (user?.rol === 'EMPLEADO') {
+        url += `&empleado_id=${user.id}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al obtener la disponibilidad');
+      }
+      const data = await res.json();
+      setEmpleadosDispData(data.empleados || []);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al cargar disponibilidad');
+    } finally {
+      setLoadingDisp(false);
     }
   };
 
@@ -188,8 +238,19 @@ export default function Citas() {
     setClientesList(cD.clientes || []);
   };
 
+  // Carga reactiva de citas en base al scope y filtro de empleado
   useEffect(() => {
-    fetchCitas();
+    fetchCitas(scope, filtroEmpleado);
+  }, [scope, filtroEmpleado]);
+
+  // Carga reactiva de disponibilidad cuando cambia fecha de disponibilidad o filtro de empleado
+  useEffect(() => {
+    if (vistaModo === 'disponibilidad') {
+      fetchBloques(selectedDateStr, filtroEmpleado);
+    }
+  }, [selectedDateStr, filtroEmpleado, vistaModo]);
+
+  useEffect(() => {
     fetchCatalogos();
   }, []);
 
@@ -205,7 +266,11 @@ export default function Citas() {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
-    setForm(getEmptyForm());
+    const emptyForm = getEmptyForm();
+    if (user?.rol === 'EMPLEADO') {
+      emptyForm.empleado_id = user.id;
+    }
+    setForm(emptyForm);
     setClienteBusqueda('');
     setForzar(false);
     setEditingId(null);
@@ -219,8 +284,9 @@ export default function Citas() {
       toast.error('El nombre es obligatorio (mínimo 2 caracteres)');
       return;
     }
-    if (!formNuevoCliente.telefono || !phoneValidCliente) {
-      toast.error('Ingresa un teléfono válido');
+    // El teléfono ya no es obligatorio, pero si se provee debe ser válido
+    if (formNuevoCliente.telefono && !phoneValidCliente) {
+      toast.error('Ingresa un teléfono válido o déjalo vacío');
       return;
     }
     setSavingCliente(true);
@@ -246,7 +312,7 @@ export default function Citas() {
       setClienteBusqueda(nuevoCliente.nombre);
       // Limpiar y cerrar el modal de creación
       setFormNuevoCliente({ nombre: '', telefono: '', correo: '', notas: '' });
-      setPhoneValidCliente(false);
+      setPhoneValidCliente(true);
       setShowCrearCliente(false);
       toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
     } catch (err: any) {
@@ -463,10 +529,11 @@ export default function Citas() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
 
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Gestión de Citas</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
+                {vistaModo === 'lista' && `${filteredAndSortedCitas.length} de `}
                 {citas.length} cita{citas.length !== 1 ? 's' : ''} en total
               </p>
             </div>
@@ -475,166 +542,384 @@ export default function Citas() {
             </Button>
           </div>
 
-          {/* Filtros Inteligentes (Tabs) */}
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-1.5 p-1 bg-secondary/30 rounded-xl border border-border/50 w-full md:w-auto self-start">
-              {[
-                { id: 'activas', label: 'Activas' },
-                { id: 'hoy', label: 'Hoy' },
-                { id: 'manana', label: 'Mañana' },
-                { id: 'semana', label: 'Esta Semana' },
-                { id: 'mes', label: 'Este Mes' },
-                { id: 'historial', label: 'Historial' },
-                { id: 'todas', label: 'Todas' },
-              ].map(f => {
-                const isActive = filtroSmart === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => {
-                      setFiltroSmart(f.id);
-                      sessionStorage.setItem('citas_filtro_smart', f.id);
-                      setFiltroEstado(''); // reset manual state filter
-                      setPage(1);
-                    }}
-                    className={cn(
-                      "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
-                      isActive
-                        ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                    )}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
+          {/* Barra de Vista e Integración de Scope */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/30 pb-4">
+            {/* Selector de Pestaña Principal (Modo) */}
+            <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start">
+              <button
+                type="button"
+                onClick={() => setVistaModo('lista')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  vistaModo === 'lista'
+                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                )}
+              >
+                <ListIcon className="w-3.5 h-3.5" /> Lista de Citas
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaModo('agenda')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  vistaModo === 'agenda'
+                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                )}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" /> Calendario / Agenda
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaModo('disponibilidad')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  vistaModo === 'disponibilidad'
+                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                )}
+              >
+                <ClockIcon className="w-3.5 h-3.5" /> Disponibilidad Personal
+              </button>
             </div>
 
-            {/* Sub-filtros para el Historial de Citas Completadas */}
-            {filtroSmart === 'historial' && (
-              <div className="flex flex-wrap gap-1 p-1 bg-secondary/15 rounded-lg border border-border/30 w-full md:w-auto self-start">
-                {[
-                  { id: 'todos', label: 'Todos' },
-                  { id: 'diario', label: 'Diario (Hoy)' },
-                  { id: 'semanal', label: 'Semanal' },
-                  { id: 'quincenal', label: 'Quincenal (15 días)' },
-                  { id: 'mensual', label: 'Mensual' },
-                ].map(p => {
-                  const isActive = filtroHistorialPeriodo === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setFiltroHistorialPeriodo(p.id);
-                        setPage(1);
-                      }}
-                      className={cn(
-                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer",
-                        isActive
-                          ? "bg-card text-foreground shadow-sm border border-border/30"
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
-                      )}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
+            {/* Switch de Scope (Mis Citas vs Ver Todas) */}
+            {canSeeAll && vistaModo !== 'disponibilidad' && (
+              <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScope('mine');
+                    setFiltroEmpleado('');
+                  }}
+                  className={cn(
+                    "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                    scope === 'mine'
+                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  )}
+                >
+                  Mis Citas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope('all')}
+                  className={cn(
+                    "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                    scope === 'all'
+                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  )}
+                >
+                  Ver Todas
+                </button>
               </div>
             )}
-
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar cliente, servicio..."
-                  value={busqueda}
-                  onChange={e => handleSearch(e.target.value)}
-                  className="pl-10 bg-card"
-                />
-              </div>
-              <select
-                value={filtroEstado}
-                onChange={e => {
-                  setFiltroEstado(e.target.value);
-                  setFiltroSmart('todas');
-                  setPage(1);
-                }}
-                className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
-              >
-                <option value="">Filtrar por estado</option>
-                {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
-              </select>
-              <select
-                value={filtroEmpleado}
-                onChange={e => {
-                  setFiltroEmpleado(e.target.value);
-                  setPage(1);
-                }}
-                className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
-              >
-                <option value="">Filtrar por empleado</option>
-                {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-              </select>
-            </div>
           </div>
 
-          {/* Listado */}
-          <div className="space-y-4">
-            {/* Vista Escritorio (Tabla) */}
-            <Card className="hidden md:block border-border/50 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-secondary/70 text-secondary-foreground border-b border-border/50">
-                    <tr>
-                      {['Cliente', 'Servicios', 'Empleado', 'Fecha y Hora', 'Monto', 'Estado', 'Acciones'].map(h => (
-                        <th key={h} className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      Array.from({ length: 5 }).map((_, idx) => (
-                        <tr key={idx} className="border-b border-border/20 animate-pulse">
-                          <td className="px-4 py-4">
-                            <div className="skeleton h-4 w-28 mb-1.5" />
-                            <div className="skeleton h-3 w-20" />
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex gap-1.5">
-                              <div className="skeleton h-5 w-24 rounded-full" />
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="skeleton h-4 w-24" />
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="skeleton h-4 w-20 mb-1.5" />
-                            <div className="skeleton h-3 w-16" />
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="skeleton h-4 w-16" />
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="skeleton h-6 w-20 rounded-full" />
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex gap-2">
-                              <div className="skeleton h-8 w-8 rounded-lg" />
-                              <div className="skeleton h-8 w-8 rounded-lg" />
-                            </div>
-                          </td>
+          {/* VISTA DE LISTADO TRADICIONAL */}
+          {vistaModo === 'lista' && (
+            <div className="space-y-5">
+              {/* Filtros Inteligentes (Tabs) */}
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-1.5 p-1 bg-secondary/30 rounded-xl border border-border/50 w-full md:w-auto self-start">
+                  {[
+                    { id: 'activas', label: 'Activas' },
+                    { id: 'hoy', label: 'Hoy' },
+                    { id: 'manana', label: 'Mañana' },
+                    { id: 'semana', label: 'Esta Semana' },
+                    { id: 'mes', label: 'Este Mes' },
+                    { id: 'historial', label: 'Historial' },
+                    { id: 'todas', label: 'Todas' },
+                  ].map(f => {
+                    const isActive = filtroSmart === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => {
+                          setFiltroSmart(f.id);
+                          sessionStorage.setItem('citas_filtro_smart', f.id);
+                          setFiltroEstado(''); // reset manual state filter
+                          setPage(1);
+                        }}
+                        className={cn(
+                          "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sub-filtros para el Historial de Citas Completadas */}
+                {filtroSmart === 'historial' && (
+                  <div className="flex flex-wrap gap-1 p-1 bg-secondary/15 rounded-lg border border-border/30 w-full md:w-auto self-start">
+                    {[
+                      { id: 'todos', label: 'Todos' },
+                      { id: 'diario', label: 'Diario (Hoy)' },
+                      { id: 'semanal', label: 'Semanal' },
+                      { id: 'quincenal', label: 'Quincenal (15 días)' },
+                      { id: 'mensual', label: 'Mensual' },
+                    ].map(p => {
+                      const isActive = filtroHistorialPeriodo === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setFiltroHistorialPeriodo(p.id);
+                            setPage(1);
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer",
+                            isActive
+                              ? "bg-card text-foreground shadow-sm border border-border/30"
+                              : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar cliente, servicio..."
+                      value={busqueda}
+                      onChange={e => handleSearch(e.target.value)}
+                      className="pl-10 bg-card"
+                    />
+                  </div>
+                  <select
+                    value={filtroEstado}
+                    onChange={e => {
+                      setFiltroEstado(e.target.value);
+                      setFiltroSmart('todas');
+                      setPage(1);
+                    }}
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
+                  >
+                    <option value="">Filtrar por estado</option>
+                    {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+                  </select>
+                  
+                  {/* Filtro por empleado sólo visible para Admin/Tech y si el scope es 'all' */}
+                  {(user?.rol !== 'EMPLEADO' && scope === 'all') && (
+                    <select
+                      value={filtroEmpleado}
+                      onChange={e => {
+                        setFiltroEmpleado(e.target.value);
+                        setPage(1);
+                      }}
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
+                    >
+                      <option value="">Todos los empleados</option>
+                      {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {/* Listado */}
+              <div className="space-y-4">
+                {/* Vista Escritorio (Tabla) */}
+                <Card className="hidden md:block border-border/50 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-secondary/70 text-secondary-foreground border-b border-border/50">
+                        <tr>
+                          {['Cliente', 'Servicios', 'Empleado', 'Fecha y Hora', 'Monto', 'Estado', 'Acciones'].map(h => (
+                            <th key={h} className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wide">{h}</th>
+                          ))}
                         </tr>
-                      ))
-                    ) : paginated.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
-                          {busqueda || filtroEstado || filtroEmpleado ? 'Sin resultados para los filtros aplicados' : 'No hay citas registradas'}
-                        </td>
-                      </tr>
-                    ) : paginated.map((cita) => {
+                      </thead>
+                      <tbody>
+                        {isLoading ? (
+                          Array.from({ length: 5 }).map((_, idx) => (
+                            <tr key={idx} className="border-b border-border/20 animate-pulse">
+                              <td className="px-4 py-4">
+                                <div className="skeleton h-4 w-28 mb-1.5" />
+                                <div className="skeleton h-3 w-20" />
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex gap-1.5">
+                                  <div className="skeleton h-5 w-24 rounded-full" />
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="skeleton h-4 w-24" />
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="skeleton h-4 w-20 mb-1.5" />
+                                <div className="skeleton h-3 w-16" />
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="skeleton h-4 w-16" />
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="skeleton h-6 w-20 rounded-full" />
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex gap-2">
+                                  <div className="skeleton h-8 w-8 rounded-lg" />
+                                  <div className="skeleton h-8 w-8 rounded-lg" />
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : paginated.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                              {busqueda || filtroEstado || filtroEmpleado ? 'Sin resultados para los filtros aplicados' : 'No hay citas registradas'}
+                            </td>
+                          </tr>
+                        ) : paginated.map((cita) => {
+                          const waUrl = cita.cliente_telefono ? urlWhatsAppConfirmacion({
+                            cliente_nombre: cita.cliente_nombre,
+                            cliente_telefono: cita.cliente_telefono,
+                            servicio: cita.servicio?.nombre || '',
+                            empleado: cita.empleado?.nombre || '',
+                            fecha: cita.fecha,
+                            hora: cita.hora,
+                          }) : null;
+                          const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
+                          return (
+                            <tr key={cita.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
+                              <td className="px-4 py-3.5">
+                                <p className="font-medium text-foreground">{cita.cliente_nombre}</p>
+                                {cita.cliente_telefono && <p className="text-xs text-muted-foreground">{cita.cliente_telefono}</p>}
+                              </td>
+                              <td className="px-4 py-3.5 text-muted-foreground">
+                                {cita.citaServicios && cita.citaServicios.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5 max-w-[220px]">
+                                    {cita.citaServicios.map((cs: any) => {
+                                      const cat = cs.servicio?.categoriaRel;
+                                      const catColor = cat?.color || '#6366f1';
+                                      return (
+                                        <span 
+                                          key={cs.id} 
+                                          className="text-xs px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1"
+                                          style={{
+                                            backgroundColor: `${catColor}15`,
+                                            color: catColor,
+                                            borderColor: `${catColor}30`
+                                          }}
+                                          title={cat ? `Categoría: ${cat.nombre}` : 'Sin categoría'}
+                                        >
+                                          {cat && (
+                                            <span 
+                                              className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                              style={{ backgroundColor: catColor }} 
+                                            />
+                                          )}
+                                          {cs.servicio?.nombre}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  cita.servicio?.nombre ? (
+                                    <span 
+                                      className="text-xs px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1 w-fit"
+                                      style={{
+                                        backgroundColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}15`,
+                                        color: cita.servicio?.categoriaRel?.color || '#6366f1',
+                                        borderColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}30`
+                                      }}
+                                    >
+                                      {cita.servicio?.categoriaRel?.nombre && (
+                                        <span 
+                                          className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                          style={{ backgroundColor: cita.servicio?.categoriaRel?.color || '#6366f1' }} 
+                                        />
+                                      )}
+                                      {cita.servicio?.nombre}
+                                    </span>
+                                  ) : '-'
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 text-muted-foreground">{cita.empleado?.nombre || '-'}</td>
+                              <td className="px-4 py-3.5">
+                                <p className="font-medium text-foreground">{fmtDate(cita.fecha)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {cita.hora} · {cita.duracion} min
+                                  {isPersonalizado && (
+                                    <span className="block text-[10px] text-amber-500 font-bold mt-0.5" title="Duración modificada manualmente">
+                                      ⏱ personalizado
+                                    </span>
+                                  )}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
+                                {formatColones(cita.monto)}
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <select
+                                  value={cita.estado}
+                                  onChange={e => changeEstado(cita.id, e.target.value)}
+                                  className={cn('text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
+                                >
+                                  {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+                                </select>
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => openEdit(cita)}>
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </Button>
+                                  {waUrl && (
+                                    <a href={waUrl} target="_blank" rel="noopener noreferrer">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[#25D366] hover:text-[#1ebe5a] hover:bg-[#25D366]/10 cursor-pointer">
+                                        <MessageCircle className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                {/* Vista Móvil (Tarjetas Ricas) */}
+                <div className="grid grid-cols-1 gap-3 md:hidden">
+                  {isLoading ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                      <Card key={idx} className="p-4 border-border/40 bg-card animate-pulse space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div className="skeleton h-4 w-28" />
+                          <div className="skeleton h-5 w-16 rounded-full" />
+                        </div>
+                        <div className="skeleton h-4 w-36 mb-1" />
+                        <div className="skeleton h-3 w-28" />
+                        <div className="flex justify-between items-center pt-2 border-t border-border/20">
+                          <div className="skeleton h-3 w-20" />
+                          <div className="flex gap-1.5">
+                            <div className="skeleton h-7 w-14 rounded-md" />
+                            <div className="skeleton h-7 w-16 rounded-md" />
+                          </div>
+                        </div>
+                      </Card>
+                    ))
+                  ) : paginated.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground text-sm bg-card border border-border/40 rounded-xl">
+                      {busqueda || filtroEstado || filtroEmpleado ? 'Sin resultados para los filtros aplicados' : 'No hay citas registradas'}
+                    </div>
+                  ) : (
+                    paginated.map((cita) => {
                       const waUrl = cita.cliente_telefono ? urlWhatsAppConfirmacion({
                         cliente_nombre: cita.cliente_nombre,
                         cliente_telefono: cita.cliente_telefono,
@@ -645,253 +930,357 @@ export default function Citas() {
                       }) : null;
                       const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
                       return (
-                        <tr key={cita.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
-                          <td className="px-4 py-3.5">
-                            <p className="font-medium text-foreground">{cita.cliente_nombre}</p>
-                            {cita.cliente_telefono && <p className="text-xs text-muted-foreground">{cita.cliente_telefono}</p>}
-                          </td>
-                          <td className="px-4 py-3.5 text-muted-foreground">
-                            {cita.citaServicios && cita.citaServicios.length > 0 ? (
-                              <div className="flex flex-wrap gap-1.5 max-w-[220px]">
-                                {cita.citaServicios.map((cs: any) => {
-                                  const cat = cs.servicio?.categoriaRel;
-                                  const catColor = cat?.color || '#6366f1';
-                                  return (
-                                    <span 
-                                      key={cs.id} 
-                                      className="text-xs px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1"
-                                      style={{
-                                        backgroundColor: `${catColor}15`,
-                                        color: catColor,
-                                        borderColor: `${catColor}30`
-                                      }}
-                                      title={cat ? `Categoría: ${cat.nombre}` : 'Sin categoría'}
-                                    >
-                                      {cat && (
-                                        <span 
-                                          className="w-1.5 h-1.5 rounded-full shrink-0" 
-                                          style={{ backgroundColor: catColor }} 
-                                        />
-                                      )}
-                                      {cs.servicio?.nombre}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              cita.servicio?.nombre ? (
-                                <span 
-                                  className="text-xs px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1 w-fit"
-                                  style={{
-                                    backgroundColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}15`,
-                                    color: cita.servicio?.categoriaRel?.color || '#6366f1',
-                                    borderColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}30`
-                                  }}
-                                >
-                                  {cita.servicio?.categoriaRel?.nombre && (
-                                    <span 
-                                      className="w-1.5 h-1.5 rounded-full shrink-0" 
-                                      style={{ backgroundColor: cita.servicio?.categoriaRel?.color || '#6366f1' }} 
-                                    />
-                                  )}
-                                  {cita.servicio?.nombre}
-                                </span>
-                              ) : '-'
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 text-muted-foreground">{cita.empleado?.nombre || '-'}</td>
-                          <td className="px-4 py-3.5">
-                            <p className="font-medium text-foreground">{fmtDate(cita.fecha)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {cita.hora} · {cita.duracion} min
-                              {isPersonalizado && (
-                                <span className="block text-[10px] text-amber-500 font-bold mt-0.5" title="Duración modificada manualmente">
-                                  ⏱ personalizado
-                                </span>
-                              )}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
-                            {formatColones(cita.monto)}
-                          </td>
-                          <td className="px-4 py-3.5">
+                        <Card key={cita.id} className="p-4 border-border/45 bg-card/60 hover:bg-secondary/15 transition-colors space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-semibold text-foreground text-sm">{cita.cliente_nombre}</p>
+                              {cita.cliente_telefono && <p className="text-xs text-muted-foreground">{cita.cliente_telefono}</p>}
+                            </div>
                             <select
                               value={cita.estado}
                               onChange={e => changeEstado(cita.id, e.target.value)}
-                              className={cn('text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
+                              className={cn('text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
                             >
                               {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
                             </select>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => openEdit(cita)}>
-                                <Edit className="w-3.5 h-3.5" />
-                              </Button>
-                              {waUrl && (
-                                <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-[#25D366] hover:text-[#1ebe5a] hover:bg-[#25D366]/10 cursor-pointer">
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                  </Button>
-                                </a>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                          </div>
 
-            {/* Vista Móvil (Tarjetas Ricas) */}
-            <div className="grid grid-cols-1 gap-3 md:hidden">
-              {isLoading ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <Card key={idx} className="p-4 border-border/40 bg-card animate-pulse space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div className="skeleton h-4 w-28" />
-                      <div className="skeleton h-5 w-16 rounded-full" />
-                    </div>
-                    <div className="skeleton h-4 w-36 mb-1" />
-                    <div className="skeleton h-3 w-28" />
-                    <div className="flex justify-between items-center pt-2 border-t border-border/20">
-                      <div className="skeleton h-3 w-20" />
-                      <div className="flex gap-1.5">
-                        <div className="skeleton h-7 w-14 rounded-md" />
-                        <div className="skeleton h-7 w-16 rounded-md" />
-                      </div>
-                    </div>
-                  </Card>
-                ))
-              ) : paginated.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm bg-card border border-border/40 rounded-xl">
-                  {busqueda || filtroEstado || filtroEmpleado ? 'Sin resultados para los filtros aplicados' : 'No hay citas registradas'}
-                </div>
-              ) : (
-                paginated.map((cita) => {
-                  const waUrl = cita.cliente_telefono ? urlWhatsAppConfirmacion({
-                    cliente_nombre: cita.cliente_nombre,
-                    cliente_telefono: cita.cliente_telefono,
-                    servicio: cita.servicio?.nombre || '',
-                    empleado: cita.empleado?.nombre || '',
-                    fecha: cita.fecha,
-                    hora: cita.hora,
-                  }) : null;
-                  const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
-                  return (
-                    <Card key={cita.id} className="p-4 border-border/45 bg-card/60 hover:bg-secondary/15 transition-colors space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-semibold text-foreground text-sm">{cita.cliente_nombre}</p>
-                          {cita.cliente_telefono && <p className="text-xs text-muted-foreground">{cita.cliente_telefono}</p>}
-                        </div>
-                        <select
-                          value={cita.estado}
-                          onChange={e => changeEstado(cita.id, e.target.value)}
-                          className={cn('text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
-                        >
-                          {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-start gap-1.5 text-xs text-muted-foreground flex-col">
-                          <span className="font-medium text-foreground text-[10px] uppercase tracking-wide">Servicios:</span>
-                          {cita.citaServicios && cita.citaServicios.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 max-w-full">
-                              {cita.citaServicios.map((cs: any) => {
-                                const cat = cs.servicio?.categoriaRel;
-                                const catColor = cat?.color || '#6366f1';
-                                return (
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-1.5 text-xs text-muted-foreground flex-col">
+                              <span className="font-medium text-foreground text-[10px] uppercase tracking-wide">Servicios:</span>
+                              {cita.citaServicios && cita.citaServicios.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 max-w-full">
+                                  {cita.citaServicios.map((cs: any) => {
+                                    const cat = cs.servicio?.categoriaRel;
+                                    const catColor = cat?.color || '#6366f1';
+                                    return (
+                                      <span 
+                                        key={cs.id}
+                                        className="px-2 py-0.5 rounded text-[10px] border font-semibold flex items-center gap-1.5"
+                                        style={{
+                                          backgroundColor: `${catColor}12`,
+                                          color: catColor,
+                                          borderColor: `${catColor}25`
+                                        }}
+                                      >
+                                        {cat && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />}
+                                        {cs.servicio?.nombre}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                cita.servicio?.nombre ? (
                                   <span 
-                                    key={cs.id}
-                                    className="px-2 py-0.5 rounded text-[10px] border font-semibold flex items-center gap-1.5"
+                                    className="px-2 py-0.5 rounded text-[10px] border font-semibold flex items-center gap-1.5 w-fit"
                                     style={{
-                                      backgroundColor: `${catColor}12`,
-                                      color: catColor,
-                                      borderColor: `${catColor}25`
+                                      backgroundColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}12`,
+                                      color: cita.servicio?.categoriaRel?.color || '#6366f1',
+                                      borderColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}25`
                                     }}
                                   >
-                                    {cat && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />}
-                                    {cs.servicio?.nombre}
+                                    {cita.servicio?.categoriaRel?.nombre && (
+                                      <span 
+                                        className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                        style={{ backgroundColor: cita.servicio?.categoriaRel?.color || '#6366f1' }} 
+                                      />
+                                    )}
+                                    {cita.servicio?.nombre}
                                   </span>
-                                );
-                              })}
+                                ) : '-'
+                              )}
                             </div>
-                          ) : (
-                            cita.servicio?.nombre ? (
-                              <span 
-                                className="px-2 py-0.5 rounded text-[10px] border font-semibold flex items-center gap-1.5 w-fit"
-                                style={{
-                                  backgroundColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}12`,
-                                  color: cita.servicio?.categoriaRel?.color || '#6366f1',
-                                  borderColor: `${cita.servicio?.categoriaRel?.color || '#6366f1'}25`
-                                }}
-                              >
-                                {cita.servicio?.categoriaRel?.nombre && (
-                                  <span 
-                                    className="w-1.5 h-1.5 rounded-full shrink-0" 
-                                    style={{ backgroundColor: cita.servicio?.categoriaRel?.color || '#6366f1' }} 
-                                  />
+                            <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-border/10">
+                              <p>Estilista: <span className="text-foreground font-semibold">{cita.empleado?.nombre || '-'}</span></p>
+                              <p>Duración: <span className="text-foreground font-semibold">
+                                {cita.duracion} min
+                                {isPersonalizado && (
+                                  <span className="ml-1 text-[10px] text-amber-500 font-bold" title="Duración modificada manualmente">
+                                    (⏱ modificado)
+                                  </span>
                                 )}
-                                {cita.servicio?.nombre}
-                              </span>
-                            ) : '-'
-                          )}
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-border/10">
-                          <p>Estilista: <span className="text-foreground font-semibold">{cita.empleado?.nombre || '-'}</span></p>
-                          <p>Duración: <span className="text-foreground font-semibold">
-                            {cita.duracion} min
-                            {isPersonalizado && (
-                              <span className="ml-1 text-[10px] text-amber-500 font-bold" title="Duración modificada manualmente">
-                                (⏱ modificado)
-                              </span>
-                            )}
-                          </span></p>
-                        </div>
-                      </div>
+                              </span></p>
+                            </div>
+                          </div>
 
-                      <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
-                        <div className="text-xs flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
-                          <span className="text-muted-foreground">· {cita.hora}</span>
-                          <span className="font-semibold text-foreground ml-1">{formatColones(cita.monto)}</span>
-                        </div>
-                        <div className="flex gap-1.5">
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
-                            <Edit className="w-3.5 h-3.5" /> Editar
-                          </Button>
-                          {waUrl && (
-                            <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                              <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/10 cursor-pointer">
-                                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                          <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
+                            <div className="text-xs flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
+                              <span className="text-muted-foreground">· {cita.hora}</span>
+                              <span className="font-semibold text-foreground ml-1">{formatColones(cita.monto)}</span>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
+                                <Edit className="w-3.5 h-3.5" /> Editar
                               </Button>
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Paginación */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border border-border/50 rounded-xl bg-secondary/20">
-                <p className="text-xs text-muted-foreground">
-                  Página {page} de {totalPages} · {filteredAndSortedCitas.length} resultados
-                </p>
-                <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-7 text-xs">Anterior</Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 text-xs">Siguiente</Button>
+                              {waUrl ? (
+                                <a href={waUrl} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/10 cursor-pointer">
+                                    <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                                  </Button>
+                                </a>
+                              ) : (
+                                <Button variant="outline" size="sm" disabled className="h-7 px-2.5 text-xs gap-1 opacity-50 cursor-not-allowed">
+                                  Sin Teléfono
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })
+                  )}
                 </div>
+
+                {/* Paginación */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border border-border/50 rounded-xl bg-secondary/20">
+                    <p className="text-xs text-muted-foreground">
+                      Página {page} de {totalPages} · {filteredAndSortedCitas.length} resultados
+                    </p>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-7 text-xs">Anterior</Button>
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 text-xs">Siguiente</Button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* VISTA DE CALENDARIO / AGENDA */}
+          {vistaModo === 'agenda' && (
+            <div className="space-y-4">
+              {/* Filtro por empleado para administradores en modo agenda */}
+              {(canSeeAll && scope === 'all') && (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1 sm:max-w-xs">
+                    <select
+                      value={filtroEmpleado}
+                      onChange={e => setFiltroEmpleado(e.target.value)}
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm w-full cursor-pointer"
+                    >
+                      <option value="">Filtrar todos los estilistas</option>
+                      {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+              
+              <AgendaCalendario
+                citas={citas}
+                empleados={empleados}
+                filtroEmpleado={filtroEmpleado}
+                scope={scope}
+                user={user}
+                onEditCita={openEdit}
+                selectedDateStr={selectedDateStr}
+                setSelectedDateStr={setSelectedDateStr}
+              />
+            </div>
+          )}
+
+          {/* VISTA DE DISPONIBILIDAD INTEGRADA */}
+          {vistaModo === 'disponibilidad' && (
+            <div className="space-y-6">
+              
+              {/* Controles superiores de Disponibilidad */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-2 bg-secondary/35 p-1 rounded-xl border border-border/50 self-start">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 cursor-pointer"
+                    onClick={() => {
+                      const [year, month, day] = selectedDateStr.split('-').map(Number);
+                      const d = new Date(year, month - 1, day);
+                      d.setDate(d.getDate() - 1);
+                      setSelectedDateStr(d.toISOString().split('T')[0]);
+                    }}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Input
+                    type="date"
+                    value={selectedDateStr}
+                    onChange={e => setSelectedDateStr(e.target.value)}
+                    className="h-8 text-xs font-semibold bg-transparent border-0 focus-visible:ring-0 w-32 cursor-pointer text-foreground pr-0"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 cursor-pointer"
+                    onClick={() => {
+                      const [year, month, day] = selectedDateStr.split('-').map(Number);
+                      const d = new Date(year, month - 1, day);
+                      d.setDate(d.getDate() + 1);
+                      setSelectedDateStr(d.toISOString().split('T')[0]);
+                    }}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 cursor-pointer hover:bg-primary/10 hover:text-primary transition-all" 
+                    onClick={() => fetchBloques(selectedDateStr, filtroEmpleado)}
+                    title="Actualizar"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 rotate-90" />
+                  </Button>
+                </div>
+
+                {user?.rol !== 'EMPLEADO' && (
+                  <div className="relative flex-1 sm:max-w-xs">
+                    <select
+                      value={filtroEmpleado}
+                      onChange={e => setFiltroEmpleado(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="">Todos los empleados</option>
+                      {empleados.map(e => (
+                        <option key={e.id} value={e.id}>{e.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Listado de Personal y Líneas Temporales */}
+              <div className="grid grid-cols-1 gap-6">
+                {loadingDisp ? (
+                  Array.from({ length: 2 }).map((_, idx) => (
+                    <Card key={idx} className="p-6 border-border/50 bg-card animate-pulse space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div className="skeleton h-5 w-40" />
+                        <div className="skeleton h-5 w-48" />
+                      </div>
+                      <div className="skeleton h-10 w-full rounded-lg" />
+                    </Card>
+                  ))
+                ) : empleadosDispData.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground text-sm bg-card border border-border/40 rounded-xl">
+                    No hay estilistas o personal configurado en el sistema
+                  </div>
+                ) : (
+                  empleadosDispData.map((item: any) => {
+                    const emp = item.empleado;
+                    const disp = item.disponibilidad;
+                    const hasError = !!item.error;
+                    
+                    const isWorking = disp?.jornada?.activo;
+                    const agendaTexto = isWorking
+                      ? `Jornada: ${to12h(disp.jornada.inicio)} - ${to12h(disp.jornada.fin)}`
+                      : disp?.motivo === 'De vacaciones' ? 'De vacaciones 🏖️' : 'Día libre / No laborable';
+
+                    const ocupados = disp?.intervalosOcupados || [];
+
+                    return (
+                      <Card key={emp.id} className="p-6 border-border/40 bg-card/60 shadow-sm space-y-5">
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/30">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-foreground text-lg">{emp.nombre}</h3>
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                {emp.rol === 'ADMIN' ? 'Administrador' : 'Estilista'}
+                              </span>
+                            </div>
+                            {emp.especialidad && <p className="text-xs text-muted-foreground mt-0.5">{emp.especialidad}</p>}
+                          </div>
+                          <div className="text-xs font-semibold text-right">
+                            <span className={cn(
+                              "px-3 py-1 rounded-full",
+                              isWorking ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
+                            )}>
+                              {agendaTexto}
+                            </span>
+                          </div>
+                        </div>
+
+                        {hasError ? (
+                          <div className="flex items-center gap-2 p-3 rounded-xl border border-destructive/20 bg-destructive/5 text-destructive text-xs">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <p>{item.error}</p>
+                          </div>
+                        ) : !isWorking ? (
+                          <div className="flex items-center justify-center p-6 rounded-xl border border-dashed border-border/60 bg-secondary/10">
+                            <p className="text-xs text-muted-foreground font-semibold">No labora este día.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Bloques de Horas del Día</p>
+                              <div className="flex flex-wrap gap-1 p-2 rounded-xl bg-secondary/15 border border-border/40">
+                                {disp.bloques && disp.bloques.map((b: any, idx: number) => {
+                                  const label = to12h(b.hora);
+                                  
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={cn(
+                                        "h-8 flex-1 min-w-[32px] rounded-md flex items-center justify-center text-[9px] font-bold transition-all relative group cursor-help select-none",
+                                        b.disponible
+                                          ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25 hover:bg-emerald-500/30"
+                                          : b.motivo.toLowerCase().includes('cita')
+                                          ? "bg-red-500/15 text-red-600 border border-red-500/25 hover:bg-red-500/30"
+                                          : "bg-amber-500/15 text-amber-600 border border-amber-500/25 hover:bg-amber-500/30"
+                                      )}
+                                      title={`${label} - ${b.motivo}`}
+                                    >
+                                      {b.hora.endsWith(':00') ? (
+                                        <span>{parseInt(b.hora.split(':')[0], 10) % 12 || 12}</span>
+                                      ) : null}
+                                      
+                                      <div className="absolute bottom-full mb-1.5 hidden group-hover:block z-50 bg-popover border border-border text-popover-foreground text-[10px] font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap">
+                                        <p className="font-bold">{label}</p>
+                                        <p className="text-muted-foreground">{b.motivo}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {ocupados.length > 0 && (
+                              <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Actividades Programadas</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  {ocupados.map((o: any, idx: number) => {
+                                    const startStr = `${Math.floor(o.inicio / 60)}:${String(o.inicio % 60).padStart(2, '0')}`;
+                                    const endStr = `${Math.floor(o.fin / 60)}:${String(o.fin % 60).padStart(2, '0')}`;
+                                    
+                                    return (
+                                      <div 
+                                        key={idx} 
+                                        className={cn(
+                                          "flex items-center gap-3 p-2.5 rounded-lg border text-xs font-medium",
+                                          o.motivo.toLowerCase().includes('cita')
+                                            ? "bg-red-500/5 border-red-500/15 text-red-600 dark:text-red-400"
+                                            : "bg-amber-500/5 border-amber-500/15 text-amber-600 dark:text-amber-400"
+                                        )}
+                                      >
+                                        <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+                                        <div className="flex-1">
+                                          <p className="font-bold">{o.motivo}</p>
+                                          <p className="text-[10px] opacity-80">{to12h(startStr)} - {to12h(endStr)}</p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
 
@@ -1313,11 +1702,11 @@ export default function Citas() {
 
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
-                  Teléfono *
+                  Teléfono <span className="text-muted-foreground/60 normal-case font-normal">(opcional)</span>
                 </label>
                 <PhoneInput
                   value={formNuevoCliente.telefono}
-                  optional={false}
+                  optional={true}
                   onChange={(formattedVal, isValid) => {
                     setFormNuevoCliente(prev => ({ ...prev, telefono: formattedVal }));
                     setPhoneValidCliente(isValid);

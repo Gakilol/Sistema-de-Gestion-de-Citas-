@@ -3,6 +3,56 @@ import { prisma } from '@/lib/db';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
 
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const userRole = req.headers.get('x-user-role') || '';
+    const userId   = req.headers.get('x-user-id');
+
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'Usuario no autorizado' }, { status: 401 });
+    }
+
+    const cita = await prisma.cita.findUnique({
+      where: { id },
+      include: {
+        empleado: { select: { nombre: true } },
+        servicio: {
+          select: {
+            nombre: true,
+            categoriaRel: { select: { nombre: true, color: true } }
+          }
+        },
+        citaServicios: {
+          include: {
+            servicio: {
+              select: {
+                id: true,
+                nombre: true,
+                duracion: true,
+                categoriaRel: { select: { nombre: true, color: true } }
+              }
+            }
+          },
+          orderBy: { orden: 'asc' }
+        }
+      }
+    });
+
+    if (!cita) {
+      return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
+    }
+
+    if (userRole === 'EMPLEADO' && cita.empleado_id !== userId) {
+      return NextResponse.json({ error: 'No tienes permiso para ver esta cita' }, { status: 403 });
+    }
+
+    return NextResponse.json({ cita }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id }   = await params;
