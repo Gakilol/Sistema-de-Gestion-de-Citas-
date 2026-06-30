@@ -188,9 +188,15 @@ const menuGroups: MenuGroup[] = [
         isNew: true,
       },
       {
-        title: 'Configuración',
+        title: 'Horarios',
         href: '/configuracion',
-        icon: Settings,
+        icon: Clock,
+        roles: ['ADMIN', 'TECH_SUPPORT'],
+      },
+      {
+        title: 'Bloques de Horario',
+        href: '/bloques-horario',
+        icon: Calendar,
         roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
@@ -350,7 +356,8 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/categorias': 'Categorías',
     '/empleados': 'Personal',
     '/reportes': 'Reportes',
-    '/configuracion': 'Configuración',
+    '/configuracion': 'Horarios',
+    '/bloques-horario': 'Bloques de Horario',
     '/auditoria': 'Auditoría del Sistema',
   };
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';
