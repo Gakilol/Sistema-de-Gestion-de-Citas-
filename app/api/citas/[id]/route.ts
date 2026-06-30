@@ -2,13 +2,35 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id }   = await params;
     const body     = await req.json();
-    const userRole = req.headers.get('x-user-role') || '';
-    const userId   = req.headers.get('x-user-id');
+    const { userId, userRole } = getUserContext(req);
+
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
+    }
+
+    const citaOriginal = await prisma.cita.findUnique({
+      where: { id },
+      include: { citaServicios: true }
+    });
+
+    if (!citaOriginal) {
+      return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
+    }
+
+    if (userRole === 'EMPLEADO') {
+      if (citaOriginal.empleado_id !== userId) {
+        return NextResponse.json({ error: 'No tienes permiso para modificar una cita que no te pertenece' }, { status: 403 });
+      }
+      if (body.empleado_id && body.empleado_id !== userId) {
+        return NextResponse.json({ error: 'No tienes permiso para reasignar esta cita a otro estilista' }, { status: 403 });
+      }
+    }
 
     const {
       estado,
@@ -154,15 +176,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // Fetch original appointment before transaction to perform diffing
-    const citaOriginal = await prisma.cita.findUnique({
-      where: { id },
-      include: { citaServicios: true }
-    });
-
-    if (!citaOriginal) {
-      return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
-    }
+    // Cita original ya cargada y validada arriba
 
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
     const cita = await prisma.$transaction(async (tx) => {

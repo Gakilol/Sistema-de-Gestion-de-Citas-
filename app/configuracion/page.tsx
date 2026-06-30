@@ -31,6 +31,28 @@ const DIAS = [
   { key: 'domingo',   label: 'Domingo' },
 ];
 
+export function formatTo12h(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  if (isNaN(h)) return timeStr;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? '00' : '30';
+  const val = `${String(h).padStart(2, '0')}:${m}`;
+  return {
+    value: val,
+    label: formatTo12h(val)
+  };
+});
+
 const defaultHorarios: Record<string, { activo: boolean; inicio: string; fin: string }> = {
   lunes:     { activo: true,  inicio: '08:00', fin: '18:00' },
   martes:    { activo: true,  inicio: '08:00', fin: '18:00' },
@@ -44,7 +66,7 @@ const defaultHorarios: Record<string, { activo: boolean; inicio: string; fin: st
 export default function Configuracion() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [tab, setTab]       = useState('negocio');
+  const [tab, setTab]       = useState('horarios');
   const [saved, setSaved]   = useState(false);
   const isTechSupport = false;
 
@@ -158,8 +180,8 @@ export default function Configuracion() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Configuración</h1>
-              <p className="text-sm text-muted-foreground">Personaliza tu sistema HAIR STYLE</p>
+              <h1 className="text-2xl font-bold text-foreground">Horarios de Apertura</h1>
+              <p className="text-sm text-muted-foreground">Gestiona el horario de atención general de HAIR STYLE</p>
             </div>
             {isTechSupport ? (
               <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
@@ -171,17 +193,6 @@ export default function Configuracion() {
                 {saved ? 'Guardado' : 'Guardar cambios'}
               </Button>
             )}
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl w-fit flex-wrap">
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={cn('flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                  tab === t.id ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
-                <t.icon className="w-3.5 h-3.5"/> {t.label}
-              </button>
-            ))}
           </div>
 
           {/* ── Tab: Negocio ─────────────────────────────────── */}
@@ -268,12 +279,26 @@ export default function Configuracion() {
                         h.activo ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
                       {h.activo ? (
                         <div className="flex items-center gap-2 flex-1">
-                          <Input type="time" value={h.inicio} onChange={e => updateHorario(key,'inicio',e.target.value)}
-                            className="h-8 text-sm w-28"/>
+                          <select
+                            value={h.inicio}
+                            onChange={e => updateHorario(key, 'inicio', e.target.value)}
+                            className="h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            {TIME_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
                           <span className="text-muted-foreground text-xs">—</span>
-                          <Input type="time" value={h.fin} onChange={e => updateHorario(key,'fin',e.target.value)}
-                            className="h-8 text-sm w-28"/>
-                          <span className="text-xs text-muted-foreground ml-2">
+                          <select
+                            value={h.fin}
+                            onChange={e => updateHorario(key, 'fin', e.target.value)}
+                            className="h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            {TIME_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <span className="text-xs text-muted-foreground ml-2 font-medium">
                             {(() => {
                               const [hi, mi] = h.inicio.split(':').map(Number);
                               const [hf, mf] = h.fin.split(':').map(Number);

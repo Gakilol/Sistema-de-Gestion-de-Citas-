@@ -3,17 +3,26 @@ import { prisma } from '@/lib/db';
 import { syncCitaEstados } from '@/lib/automatizacion';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
     await syncCitaEstados();
 
+    const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'Usuario no autorizado' }, { status: 401 });
+    }
+
     const estado   = req.nextUrl.searchParams.get('estado') || '';
     const busqueda = req.nextUrl.searchParams.get('q') || '';
+
+    const scopeWhere = getScopedAppointmentWhere(userId, userRole);
 
     const citas = await prisma.cita.findMany({
       where: {
         ...(estado && estado !== 'all' ? { estado: estado as any } : {}),
+        ...scopeWhere,
       },
       include: {
         empleado: { select: { nombre: true } },
@@ -58,10 +67,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body     = await req.json();
-    const userId   = req.headers.get('x-user-id');
-    const userRole = req.headers.get('x-user-role') || '';
+    const { userId, userRole } = getUserContext(req);
 
-    if (!userId) {
+    if (!userId || !userRole) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
     }
 
@@ -78,6 +86,11 @@ export async function POST(req: NextRequest) {
       notas,
       forzar,
     } = body;
+
+    let finalEmpleadoId = empleado_id;
+    if (userRole === 'EMPLEADO') {
+      finalEmpleadoId = userId;
+    }
 
     // Resolver servicios
     let serviciosParaCita: { id: string; duracion: number; precio: number }[] = [];
@@ -123,7 +136,7 @@ export async function POST(req: NextRequest) {
 
     const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
     const disponibilidad = await calcularDisponibilidad(
-      empleado_id,
+      finalEmpleadoId,
       fecha.split('T')[0],
       primerServicioId,
       duracionCalculada,
@@ -187,7 +200,7 @@ export async function POST(req: NextRequest) {
           cliente_nombre:   cliente_nombre.trim(),
           cliente_telefono: cliente_telefono?.trim() || null,
           servicio_id:      primerServicioId,
-          empleado_id,
+          empleado_id:      finalEmpleadoId,
           fecha:            parseLocalDateToUTC(fecha.split('T')[0]),
           hora,
           duracion:         duracionCalculada,

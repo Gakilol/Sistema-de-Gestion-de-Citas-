@@ -205,7 +205,11 @@ export default function Citas() {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
-    setForm(getEmptyForm());
+    const emptyForm = getEmptyForm();
+    if (user?.rol === 'EMPLEADO') {
+      emptyForm.empleado_id = user.id;
+    }
+    setForm(emptyForm);
     setClienteBusqueda('');
     setForzar(false);
     setEditingId(null);
@@ -567,17 +571,19 @@ export default function Citas() {
                 <option value="">Filtrar por estado</option>
                 {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
               </select>
-              <select
-                value={filtroEmpleado}
-                onChange={e => {
-                  setFiltroEmpleado(e.target.value);
-                  setPage(1);
-                }}
-                className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
-              >
-                <option value="">Filtrar por empleado</option>
-                {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-              </select>
+              {user?.rol !== 'EMPLEADO' && (
+                <select
+                  value={filtroEmpleado}
+                  onChange={e => {
+                    setFiltroEmpleado(e.target.value);
+                    setPage(1);
+                  }}
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
+                >
+                  <option value="">Filtrar por empleado</option>
+                  {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                </select>
+              )}
             </div>
           </div>
 
@@ -1177,18 +1183,24 @@ export default function Citas() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Empleado *</label>
-                <select
-                  value={form.empleado_id}
-                  onChange={e => setForm({ ...form, empleado_id: e.target.value, hora: '' })}
-                  required
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Seleccionar empleado...</option>
-                  {/* Permitimos el empleado actual si estamos editando, e incluimos solo empleados ACTIVOS para nuevas citas */}
-                  {empleados.filter(e => e.activo || e.id === form.empleado_id).map(e => (
-                    <option key={e.id} value={e.id}>{e.nombre}{e.especialidad ? ` (${e.especialidad})` : ''}</option>
-                  ))}
-                </select>
+                {user?.rol === 'EMPLEADO' ? (
+                  <div className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground font-semibold">
+                    {user.nombre}
+                  </div>
+                ) : (
+                  <select
+                    value={form.empleado_id}
+                    onChange={e => setForm({ ...form, empleado_id: e.target.value, hora: '' })}
+                    required
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Seleccionar empleado...</option>
+                    {/* Permitimos el empleado actual si estamos editando, e incluimos solo empleados ACTIVOS para nuevas citas */}
+                    {empleados.filter(e => e.activo || e.id === form.empleado_id).map(e => (
+                      <option key={e.id} value={e.id}>{e.nombre}{e.especialidad ? ` (${e.especialidad})` : ''}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Fecha *</label>
