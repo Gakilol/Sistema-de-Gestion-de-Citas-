@@ -28,6 +28,10 @@ interface DashboardData {
     citasCompletadasMes: number;
     citasCompletadasHoy: number;
     tasaCompletadas: number;
+    ingresosHoy?: number;
+    ingresosMes?: number;
+    ingresosProyectados?: number;
+    servicioMasGenerador?: string;
   };
   upcomingAppointments: any[];
   citasHoy: any[];

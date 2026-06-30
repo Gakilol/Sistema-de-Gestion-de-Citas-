@@ -194,12 +194,6 @@ const menuGroups: MenuGroup[] = [
         roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
-        title: 'Bloques de Horario',
-        href: '/bloques-horario',
-        icon: Calendar,
-        roles: ['ADMIN', 'TECH_SUPPORT'],
-      },
-      {
         title: 'Auditoría del Sistema',
         href: '/auditoria',
         icon: Clock,

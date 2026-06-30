@@ -21,8 +21,6 @@ export async function GET(req: NextRequest) {
 
     const scopeWhere = getScopedAppointmentWhere(userId, userRole, scope, filterEmp);
 
-    const scopeWhere = getScopedAppointmentWhere(userId, userRole);
-
     const citas = await prisma.cita.findMany({
       where: {
         ...(estado && estado !== 'all' ? { estado: estado as any } : {}),

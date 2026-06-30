@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon } from 'lucide-react';
+import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -388,7 +388,7 @@ export default function Citas() {
       toast.success(editingId ? 'Cita actualizada' : 'Cita creada exitosamente');
       setShowModal(false);
       setForzar(false);
-      fetchCitas(busqueda, filtroEstado, filtroEmpleado);
+      fetchCitas();
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar');
     } finally {
@@ -405,12 +405,12 @@ export default function Citas() {
         body: JSON.stringify({ estado }),
       });
       if (!res.ok) {
-        fetchCitas(busqueda, filtroEstado, filtroEmpleado);
+        fetchCitas();
         return;
       }
       toast.success(`Estado → ${ESTADO_LABEL[estado]}`);
     } catch {
-      fetchCitas(busqueda, filtroEstado, filtroEmpleado);
+      fetchCitas();
     }
   };
 

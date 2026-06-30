@@ -30,11 +30,11 @@ export function mensajeConfirmacion(cita: CitaWA): string {
     `Hola ${cita.cliente_nombre},`,
     `Su cita ha sido *confirmada*. Aqui estan los detalles:`,
     ``,
-    `*Colaborador asignado(a) para su cita:* ${cita.empleado}`,
+    `*Estilistaasignado(a) para su cita:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
     `*Hora:* ${cita.hora}`,
     cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
-    cita.notas     ? `*Notas:* ${cita.notas}` : null,
+    cita.notas ? `*Notas:* ${cita.notas}` : null,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ];
@@ -107,7 +107,7 @@ export function mensajeReprogramacion(cita: CitaWA): string {
 export function generarEnlaceWA(telefono: string, mensaje: string): string {
   // Limpiar teléfono: solo dígitos, agregar código de país si no tiene
   const cleaned = telefono.replace(/\D/g, '');
-  const numero  = cleaned.startsWith('505') || cleaned.startsWith('506')
+  const numero = cleaned.startsWith('505') || cleaned.startsWith('506')
     ? cleaned
     : `506${cleaned}`; // 506 = Costa Rica por defecto
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;

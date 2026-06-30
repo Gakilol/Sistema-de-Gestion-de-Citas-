@@ -80,14 +80,6 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
-    // ─── Protección adicional: /bloques-horario y /api/bloques-horario solo para ADMIN y TECH_SUPPORT
-    const isBloquesPath = path.startsWith('/bloques-horario') || path.startsWith('/api/bloques-horario');
-    if (isBloquesPath && !reportesRestringidos.includes(userRole)) {
-      if (path.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Acceso denegado. Solo ADMIN y TECH_SUPPORT pueden acceder a los bloques de horario.' }, { status: 403 });
-      }
-      return NextResponse.redirect(new URL('/dashboard', req.url));
-    }
 
     // Inyectar datos del usuario en los headers para que las rutas de API internas los lean de forma segura
     const requestHeaders = new Headers(req.headers);
