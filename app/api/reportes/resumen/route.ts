@@ -144,7 +144,12 @@ export async function GET(req: NextRequest) {
       LIMIT 1
     `;
     const horaMasSolicitada = horaMasSolicitadaRaw.length > 0
-      ? `${horaMasSolicitadaRaw[0].hora_h}:00 - ${String(Number(horaMasSolicitadaRaw[0].hora_h) + 1).padStart(2, '0')}:00`
+      ? (() => {
+          const hStart = Number(horaMasSolicitadaRaw[0].hora_h);
+          const hEnd = hStart + 1;
+          const fmt = (h: number) => `${h % 12 || 12}:00 ${h >= 12 ? 'PM' : 'AM'}`;
+          return `${fmt(hStart)} - ${fmt(hEnd)}`;
+        })()
       : 'N/A';
 
     // Most requested service

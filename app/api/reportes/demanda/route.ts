@@ -57,12 +57,23 @@ export async function GET(req: NextRequest) {
     `;
     const porHora = Array.from({ length: 24 }, (_, h) => {
       const found = porHoraRaw.find(r => Number(r.hora) === h);
+      const rawHora = `${String(h).padStart(2, '0')}:00`;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      const hora12h = `${h12} ${ampm}`;
+      
+      const nextH = h + 1;
+      const nextAmpm = nextH >= 12 ? 'PM' : 'AM';
+      const nextH12 = nextH % 12 || 12;
+      const label = `${h12}:00 ${ampm} - ${nextH12}:00 ${nextAmpm}`;
+
       return {
-        hora: `${String(h).padStart(2, '0')}:00`,
-        label: `${String(h).padStart(2, '0')}:00 - ${String(h + 1).padStart(2, '0')}:00`,
+        rawHora,
+        hora: hora12h,
+        label,
         total: found ? Number(found.total) : 0,
       };
-    }).filter(h => h.total > 0 || (h.hora >= '06:00' && h.hora <= '22:00'));
+    }).filter(h => h.total > 0 || (h.rawHora >= '06:00' && h.rawHora <= '22:00'));
 
     // Heatmap: day of week × hour
     const heatmapRaw: any[] = await prisma.$queryRaw`
@@ -76,11 +87,16 @@ export async function GET(req: NextRequest) {
         ${empFilter} ${servFilter}
       GROUP BY dow, hora
     `;
-    const heatmap = heatmapRaw.map(r => ({
-      dia: DIAS_SEMANA[Number(r.dow)] || `Día ${r.dow}`,
-      hora: `${String(Number(r.hora)).padStart(2, '0')}:00`,
-      total: Number(r.total),
-    }));
+    const heatmap = heatmapRaw.map(r => {
+      const h = Number(r.hora);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return {
+        dia: DIAS_SEMANA[Number(r.dow)] || `Día ${r.dow}`,
+        hora: `${h12}:00 ${ampm}`,
+        total: Number(r.total),
+      };
+    });
 
     // Services most requested
     const porServicioRaw = await prisma.cita.groupBy({

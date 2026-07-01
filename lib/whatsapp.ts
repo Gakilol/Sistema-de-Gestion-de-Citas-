@@ -18,6 +18,7 @@ export interface CitaWA {
 const SALON_NAME = 'HAIR STYLE Salon & Barber';
 
 import { formatDBDateLong } from './timezone';
+import { formatTo12h } from './utils';
 
 function fmtFecha(d: string | Date): string {
   return formatDBDateLong(d);
@@ -34,7 +35,7 @@ export function mensajeConfirmacion(cita: CitaWA): string {
     ``,
     `*${titulo}:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
-    `*Hora:* ${cita.hora}`,
+    `*Hora:* ${formatTo12h(cita.hora)}`,
     cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
     cita.notas ? `*Notas:* ${cita.notas}` : null,
     ``,
@@ -54,7 +55,7 @@ export function mensajeRecordatorio(cita: CitaWA): string {
     ``,
     `*${titulo}:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
-    `*Hora:* ${cita.hora}`,
+    `*Hora:* ${formatTo12h(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ];
@@ -71,7 +72,7 @@ export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
     `Le recordamos que su cita está programada para *hoy*:`,
     ``,
     `*${titulo}:* ${cita.empleado}`,
-    `*Hora:* ${cita.hora}`,
+    `*Hora:* ${formatTo12h(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ];
@@ -84,7 +85,7 @@ export function mensajeCancelacion(cita: CitaWA): string {
     `*${SALON_NAME}*`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Su cita del *${fmtFecha(cita.fecha)}* a las *${cita.hora}* ha sido cancelada.`,
+    `Su cita del *${fmtFecha(cita.fecha)}* a las *${formatTo12h(cita.hora)}* ha sido cancelada.`,
     ``,
     `Si desea reagendar, no dude en contactarnos.`,
     `Hasta pronto.`,
@@ -102,7 +103,7 @@ export function mensajeReprogramacion(cita: CitaWA): string {
     ``,
     `*${titulo}:* ${cita.empleado}`,
     `*Nueva fecha:* ${fmtFecha(cita.fecha)}`,
-    `*Nueva hora:* ${cita.hora}`,
+    `*Nueva hora:* ${formatTo12h(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
   ].join('\n');

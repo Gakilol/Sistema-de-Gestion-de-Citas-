@@ -837,7 +837,7 @@ export default function Citas() {
                               <td className="px-4 py-3.5">
                                 <p className="font-medium text-foreground">{fmtDate(cita.fecha)}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {cita.hora} · {cita.duracion} min
+                                  {to12h(cita.hora)} · {cita.duracion} min
                                   {isPersonalizado && (
                                     <span className="block text-[10px] text-amber-500 font-bold mt-0.5" title="Duración modificada manualmente">
                                       ⏱ personalizado
@@ -992,7 +992,7 @@ export default function Citas() {
                           <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
                             <div className="text-xs flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
-                              <span className="text-muted-foreground">· {cita.hora}</span>
+                              <span className="text-muted-foreground">· {to12h(cita.hora)}</span>
                               <span className="font-semibold text-foreground ml-1">{formatColones(cita.monto)}</span>
                             </div>
                             <div className="flex gap-1.5">

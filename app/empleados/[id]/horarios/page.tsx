@@ -8,7 +8,17 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatTo12h } from '@/lib/utils';
+
+const TIME_OPTIONS = Array.from({ length: 96 }).map((_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return {
+    value: val,
+    label: formatTo12h(val)
+  };
+});
 
 const DIAS = [
   { key: 'lunes',     label: 'Lun', labelFull: 'Lunes', val: 1 },
@@ -35,6 +45,22 @@ const defaultHorario: HorarioSemana = {
   viernes: [{ inicio: '08:00', fin: '17:00' }],
   sabado: [],
   domingo: [],
+};
+
+const getOptions = (currentVal: string) => {
+  if (!currentVal) return TIME_OPTIONS;
+  const cleanVal = currentVal.substring(0, 5);
+  const exists = TIME_OPTIONS.some(opt => opt.value === cleanVal);
+  if (!exists) {
+    const newOpts = [...TIME_OPTIONS, { value: cleanVal, label: formatTo12h(cleanVal) }];
+    newOpts.sort((a, b) => {
+      const [ha, ma] = a.value.split(':').map(Number);
+      const [hb, mb] = b.value.split(':').map(Number);
+      return (ha * 60 + ma) - (hb * 60 + mb);
+    });
+    return newOpts;
+  }
+  return TIME_OPTIONS;
 };
 
 export default function HorariosEmpleado() {
@@ -273,11 +299,25 @@ export default function HorariosEmpleado() {
                       <div className="space-y-2">
                         {turnos.map((t, i) => (
                           <div key={i} className="flex items-center gap-2">
-                            <Input type="time" value={t.inicio} onChange={e => updateTurno(key, i, 'inicio', e.target.value)}
-                              className="h-8 text-sm w-28"/>
+                            <select
+                              value={(t.inicio || '08:00').substring(0, 5)}
+                              onChange={e => updateTurno(key, i, 'inicio', e.target.value)}
+                              className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                            >
+                              {getOptions(t.inicio).map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
                             <span className="text-muted-foreground text-xs">—</span>
-                            <Input type="time" value={t.fin} onChange={e => updateTurno(key, i, 'fin', e.target.value)}
-                              className="h-8 text-sm w-28"/>
+                            <select
+                              value={(t.fin || '17:00').substring(0, 5)}
+                              onChange={e => updateTurno(key, i, 'fin', e.target.value)}
+                              className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                            >
+                              {getOptions(t.fin).map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
                             <button onClick={() => removeTurno(key, i)} className="text-muted-foreground hover:text-destructive transition-colors ml-1">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </button>
@@ -310,13 +350,25 @@ export default function HorariosEmpleado() {
                     className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
                     {DIAS.map((dia) => <option key={dia.key} value={dia.val}>{dia.labelFull}</option>)}
                   </select>
-                  <Input type="time" value={d.hora_inicio}
-                    onChange={e=>setDescansos(ds=>ds.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))}
-                    className="h-8 text-sm w-28"/>
+                  <select
+                    value={(d.hora_inicio || '13:00').substring(0, 5)}
+                    onChange={e => setDescansos(ds => ds.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))}
+                    className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                  >
+                    {getOptions(d.hora_inicio).map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                   <span className="text-xs text-muted-foreground">—</span>
-                  <Input type="time" value={d.hora_fin}
-                    onChange={e=>setDescansos(ds=>ds.map((x,j)=>j===i?{...x,hora_fin:e.target.value}:x))}
-                    className="h-8 text-sm w-28"/>
+                  <select
+                    value={(d.hora_fin || '14:00').substring(0, 5)}
+                    onChange={e => setDescansos(ds => ds.map((x,j)=>j===i?{...x,hora_fin:e.target.value}:x))}
+                    className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                  >
+                    {getOptions(d.hora_fin).map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                   <button onClick={()=>setDescansos(ds=>ds.filter((_,j)=>j!==i))}
                     className="text-muted-foreground hover:text-destructive ml-auto"><Trash2 className="w-3.5 h-3.5"/></button>
                 </div>
@@ -338,9 +390,25 @@ export default function HorariosEmpleado() {
                 <div key={i} className="grid grid-cols-2 gap-2 p-3 rounded-xl border border-border/50 bg-secondary/20">
                   <div className="col-span-2 flex items-center gap-2">
                     <Input type="date" value={b.fecha} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,fecha:e.target.value}:x))} className="h-8 text-sm"/>
-                    <Input type="time" value={b.hora_inicio} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))} className="h-8 text-sm w-28"/>
+                    <select
+                      value={(b.hora_inicio || '09:00').substring(0, 5)}
+                      onChange={e => setBloqueos(bs => bs.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))}
+                      className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32 animate-none"
+                    >
+                      {getOptions(b.hora_inicio).map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                     <span className="text-xs text-muted-foreground">—</span>
-                    <Input type="time" value={b.hora_fin} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,hora_fin:e.target.value}:x))} className="h-8 text-sm w-28"/>
+                    <select
+                      value={(b.hora_fin || '10:00').substring(0, 5)}
+                      onChange={e => setBloqueos(bs => bs.map((x,j)=>j===i?{...x,hora_fin:e.target.value}:x))}
+                      className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32 animate-none"
+                    >
+                      {getOptions(b.hora_fin).map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                     <button onClick={()=>setBloqueos(bs=>bs.filter((_,j)=>j!==i))} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5"/></button>
                   </div>
                   <div className="col-span-2">
