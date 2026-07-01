@@ -351,7 +351,6 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/empleados': 'Personal',
     '/reportes': 'Reportes',
     '/configuracion': 'Horarios',
-    '/bloques-horario': 'Bloques de Horario',
     '/auditoria': 'Auditoría del Sistema',
   };
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';

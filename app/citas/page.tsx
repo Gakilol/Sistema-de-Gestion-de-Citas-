@@ -147,13 +147,9 @@ export default function Citas() {
   const [page, setPage]           = useState(1);
 
   // Modos de Vista y Scopes
-  const [vistaModo, setVistaModo] = useState<'lista' | 'agenda' | 'disponibilidad'>('lista');
+  const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('lista');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
   const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
-
-  // Estado local para disponibilidad integrada (Bloques de horario)
-  const [empleadosDispData, setEmpleadosDispData] = useState<any[]>([]);
-  const [loadingDisp, setLoadingDisp] = useState(false);
 
   const { user }                  = useAuth();
   const isAdmin                   = user?.rol === 'ADMIN';
@@ -204,28 +200,6 @@ export default function Citas() {
     }
   };
 
-  const fetchBloques = async (selectedDate: string, empId?: string) => {
-    setLoadingDisp(true);
-    try {
-      let url = `/api/bloques-horario?fecha=${selectedDate}`;
-      if (empId) {
-        url += `&empleado_id=${empId}`;
-      } else if (user?.rol === 'EMPLEADO') {
-        url += `&empleado_id=${user.id}`;
-      }
-      const res = await fetch(url);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Error al obtener la disponibilidad');
-      }
-      const data = await res.json();
-      setEmpleadosDispData(data.empleados || []);
-    } catch (err: any) {
-      toast.error(err.message || 'Error al cargar disponibilidad');
-    } finally {
-      setLoadingDisp(false);
-    }
-  };
 
   const fetchCatalogos = async () => {
     const [sR, eR, cR] = await Promise.all([fetch('/api/servicios'), fetch('/api/empleados'), fetch('/api/clientes')]);
@@ -271,12 +245,6 @@ export default function Citas() {
     fetchCitas(scope, filtroEmpleado);
   }, [scope, filtroEmpleado]);
 
-  // Carga reactiva de disponibilidad cuando cambia fecha de disponibilidad o filtro de empleado
-  useEffect(() => {
-    if (vistaModo === 'disponibilidad') {
-      fetchBloques(selectedDateStr, filtroEmpleado);
-    }
-  }, [selectedDateStr, filtroEmpleado, vistaModo]);
 
   useEffect(() => {
     fetchCatalogos();
@@ -598,22 +566,10 @@ export default function Citas() {
               >
                 <CalendarIcon className="w-3.5 h-3.5" /> Calendario / Agenda
               </button>
-              <button
-                type="button"
-                onClick={() => setVistaModo('disponibilidad')}
-                className={cn(
-                  "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
-                  vistaModo === 'disponibilidad'
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                )}
-              >
-                <ClockIcon className="w-3.5 h-3.5" /> Disponibilidad Personal
-              </button>
             </div>
 
             {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
-            {canSeeAll && vistaModo !== 'disponibilidad' && (
+            {canSeeAll && (
               <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start md:self-auto shadow-inner">
                 <button
                   type="button"
@@ -1111,206 +1067,7 @@ export default function Citas() {
             </div>
           )}
 
-          {/* VISTA DE DISPONIBILIDAD INTEGRADA */}
-          {vistaModo === 'disponibilidad' && (
-            <div className="space-y-6">
-              
-              {/* Controles superiores de Disponibilidad */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-2 bg-secondary/35 p-1 rounded-xl border border-border/50 self-start">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 cursor-pointer"
-                    onClick={() => {
-                      const [year, month, day] = selectedDateStr.split('-').map(Number);
-                      const d = new Date(year, month - 1, day);
-                      d.setDate(d.getDate() - 1);
-                      setSelectedDateStr(d.toISOString().split('T')[0]);
-                    }}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Input
-                    type="date"
-                    value={selectedDateStr}
-                    onChange={e => setSelectedDateStr(e.target.value)}
-                    className="h-8 text-xs font-semibold bg-transparent border-0 focus-visible:ring-0 w-32 cursor-pointer text-foreground pr-0"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 cursor-pointer"
-                    onClick={() => {
-                      const [year, month, day] = selectedDateStr.split('-').map(Number);
-                      const d = new Date(year, month - 1, day);
-                      d.setDate(d.getDate() + 1);
-                      setSelectedDateStr(d.toISOString().split('T')[0]);
-                    }}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 cursor-pointer hover:bg-primary/10 hover:text-primary transition-all" 
-                    onClick={() => fetchBloques(selectedDateStr, filtroEmpleado)}
-                    title="Actualizar"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5 rotate-90" />
-                  </Button>
-                </div>
 
-                {user?.rol !== 'EMPLEADO' && (
-                  <div className="relative flex-1 sm:max-w-xs">
-                    <select
-                      value={filtroEmpleado}
-                      onChange={e => setFiltroEmpleado(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    >
-                      <option value="">Todos los empleados</option>
-                      {empleados.map(e => (
-                        <option key={e.id} value={e.id}>{e.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Listado de Personal y Líneas Temporales */}
-              <div className="grid grid-cols-1 gap-6">
-                {loadingDisp ? (
-                  Array.from({ length: 2 }).map((_, idx) => (
-                    <Card key={idx} className="p-6 border-border/50 bg-card animate-pulse space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div className="skeleton h-5 w-40" />
-                        <div className="skeleton h-5 w-48" />
-                      </div>
-                      <div className="skeleton h-10 w-full rounded-lg" />
-                    </Card>
-                  ))
-                ) : empleadosDispData.length === 0 ? (
-                  <div className="text-center py-16 text-muted-foreground text-sm bg-card border border-border/40 rounded-xl">
-                    No hay estilistas o personal configurado en el sistema
-                  </div>
-                ) : (
-                  empleadosDispData.map((item: any) => {
-                    const emp = item.empleado;
-                    const disp = item.disponibilidad;
-                    const hasError = !!item.error;
-                    
-                    const isWorking = disp?.jornada?.activo;
-                    const agendaTexto = isWorking
-                      ? `Jornada: ${to12h(disp.jornada.inicio)} - ${to12h(disp.jornada.fin)}`
-                      : disp?.motivo === 'De vacaciones' ? 'De vacaciones 🏖️' : 'Día libre / No laborable';
-
-                    const ocupados = disp?.intervalosOcupados || [];
-
-                    return (
-                      <Card key={emp.id} className="p-6 border-border/40 bg-card/60 shadow-sm space-y-5">
-                        
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/30">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-foreground text-lg">{emp.nombre}</h3>
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                                {emp.rol === 'ADMIN' ? 'Administrador' : 'Estilista'}
-                              </span>
-                            </div>
-                            {emp.especialidad && <p className="text-xs text-muted-foreground mt-0.5">{emp.especialidad}</p>}
-                          </div>
-                          <div className="text-xs font-semibold text-right">
-                            <span className={cn(
-                              "px-3 py-1 rounded-full",
-                              isWorking ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
-                            )}>
-                              {agendaTexto}
-                            </span>
-                          </div>
-                        </div>
-
-                        {hasError ? (
-                          <div className="flex items-center gap-2 p-3 rounded-xl border border-destructive/20 bg-destructive/5 text-destructive text-xs">
-                            <AlertTriangle className="w-4 h-4 shrink-0" />
-                            <p>{item.error}</p>
-                          </div>
-                        ) : !isWorking ? (
-                          <div className="flex items-center justify-center p-6 rounded-xl border border-dashed border-border/60 bg-secondary/10">
-                            <p className="text-xs text-muted-foreground font-semibold">No labora este día.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <div>
-                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Bloques de Horas del Día</p>
-                              <div className="flex flex-wrap gap-1 p-2 rounded-xl bg-secondary/15 border border-border/40">
-                                {disp.bloques && disp.bloques.map((b: any, idx: number) => {
-                                  const label = to12h(b.hora);
-                                  
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={cn(
-                                        "h-8 flex-1 min-w-[32px] rounded-md flex items-center justify-center text-[9px] font-bold transition-all relative group cursor-help select-none",
-                                        b.disponible
-                                          ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/25 hover:bg-emerald-500/30"
-                                          : b.motivo.toLowerCase().includes('cita')
-                                          ? "bg-red-500/15 text-red-600 border border-red-500/25 hover:bg-red-500/30"
-                                          : "bg-amber-500/15 text-amber-600 border border-amber-500/25 hover:bg-amber-500/30"
-                                      )}
-                                      title={`${label} - ${b.motivo}`}
-                                    >
-                                      {b.hora.endsWith(':00') ? (
-                                        <span>{parseInt(b.hora.split(':')[0], 10) % 12 || 12}</span>
-                                      ) : null}
-                                      
-                                      <div className="absolute bottom-full mb-1.5 hidden group-hover:block z-50 bg-popover border border-border text-popover-foreground text-[10px] font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap">
-                                        <p className="font-bold">{label}</p>
-                                        <p className="text-muted-foreground">{b.motivo}</p>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {ocupados.length > 0 && (
-                              <div className="space-y-2">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Actividades Programadas</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                  {ocupados.map((o: any, idx: number) => {
-                                    const startStr = `${Math.floor(o.inicio / 60)}:${String(o.inicio % 60).padStart(2, '0')}`;
-                                    const endStr = `${Math.floor(o.fin / 60)}:${String(o.fin % 60).padStart(2, '0')}`;
-                                    
-                                    return (
-                                      <div 
-                                        key={idx} 
-                                        className={cn(
-                                          "flex items-center gap-3 p-2.5 rounded-lg border text-xs font-medium",
-                                          o.motivo.toLowerCase().includes('cita')
-                                            ? "bg-red-500/5 border-red-500/15 text-red-600 dark:text-red-400"
-                                            : "bg-amber-500/5 border-amber-500/15 text-amber-600 dark:text-amber-400"
-                                        )}
-                                      >
-                                        <ClockIcon className="w-3.5 h-3.5 shrink-0" />
-                                        <div className="flex-1">
-                                          <p className="font-bold">{o.motivo}</p>
-                                          <p className="text-[10px] opacity-80">{to12h(startStr)} - {to12h(endStr)}</p>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </Card>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
 
         </div>
       </main>
