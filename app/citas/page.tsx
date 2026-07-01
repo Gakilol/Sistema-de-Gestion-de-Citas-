@@ -584,9 +584,9 @@ export default function Citas() {
               </button>
             </div>
 
-            {/* Switch de Scope (Mis Citas vs Ver Todas) */}
+            {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
             {canSeeAll && vistaModo !== 'disponibilidad' && (
-              <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start md:self-auto">
+              <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start md:self-auto shadow-inner">
                 <button
                   type="button"
                   onClick={() => {
@@ -600,7 +600,7 @@ export default function Citas() {
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  Mis Citas
+                  {vistaModo === 'agenda' ? 'Ver mi agenda' : 'Mis Citas'}
                 </button>
                 <button
                   type="button"
@@ -612,7 +612,7 @@ export default function Citas() {
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  Ver Todas
+                  {vistaModo === 'agenda' ? 'Ver agenda de todos' : 'Ver Todas'}
                 </button>
               </div>
             )}

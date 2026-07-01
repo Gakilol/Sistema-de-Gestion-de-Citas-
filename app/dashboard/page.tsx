@@ -28,6 +28,7 @@ interface DashboardData {
     citasCompletadasMes: number;
     citasCompletadasHoy: number;
     tasaCompletadas: number;
+    citasCanceladasTotales?: number;
     ingresosHoy?: number;
     ingresosMes?: number;
     ingresosProyectados?: number;
@@ -62,8 +63,6 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
-
-// Eliminado format USD
 
 function fmtDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d;
@@ -272,7 +271,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <KpiCard
-                  title="Citas Hoy"
+                  title="Mis Citas de Hoy"
                   value={String(stats?.citasHoy ?? 0)}
                   sub={`${stats?.citasPendientes ?? 0} pendientes`}
                   icon={Calendar}
@@ -286,17 +285,17 @@ export default function Dashboard() {
                   accent="emerald"
                 />
                 <KpiCard
-                  title="Completadas Mes"
+                  title="Completadas del Mes"
                   value={String(stats?.citasCompletadasMes ?? 0)}
-                  sub="Citas finalizadas este mes"
+                  sub="Mis citas finalizadas este mes"
                   icon={Calendar}
                   accent="blue"
                 />
                 <KpiCard
-                  title="Personal Activo"
-                  value={String(stats?.empleadosActivos ?? 0)}
-                  sub="Empleados en sistema"
-                  icon={Users}
+                  title="Citas Canceladas"
+                  value={String(stats?.citasCanceladasTotales ?? 0)}
+                  sub="Total de citas canceladas"
+                  icon={Clock}
                   accent="purple"
                 />
               </>
@@ -304,90 +303,96 @@ export default function Dashboard() {
           </div>
 
           {/* ── Gráficas ────────────────────────────────────────── */}
-          {isAdmin && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Área: citas 7 días */}
-              <Card className="lg:col-span-2 p-5 border-border/50">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-sm font-semibold text-foreground">Citas Completadas — Últimos 7 días</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">Volumen diario de citas finalizadas</p>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary rounded-lg px-2.5 py-1">
-                    <Activity className="w-3 h-3" />
-                    En vivo
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Área: citas 7 días */}
+            <Card className="lg:col-span-2 p-5 border-border/50">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    {isAdmin ? 'Citas Completadas — Últimos 7 días' : 'Mis Citas Completadas — Últimos 7 días'}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isAdmin ? 'Volumen diario de citas finalizadas' : 'Mi volumen diario de citas finalizadas'}
+                  </p>
                 </div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#d4a017" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#d4a017" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="citas"    name="Citas"    stroke="#d4a017" strokeWidth={2} fill="url(#gradGold)" dot={{ r: 3, fill: '#d4a017', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </Card>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary rounded-lg px-2.5 py-1">
+                  <Activity className="w-3 h-3" />
+                  En vivo
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#d4a017" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#d4a017" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area type="monotone" dataKey="citas"    name="Citas"    stroke="#d4a017" strokeWidth={2} fill="url(#gradGold)" dot={{ r: 3, fill: '#d4a017', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Card>
 
-              {/* Pie: servicios populares */}
-              <Card className="p-5 border-border/50">
-                <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-foreground">Servicios Populares</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Por número de citas</p>
-                </div>
-                {populares.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={140}>
-                      <PieChart>
-                        <Pie
-                          data={populares}
-                          dataKey="cantidad"
-                          nameKey="nombre"
-                          cx="50%" cy="50%"
-                          innerRadius={38}
-                          outerRadius={60}
-                          paddingAngle={3}
-                        >
-                          {populares.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(v, n) => [`${v} citas`, n]}
-                          contentStyle={{ borderRadius: 10, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))', fontSize: 12 }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="space-y-1.5 mt-1">
-                      {populares.map((s, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-muted-foreground truncate max-w-[110px]">{s.nombre}</span>
-                          </div>
-                          <span className="font-semibold text-foreground">{s.cantidad}</span>
+            {/* Pie: servicios populares */}
+            <Card className="p-5 border-border/50">
+              <div className="mb-4">
+                <h2 className="text-sm font-semibold text-foreground">
+                  {isAdmin ? 'Servicios Populares' : 'Mis Servicios Populares'}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isAdmin ? 'Por número de citas' : 'Mis servicios más realizados'}
+                </p>
+              </div>
+              {populares.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <PieChart>
+                      <Pie
+                        data={populares}
+                        dataKey="cantidad"
+                        nameKey="nombre"
+                        cx="50%" cy="50%"
+                        innerRadius={38}
+                        outerRadius={60}
+                        paddingAngle={3}
+                      >
+                        {populares.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v, n) => [`${v} citas`, n]}
+                        contentStyle={{ borderRadius: 10, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))', fontSize: 12 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1.5 mt-1">
+                    {populares.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="text-muted-foreground truncate max-w-[110px]">{s.nombre}</span>
                         </div>
-                      ))}
-                    </div>
-                    {stats?.servicioMasGenerador && (
-                      <div className="mt-3 pt-3 border-t border-border/40 text-xs text-muted-foreground flex items-center justify-between">
-                        <span className="font-semibold text-primary">Top Facturación:</span>
-                        <span className="text-foreground font-medium">{stats.servicioMasGenerador}</span>
+                        <span className="font-semibold text-foreground">{s.cantidad}</span>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="h-[180px] flex items-center justify-center text-muted-foreground text-xs">Sin datos suficientes</div>
-                )}
-              </Card>
-            </div>
-          )}
+                    ))}
+                  </div>
+                  {isAdmin && stats?.servicioMasGenerador && (
+                    <div className="mt-3 pt-3 border-t border-border/40 text-xs text-muted-foreground flex items-center justify-between">
+                      <span className="font-semibold text-primary">Top Facturación:</span>
+                      <span className="text-foreground font-medium">{stats.servicioMasGenerador}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="h-[180px] flex items-center justify-center text-muted-foreground text-xs">Sin datos suficientes</div>
+              )}
+            </Card>
+          </div>
 
           {/* ── Segunda fila de gráficas ─────────────────────────── */}
           {isAdmin && productividad.length > 0 && (

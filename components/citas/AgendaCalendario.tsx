@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -43,7 +43,7 @@ export function AgendaCalendario({
   setSelectedDateStr,
   isLoading = false,
 }: AgendaCalendarioProps) {
-  const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('3dias');
+  const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('dia'); // Por defecto 'dia' para columnas claras de empleados
 
   // Helper para convertir YYYY-MM-DD local a objeto Date de forma segura en zona horaria local
   const parseLocalDate = (dateStr: string) => {
@@ -60,6 +60,20 @@ export function AgendaCalendario({
   };
 
   const fechaBase = useMemo(() => parseLocalDate(selectedDateStr), [selectedDateStr]);
+
+  // Filtrar empleados según el rol y filtros del admin/scope
+  const empleadosColumnas = useMemo(() => {
+    if (user?.rol === 'EMPLEADO' || scope === 'mine') {
+      // Un empleado o admin/soporte en modo "Ver mi agenda" sólo puede ver su propia columna
+      return empleados.filter((e) => e.id === user?.id);
+    }
+    if (filtroEmpleado) {
+      // Si el admin/soporte tiene un empleado filtrado
+      return empleados.filter((e) => e.id === filtroEmpleado);
+    }
+    // Admin/Soporte ve a todos los empleados activos en modo global
+    return empleados.filter((e) => e.activo);
+  }, [empleados, filtroEmpleado, user, scope]);
 
   // Obtener rango de días según la vista seleccionada
   const diasAMostrar = useMemo(() => {
@@ -191,7 +205,7 @@ export function AgendaCalendario({
       };
     });
 
-    // Ordenar por hora de inicio, luego duración descendente (más largas primero)
+    // Ordenar por hora de inicio, luego duración descendente
     parsed.sort((a, b) => {
       if (a.minInicio !== b.minInicio) {
         return a.minInicio - b.minInicio;
@@ -266,6 +280,18 @@ export function AgendaCalendario({
     return result;
   };
 
+  // Calcular ancho mínimo de cuadrícula en base al total de subcolumnas
+  const totalSubColumnas = useMemo(() => {
+    return diasAMostrar.length * empleadosColumnas.length;
+  }, [diasAMostrar, empleadosColumnas]);
+
+  const minGridWidth = useMemo(() => {
+    if (vista === 'dia') {
+      return totalSubColumnas > 3 ? `${totalSubColumnas * 160}px` : '100%';
+    }
+    return `${Math.max(650, totalSubColumnas * 120)}px`;
+  }, [vista, totalSubColumnas]);
+
   return (
     <div className="flex flex-col h-[750px] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative">
       
@@ -288,6 +314,11 @@ export function AgendaCalendario({
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
+          {scope === 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 animate-pulse uppercase tracking-wider">
+              <Users className="w-3 h-3 shrink-0" /> Agenda Global
+            </span>
+          )}
         </div>
 
         {/* Toggles de Vista */}
@@ -319,43 +350,51 @@ export function AgendaCalendario({
         {/* Envoltorio con Ancho Mínimo para Evitar Columnas Apretadas */}
         <div
           className="flex flex-col h-full min-h-[850px]"
-          style={{
-            minWidth:
-              vista === 'dia'
-                ? '100%'
-                : vista === '3dias'
-                ? '650px'
-                : '1000px',
-          }}
+          style={{ minWidth: minGridWidth }}
         >
-          {/* CABECERA DE DÍAS (Sticky top & z-30 para quedar sobre el grid) */}
+          {/* CABECERA DE DÍAS Y EMPLEADOS (Sticky top & z-30 para quedar sobre el grid) */}
           <div className="flex sticky top-0 bg-card border-b border-border/40 z-30 shadow-sm">
             {/* Esquina superior izquierda (horas header spacer, sticky top & left, z-40) */}
             <div className="w-16 md:w-20 shrink-0 sticky left-0 bg-card border-r border-border/40 z-40 flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" />
             
-            {/* Columnas de nombres de días */}
+            {/* Columnas de nombres de días y empleados */}
             <div className="flex-1 flex">
-              {diasAMostrar.map((dia, idx) => {
+              {diasAMostrar.map((dia, dIdx) => {
                 const esHoy = formatLocalDate(dia) === formatLocalDate(new Date());
                 return (
                   <div
-                    key={idx}
+                    key={dIdx}
                     className={cn(
-                      "flex-1 py-3 text-center border-r border-border/20 last:border-r-0 flex flex-col items-center justify-center min-w-[90px] transition-colors",
-                      esHoy && "bg-primary/5 text-primary"
+                      "flex-1 flex flex-col border-r border-border/20 last:border-r-0",
+                      esHoy && "bg-primary/[0.02] text-primary"
                     )}
                   >
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-wider">
-                      {DIAS_SEMANA_ABR[dia.getDay()]}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-base font-extrabold w-7 h-7 flex items-center justify-center rounded-full mt-0.5 transition-all",
-                        esHoy && "bg-primary text-primary-foreground shadow-md scale-105"
-                      )}
-                    >
-                      {dia.getDate()}
-                    </span>
+                    {/* Header del Día */}
+                    <div className="py-2 text-center border-b border-border/20 bg-secondary/10 flex flex-col items-center justify-center min-w-[90px]">
+                      <span className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                        {DIAS_SEMANA_ABR[dia.getDay()]}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-xs font-extrabold w-6 h-6 flex items-center justify-center rounded-full mt-0.5 transition-all",
+                          esHoy && "bg-primary text-primary-foreground shadow-md scale-105"
+                        )}
+                      >
+                        {dia.getDate()}
+                      </span>
+                    </div>
+
+                    {/* Sub-headers de Empleados */}
+                    <div className="flex divide-x divide-border/10">
+                      {empleadosColumnas.map((emp) => (
+                        <div
+                          key={emp.id}
+                          className="flex-1 py-1.5 text-center text-[10px] font-bold text-muted-foreground truncate px-1"
+                        >
+                          {emp.nombre.split(' ')[0]}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
@@ -394,108 +433,115 @@ export function AgendaCalendario({
                 ))}
               </div>
 
-              {/* Renderizado de Columnas de Citas por Día */}
+              {/* Renderizado de Columnas de Citas por Día y Empleado */}
               {diasAMostrar.map((dia, dIdx) => {
                 const diaStr = formatLocalDate(dia);
-                const citasDiaRaw = citasPorDia[diaStr] || [];
-                const citasDia = procesarCitasDia(citasDiaRaw);
+                const citasDiaTodos = citasPorDia[diaStr] || [];
                 const esHoy = diaStr === formatLocalDate(new Date());
 
                 return (
                   <div
                     key={dIdx}
                     className={cn(
-                      "flex-1 relative border-r border-border/20 last:border-r-0 h-full min-w-[90px] transition-colors z-10",
+                      "flex-1 flex divide-x divide-border/10 border-r border-border/20 last:border-r-0 h-full relative z-10",
                       esHoy && "bg-primary/[0.01]"
                     )}
                   >
-                    {/* Citas de este día */}
-                    {citasDia.map((cita) => {
-                      const { topPx, heightPx, colIndex, totalColumns } = cita;
-                      const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
-                      
-                      const widthPct = 100 / totalColumns;
-                      const leftPct = colIndex * widthPct;
-                      const gapPx = 1.5;
-
-                      const isSmall = heightPx < 48;
-                      const isMedium = heightPx >= 48 && heightPx < 78;
-                      const isLarge = heightPx >= 78;
-
-                      // Tooltip nativo multilínea completo
-                      const tooltipText = `${cita.cliente_nombre}\nHora: ${formatTime12h(cita.hora)} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
+                    {empleadosColumnas.map((emp) => {
+                      const citasDiaRaw = citasDiaTodos.filter((cita) => cita.empleado_id === emp.id);
+                      const citasDia = procesarCitasDia(citasDiaRaw);
 
                       return (
                         <div
-                          key={cita.id}
-                          onClick={() => onEditCita(cita)}
-                          title={tooltipText}
-                          className="absolute p-2 rounded-xl border text-left cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:shadow-lg hover:scale-[1.01] hover:z-30 select-none active:scale-[0.99]"
-                          style={{
-                            top: `${topPx}px`,
-                            height: `${heightPx}px`,
-                            left: `calc(${leftPct}% + ${gapPx}px)`,
-                            width: `calc(${widthPct}% - ${gapPx * 2}px)`,
-                            // Mezcla adaptativa: color de categoría al 10% sobre el fondo bg-card de Tailwind
-                            backgroundColor: `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
-                            borderColor: `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
-                          }}
+                          key={emp.id}
+                          className="flex-1 relative h-full min-w-[80px]"
                         >
-                          {/* Indicador de color lateral sólido */}
-                          <div
-                            className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-all group-hover:w-1.5"
-                            style={{ backgroundColor: catColor }}
-                          />
+                          {/* Citas de este día para este estilista */}
+                          {citasDia.map((cita) => {
+                            const { topPx, heightPx, colIndex, totalColumns } = cita;
+                            const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
+                            
+                            const widthPct = 100 / totalColumns;
+                            const leftPct = colIndex * widthPct;
+                            const gapPx = 1.5;
 
-                          {/* Contenido de la Tarjeta */}
-                          <div className="pl-1.5 flex flex-col h-full justify-between overflow-hidden">
-                            <div className="overflow-hidden">
-                              <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
-                                {cita.cliente_nombre}
-                              </p>
-                              
-                              {/* Citas pequeñas: solo nombre y hora */}
-                              {isSmall && (
-                                <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                  {formatTime12h(cita.hora)}
-                                </p>
-                              )}
+                            const isSmall = heightPx < 48;
+                            const isMedium = heightPx >= 48 && heightPx < 78;
+                            const isLarge = heightPx >= 78;
 
-                              {/* Citas medianas: nombre, hora, duración y servicio */}
-                              {isMedium && (
-                                <>
-                                  <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                    {formatTime12h(cita.hora)} · {cita.duracion}m
-                                  </p>
-                                  <span className="flex items-center gap-1 mt-1 text-[8px] font-bold text-foreground/70 truncate">
-                                    <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
-                                    {cita.servicio?.nombre}
-                                  </span>
-                                </>
-                              )}
+                            // Tooltip nativo
+                            const tooltipText = `${cita.cliente_nombre}\nHora: ${formatTime12h(cita.hora)} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
 
-                              {/* Citas grandes: nombre, hora, duración, servicio y estilista */}
-                              {isLarge && (
-                                <>
-                                  <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                    {formatTime12h(cita.hora)} · {cita.duracion} min
-                                  </p>
-                                  <div className="flex flex-col gap-1 mt-1.5 opacity-90 text-[8px] font-medium truncate">
-                                    <span className="flex items-center gap-1 text-foreground/80 truncate font-semibold">
-                                      <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
-                                      {cita.servicio?.nombre}
-                                    </span>
-                                    {scope === 'all' && (
-                                      <span className="flex items-center gap-1 text-foreground/75 truncate font-semibold">
-                                        <User className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
-                                        {cita.empleado?.nombre}
-                                      </span>
+                            return (
+                              <div
+                                key={cita.id}
+                                onClick={() => onEditCita(cita)}
+                                title={tooltipText}
+                                className="absolute p-2 rounded-xl border text-left cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:shadow-lg hover:scale-[1.01] hover:z-30 select-none active:scale-[0.99]"
+                                style={{
+                                  top: `${topPx}px`,
+                                  height: `${heightPx}px`,
+                                  left: `calc(${leftPct}% + ${gapPx}px)`,
+                                  width: `calc(${widthPct}% - ${gapPx * 2}px)`,
+                                  backgroundColor: `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
+                                  borderColor: `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
+                                }}
+                              >
+                                {/* Indicador lateral */}
+                                <div
+                                  className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-all group-hover:w-1.5"
+                                  style={{ backgroundColor: catColor }}
+                                />
+
+                                {/* Contenido */}
+                                <div className="pl-1.5 flex flex-col h-full justify-between overflow-hidden">
+                                  <div className="overflow-hidden">
+                                    <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
+                                      {cita.cliente_nombre}
+                                    </p>
+                                    
+                                    {isSmall && (
+                                      <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
+                                        {formatTime12h(cita.hora)}
+                                      </p>
+                                    )}
+
+                                    {isMedium && (
+                                      <>
+                                        <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
+                                          {formatTime12h(cita.hora)} · {cita.duracion}m
+                                        </p>
+                                        <span className="flex items-center gap-1 mt-1 text-[8px] font-bold text-foreground/70 truncate">
+                                          <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                          {cita.servicio?.nombre}
+                                        </span>
+                                      </>
+                                    )}
+
+                                    {isLarge && (
+                                      <>
+                                        <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
+                                          {formatTime12h(cita.hora)} · {cita.duracion} min
+                                        </p>
+                                        <div className="flex flex-col gap-1 mt-1.5 opacity-90 text-[8px] font-medium truncate">
+                                          <span className="flex items-center gap-1 text-foreground/80 truncate font-semibold">
+                                            <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                            {cita.servicio?.nombre}
+                                          </span>
+                                          {scope === 'all' && (
+                                            <span className="flex items-center gap-1 text-foreground/75 truncate font-semibold">
+                                              <User className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                              {cita.empleado?.nombre}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </>
                                     )}
                                   </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })}
@@ -521,7 +567,7 @@ export function AgendaCalendario({
           </div>
         )}
 
-        {/* OVERLAY DE CARGA (BLUR Y SPINNER) */}
+        {/* OVERLAY DE CARGA */}
         {isLoading && (
           <div className="absolute inset-0 bg-background/40 backdrop-blur-[1px] z-50 flex items-center justify-center transition-all duration-300 animate-in fade-in">
             <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-card border border-border shadow-2xl">

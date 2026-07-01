@@ -4,8 +4,8 @@ import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import { syncCitaEstados } from '@/lib/automatizacion';
 
 export class AdminServicio {
-  // ─── Dashboard completo ────────────────────────────────────────────────
-  static async getDashboardStats(periodo: 'hoy' | 'semana' | 'mes' = 'mes') {
+  // ─── Dashboard completo con soporte opcional de empleadoId ─────────────
+  static async getDashboardStats(periodo: 'hoy' | 'semana' | 'mes' = 'mes', empleadoId?: string) {
     // Sincronizar estados de citas de forma automática y JIT antes de computar métricas
     await syncCitaEstados();
 
@@ -25,6 +25,9 @@ export class AdminServicio {
     const finSemana = new Date(inicioSemana);
     finSemana.setUTCDate(inicioSemana.getUTCDate() + 6);
     finSemana.setUTCHours(23, 59, 59, 999);
+
+    // Filtro base por empleado
+    const filterCita = empleadoId ? { empleado_id: empleadoId } : {};
 
     // ── Conteos paralelos ───────────────────────────────────────────────
     const [
@@ -46,11 +49,12 @@ export class AdminServicio {
       ingresosProyectadosRaw,
       ingresosRealesRaw,
       servicioMasGeneradorRaw,
+      citasCanceladasTotales, // Nueva métrica para empleado
     ] = await Promise.all([
       // Total citas
-      prisma.cita.count(),
+      prisma.cita.count({ where: filterCita }),
       // Completadas totales
-      prisma.cita.count({ where: { estado: EstadoCita.COMPLETADA } }),
+      prisma.cita.count({ where: { estado: EstadoCita.COMPLETADA, ...filterCita } }),
       // Citas hoy (todas)
       prisma.cita.count({
         where: {
@@ -58,6 +62,7 @@ export class AdminServicio {
             gte: dateToday,
             lte: dateToday,
           },
+          ...filterCita,
         },
       }),
       // Pendientes hoy
@@ -68,15 +73,19 @@ export class AdminServicio {
             gte: dateToday,
             lte: dateToday,
           },
+          ...filterCita,
         },
       }),
-      // Empleados activos
-      prisma.empleado.count({ where: { activo: true } }),
+      // Empleados activos (si es empleado, sólo cuenta 1 o si está activo)
+      empleadoId
+        ? prisma.empleado.count({ where: { id: empleadoId, activo: true } })
+        : prisma.empleado.count({ where: { activo: true } }),
       // Completadas este mes
       prisma.cita.count({
         where: {
           estado: EstadoCita.COMPLETADA,
           fecha: { gte: inicioMes, lte: finMes },
+          ...filterCita,
         },
       }),
       // Completadas hoy
@@ -87,6 +96,7 @@ export class AdminServicio {
             gte: dateToday,
             lte: dateToday,
           },
+          ...filterCita,
         },
       }),
 
@@ -95,6 +105,7 @@ export class AdminServicio {
         where: {
           estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.REPROGRAMADA] },
           fecha: { gte: dateToday },
+          ...filterCita,
         },
         orderBy: [{ fecha: 'asc' }, { hora: 'asc' }],
         take: 5,
@@ -106,12 +117,14 @@ export class AdminServicio {
       // Servicios populares con include (evita N+1)
       prisma.cita.groupBy({
         by: ['servicio_id'],
+        where: filterCita,
         _count: { servicio_id: true },
         orderBy: { _count: { servicio_id: 'desc' } },
         take: 5,
       }),
       // Actividad reciente (últimas 8 citas creadas)
       prisma.cita.findMany({
+        where: filterCita,
         orderBy: { created_at: 'desc' },
         take: 8,
         include: {
@@ -126,6 +139,7 @@ export class AdminServicio {
             gte: dateToday,
             lte: dateToday,
           },
+          ...filterCita,
         },
         orderBy: { hora: 'asc' },
         include: {
@@ -134,47 +148,51 @@ export class AdminServicio {
         },
       }),
 
-      // Productividad por empleado (este mes)
+      // Productividad por empleado (este mes) - Si es empleado individual no es tan útil, pero se puede agrupar igual
       prisma.cita.groupBy({
         by: ['empleado_id'],
-        where: { fecha: { gte: inicioMes, lte: finMes } },
+        where: { fecha: { gte: inicioMes, lte: finMes }, ...filterCita },
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
         take: 5,
       }),
 
-      // Ingresos de Hoy (Sumatoria de montos de citas COMPLETADA hoy)
+      // Ingresos de Hoy
       prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: dateToday, lte: dateToday } },
+        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: dateToday, lte: dateToday }, ...filterCita },
         _sum: { monto: true }
       }),
-      // Ingresos de la Semana (Sumatoria de montos de citas COMPLETADA esta semana)
+      // Ingresos de la Semana
       prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioSemana, lte: finSemana } },
+        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioSemana, lte: finSemana }, ...filterCita },
         _sum: { monto: true }
       }),
-      // Ingresos del Mes (Sumatoria de montos de citas COMPLETADA este mes)
+      // Ingresos del Mes
       prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioMes, lte: finMes } },
+        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioMes, lte: finMes }, ...filterCita },
         _sum: { monto: true }
       }),
-      // Ingresos Proyectados (Sumatoria de montos de citas activas: PENDIENTE, CONFIRMADA, REPROGRAMADA, EN_PROGRESO)
+      // Ingresos Proyectados
       prisma.cita.aggregate({
-        where: { estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO, EstadoCita.REPROGRAMADA] } },
+        where: { estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO, EstadoCita.REPROGRAMADA] }, ...filterCita },
         _sum: { monto: true }
       }),
-      // Ingresos Reales Totales (Sumatoria de montos de todas las citas completadas)
+      // Ingresos Reales Totales
       prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA },
+        where: { estado: EstadoCita.COMPLETADA, ...filterCita },
         _sum: { monto: true }
       }),
       // Servicio que más dinero genera (Top 1)
       prisma.citaServicio.groupBy({
         by: ['servicio_id'],
-        where: { cita: { estado: EstadoCita.COMPLETADA } },
+        where: { cita: { estado: EstadoCita.COMPLETADA, ...filterCita } },
         _sum: { precio: true },
         orderBy: { _sum: { precio: 'desc' } },
         take: 1
+      }),
+      // Citas canceladas totales (para empleado)
+      prisma.cita.count({
+        where: { estado: EstadoCita.CANCELADA, ...filterCita }
       }),
     ]);
 
@@ -213,7 +231,7 @@ export class AdminServicio {
     }));
 
     // ── Citas últimos 7 días (gráfica) ────────────────────────────
-    const citasChart = await AdminServicio.getCitasUltimos7Dias();
+    const citasChart = await AdminServicio.getCitasUltimos7Dias(empleadoId);
 
     // ── Tasa de completadas ───────────────────────────────────────────
     const tasaCompletadas = totalCitas > 0
@@ -230,6 +248,7 @@ export class AdminServicio {
         citasCompletadasMes,
         citasCompletadasHoy,
         tasaCompletadas,
+        citasCanceladasTotales,
         ingresosHoy: ingresosHoyRaw._sum.monto ? Number(ingresosHoyRaw._sum.monto) : 0,
         ingresosSemana: ingresosSemanaRaw._sum.monto ? Number(ingresosSemanaRaw._sum.monto) : 0,
         ingresosMes: ingresosMesRaw._sum.monto ? Number(ingresosMesRaw._sum.monto) : 0,
@@ -259,7 +278,7 @@ export class AdminServicio {
   }
 
   // ─── Citas últimos 7 días ────────────────────────────────────────
-  static async getCitasUltimos7Dias() {
+  static async getCitasUltimos7Dias(empleadoId?: string) {
     const todayStr = getBusinessTodayString();
     const [year, month, day] = todayStr.split('-').map(Number);
     const baseDate = new Date(Date.UTC(year, month - 1, day));
@@ -276,6 +295,7 @@ export class AdminServicio {
           where: {
             estado: EstadoCita.COMPLETADA,
             fecha: d,
+            ...(empleadoId ? { empleado_id: empleadoId } : {}),
           },
           _count: { id: true },
         });
