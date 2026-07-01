@@ -31,7 +31,7 @@ export function mensajeConfirmacion(cita: CitaWA): string {
     `*${SALON_NAME}*`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Su cita ha sido *confirmada*. Aqui estan los detalles:`,
+    `*Recordarle su cita*. Aqui estan los detalles:`,
     ``,
     `*${titulo}:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
