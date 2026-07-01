@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
           { correo: { contains: busqueda, mode: 'insensitive' } },
         ] : undefined,
       },
-      select: { id: true, nombre: true, correo: true, telefono: true, especialidad: true, horario: true, rol: true, activo: true, createdAt: true },
+      select: { id: true, nombre: true, correo: true, telefono: true, especialidad: true, tituloCliente: true, horario: true, rol: true, activo: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json({ empleados }, { status: 200 });
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { nombre, correo, telefono, password, especialidad, horario, rol } = body;
+    const { nombre, correo, telefono, password, especialidad, tituloCliente, horario, rol } = body;
 
     const existe = await prisma.empleado.findUnique({ where: { correo } });
     if (existe) {
@@ -56,10 +56,11 @@ export async function POST(req: NextRequest) {
         telefono,
         passwordHash,
         especialidad,
+        tituloCliente,
         horario: horario || defaultHorario,
         rol: rol || 'EMPLEADO',
       },
-      select: { id: true, nombre: true, correo: true, rol: true }
+      select: { id: true, nombre: true, correo: true, rol: true, tituloCliente: true }
     });
 
     const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');

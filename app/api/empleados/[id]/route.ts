@@ -13,6 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         correo: true,
         telefono: true,
         especialidad: true,
+        tituloCliente: true,
         horario: true,
         rol: true,
         activo: true,
@@ -50,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const { nombre, correo, telefono, password, especialidad, horario, rol, activo } = body;
+    const { nombre, correo, telefono, password, especialidad, tituloCliente, horario, rol, activo } = body;
 
     const dataToUpdate: any = {};
     if (nombre) dataToUpdate.nombre = nombre;
@@ -58,6 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (telefono !== undefined) dataToUpdate.telefono = telefono;
     if (password) dataToUpdate.passwordHash = await bcrypt.hash(password, 10);
     if (especialidad !== undefined) dataToUpdate.especialidad = especialidad;
+    if (tituloCliente !== undefined) dataToUpdate.tituloCliente = tituloCliente;
     if (horario !== undefined) dataToUpdate.horario = horario;
     if (rol) dataToUpdate.rol = rol;
     if (activo !== undefined) dataToUpdate.activo = activo;

@@ -817,6 +817,7 @@ export default function Citas() {
                             cliente_telefono: cita.cliente_telefono,
                             servicio: cita.servicio?.nombre || '',
                             empleado: cita.empleado?.nombre || '',
+                            empleado_titulo: cita.empleado?.tituloCliente || null,
                             fecha: cita.fecha,
                             hora: cita.hora,
                           }) : null;
@@ -953,6 +954,7 @@ export default function Citas() {
                         cliente_telefono: cita.cliente_telefono,
                         servicio: cita.servicio?.nombre || '',
                         empleado: cita.empleado?.nombre || '',
+                        empleado_titulo: cita.empleado?.tituloCliente || null,
                         fecha: cita.fecha,
                         hora: cita.hora,
                       }) : null;

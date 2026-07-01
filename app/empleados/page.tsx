@@ -11,7 +11,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const emptyForm = { nombre:'',correo:'',telefono:'',password:'',especialidad:'',rol:'EMPLEADO' };
+const emptyForm = { nombre:'',correo:'',telefono:'',password:'',especialidad:'',tituloCliente:'',rol:'EMPLEADO' };
 
 function Avatar({ nombre }: { nombre: string }) {
   const initials = nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()||'?';
@@ -66,7 +66,7 @@ export default function Empleados() {
 
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowModal(true); };
   const openEdit   = (e:any) => {
-    setForm({ nombre:e.nombre, correo:e.correo, telefono:e.telefono||'', password:'', especialidad:e.especialidad||'', rol:e.rol });
+    setForm({ nombre:e.nombre, correo:e.correo, telefono:e.telefono||'', password:'', especialidad:e.especialidad||'', tituloCliente:e.tituloCliente||'', rol:e.rol });
     setEditingId(e.id); setShowModal(true);
   };
 
@@ -226,6 +226,10 @@ export default function Empleados() {
                     <option value="TECH_SUPPORT">Soporte Técnico</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Título para cliente en recordatorios</label>
+                <Input value={form.tituloCliente} onChange={e=>setForm({...form,tituloCliente:e.target.value})} placeholder="Ej: Barbero asignado para su cita"/>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={()=>setShowModal(false)}>Cancelar</Button>

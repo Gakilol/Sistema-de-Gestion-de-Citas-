@@ -42,7 +42,7 @@ async function handleCron(req: NextRequest) {
         whatsapp_reminder_sent: false
       },
       include: {
-        empleado: { select: { nombre: true } },
+        empleado: { select: { nombre: true, tituloCliente: true } },
         servicio: { select: { nombre: true } },
         citaServicios: {
           include: {
@@ -97,6 +97,7 @@ async function handleCron(req: NextRequest) {
         cliente_telefono: cita.cliente_telefono,
         servicio: servicioNombres,
         empleado: cita.empleado.nombre,
+        empleado_titulo: cita.empleado.tituloCliente,
         fecha: cita.fecha,
         hora: cita.hora
       });

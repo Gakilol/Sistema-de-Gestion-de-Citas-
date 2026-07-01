@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const cita = await prisma.cita.findUnique({
       where: { id },
       include: {
-        empleado: { select: { nombre: true } },
+        empleado: { select: { nombre: true, tituloCliente: true } },
         servicio: {
           select: {
             nombre: true,

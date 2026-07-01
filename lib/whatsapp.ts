@@ -7,6 +7,7 @@ export interface CitaWA {
   cliente_telefono?: string | null;
   servicio: string;
   empleado: string;
+  empleado_titulo?: string | null;
   fecha: string | Date;
   hora: string;
   duracion?: number;
@@ -24,13 +25,14 @@ function fmtFecha(d: string | Date): string {
 
 // ─── Confirmación de cita ───────────────────────────────────────────────────
 export function mensajeConfirmacion(cita: CitaWA): string {
+  const titulo = cita.empleado_titulo || 'Colaborador asignado para su cita';
   const lines = [
     `*${SALON_NAME}*`,
     ``,
     `Hola ${cita.cliente_nombre},`,
     `Su cita ha sido *confirmada*. Aqui estan los detalles:`,
     ``,
-    `*Estilistaasignado(a) para su cita:* ${cita.empleado}`,
+    `*${titulo}:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
     `*Hora:* ${cita.hora}`,
     cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
@@ -43,13 +45,14 @@ export function mensajeConfirmacion(cita: CitaWA): string {
 
 // ─── Recordatorio ───────────────────────────────────────────────────────────
 export function mensajeRecordatorio(cita: CitaWA): string {
+  const titulo = cita.empleado_titulo || 'Colaborador asignado para su cita';
   const lines = [
     `*${SALON_NAME}*`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Le recordamos que tiene una cita *manana*:`,
+    `recordarle su cita. Aqui estan los detalles:`,
     ``,
-    `*Colaborador asignado(a) para su cita:* ${cita.empleado}`,
+    `*${titulo}:* ${cita.empleado}`,
     `*Fecha:* ${fmtFecha(cita.fecha)}`,
     `*Hora:* ${cita.hora}`,
     ``,
@@ -60,13 +63,14 @@ export function mensajeRecordatorio(cita: CitaWA): string {
 
 // ─── Recordatorio 1 Hora Antes ───────────────────────────────────────────────
 export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
+  const titulo = cita.empleado_titulo || 'Colaborador asignado para su cita';
   const lines = [
     `*${SALON_NAME}* ⏱️`,
     ``,
     `Hola *${cita.cliente_nombre}*,`,
     `Le recordamos que su cita está programada para *hoy*:`,
     ``,
-    `*Colaborador asignado(a) para su cita:* ${cita.empleado}`,
+    `*${titulo}:* ${cita.empleado}`,
     `*Hora:* ${cita.hora}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
@@ -89,13 +93,14 @@ export function mensajeCancelacion(cita: CitaWA): string {
 
 // ─── Reprogramación ─────────────────────────────────────────────────────────
 export function mensajeReprogramacion(cita: CitaWA): string {
+  const titulo = cita.empleado_titulo || 'Colaborador asignado para su cita';
   return [
     `*${SALON_NAME}*`,
     ``,
     `Hola ${cita.cliente_nombre},`,
     `Su cita ha sido *reprogramada*:`,
     ``,
-    `*Colaborador asignado(a) para su cita:* ${cita.empleado}`,
+    `*${titulo}:* ${cita.empleado}`,
     `*Nueva fecha:* ${fmtFecha(cita.fecha)}`,
     `*Nueva hora:* ${cita.hora}`,
     ``,

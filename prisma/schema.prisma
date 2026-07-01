@@ -8,15 +8,16 @@ datasource db {
 }
 
 model Empleado {
-  id           String   @id @default(dbgenerated("gen_random_uuid()"))
-  nombre       String
-  correo       String   @unique
-  telefono     String?
-  passwordHash String
-  especialidad String?
-  horario      Json?
-  rol          RolUsuario @default(EMPLEADO)
-  activo       Boolean  @default(true)
+  id            String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre        String
+  correo        String   @unique
+  telefono      String?
+  passwordHash  String
+  especialidad  String?
+  tituloCliente String?
+  horario       Json?
+  rol           RolUsuario @default(EMPLEADO)
+  activo        Boolean  @default(true)
   
   citas        Cita[]   @relation("EmpleadoAsignado")
   citasCreadas Cita[]   @relation("CreadorCita")

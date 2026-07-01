@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
         ...scopeWhere,
       },
       include: {
-        empleado: { select: { nombre: true } },
+        empleado: { select: { nombre: true, tituloCliente: true } },
         servicio: {
           select: {
             nombre: true,
