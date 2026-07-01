@@ -21,15 +21,40 @@ export function formatCurrency(amount: number, moneda: string = 'USD', tipoCambi
     .trim();
 }
 
+export function parseCurrencyCRC(value: number | string | any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') {
+    return isNaN(value) ? 0 : Math.round(value);
+  }
+  // Convert from Prisma Decimal object if applicable
+  if (value && typeof value === 'object' && typeof value.toNumber === 'function') {
+    return Math.round(value.toNumber());
+  }
+  // Strip formatting from string
+  const cleaned = String(value)
+    .replace(/[₡$]/g, '')
+    .replace(/,/g, '')
+    .trim();
+  const num = Number(cleaned);
+  return isNaN(num) ? 0 : Math.round(num);
+}
+
 export function formatColones(amount: number | string | any): string {
-  if (amount === null || amount === undefined) return '₡0';
-  const num = typeof amount === 'number' ? amount : Number(amount);
-  if (isNaN(num)) return '₡0';
+  const num = parseCurrencyCRC(amount);
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(num);
   return `₡${formatted}`;
+}
+
+export function calcularTotalCita(servicios: { precio: number | string | any }[] | any[]): number {
+  if (!Array.isArray(servicios)) return 0;
+  return servicios.reduce((sum, s) => {
+    // Acepta tanto un objeto con propiedad precio como un valor directo
+    const precio = s && typeof s === 'object' ? s.precio : s;
+    return sum + parseCurrencyCRC(precio);
+  }, 0);
 }
 
 export function formatTo12h(timeStr: string): string {

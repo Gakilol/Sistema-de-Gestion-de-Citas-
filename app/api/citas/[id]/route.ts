@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
+import { parseCurrencyCRC, calcularTotalCita } from '@/lib/utils';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -242,12 +243,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // Preservar duplicados: cada elemento de la lista origina su propio CitaServicio
         serviciosParaActualizar = servicios_seleccionados.map((sel: any) => {
           const sDb = serviciosDb.find(s => s.id === sel.id);
+          if (!sDb) {
+            throw new Error(`El servicio seleccionado no existe o no está disponible`);
+          }
           return {
             id:       sel.id,
-            duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30),
-            precio:   sDb?.precio ? Number(sDb.precio) : 0,
+            duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb.duracion || 30),
+            precio:   parseCurrencyCRC(sDb.precio),
           };
-        }).filter((s: any) => s.id);
+        });
 
       } else if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
         flagActualizarServicios = true;
@@ -257,18 +261,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // Preservar duplicados usando el array original
         serviciosParaActualizar = finalServicioIds.map((sid: string) => {
           const sDb = serviciosDb.find(s => s.id === sid);
+          if (!sDb) {
+            throw new Error(`El servicio con ID ${sid} no fue encontrado`);
+          }
           return {
             id:       sid,
-            duracion: sDb?.duracion || 30,
-            precio:   sDb?.precio ? Number(sDb.precio) : 0,
+            duracion: sDb.duracion || 30,
+            precio:   parseCurrencyCRC(sDb.precio),
           };
-        }).filter((s: any) => s.id);
+        });
       }
 
       if (flagActualizarServicios && serviciosParaActualizar.length > 0) {
         const duracionCalculada = serviciosParaActualizar.reduce((sum, s) => sum + s.duracion, 0);
         const primerServicioId  = serviciosParaActualizar[0].id;
-        const montoCalculado    = serviciosParaActualizar.reduce((sum, s) => sum + s.precio, 0);
+        const montoCalculado    = calcularTotalCita(serviciosParaActualizar);
 
         dataToUpdate.servicio_id = primerServicioId;
         dataToUpdate.duracion    = duracionCalculada;

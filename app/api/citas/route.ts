@@ -4,6 +4,7 @@ import { syncCitaEstados } from '@/lib/automatizacion';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
+import { parseCurrencyCRC, calcularTotalCita } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   try {
@@ -96,39 +97,47 @@ export async function POST(req: NextRequest) {
 
     // Resolver servicios
     let serviciosParaCita: { id: string; duracion: number; precio: number }[] = [];
-    if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
-      const ids = servicios_seleccionados.map((s: any) => s.id);
-      const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
-      if (serviciosDb.length === 0) {
-        return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
+    try {
+      if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+        const ids = servicios_seleccionados.map((s: any) => s.id);
+        const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
+        
+        serviciosParaCita = servicios_seleccionados.map((sel: any) => {
+          const sDb = serviciosDb.find(s => s.id === sel.id);
+          if (!sDb) {
+            throw new Error(`El servicio seleccionado no existe o no está disponible`);
+          }
+          return {
+            id: sel.id,
+            duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb.duracion || 30),
+            precio: parseCurrencyCRC(sDb.precio)
+          };
+        });
+      } else {
+        const ids = Array.isArray(servicio_ids) && servicio_ids.length > 0 ? servicio_ids : [servicio_id];
+        if (!ids[0]) {
+          return NextResponse.json({ error: 'No se especificaron servicios para la cita' }, { status: 400 });
+        }
+        const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
+        
+        serviciosParaCita = ids.map((id: string) => {
+          const sDb = serviciosDb.find(s => s.id === id);
+          if (!sDb) {
+            throw new Error(`El servicio con ID ${id} no fue encontrado`);
+          }
+          return {
+            id: sDb.id,
+            duracion: sDb.duracion,
+            precio: parseCurrencyCRC(sDb.precio)
+          };
+        });
       }
-      serviciosParaCita = servicios_seleccionados.map((sel: any) => {
-        const sDb = serviciosDb.find(s => s.id === sel.id);
-        return {
-          id: sel.id,
-          duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb?.duracion || 30),
-          precio: sDb?.precio ? Number(sDb.precio) : 0
-        };
-      }).filter((s: any) => s.id);
-    } else {
-      const ids = Array.isArray(servicio_ids) && servicio_ids.length > 0 ? servicio_ids : [servicio_id];
-      const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
-      const serviciosDbOrdenados = ids
-        .map((id: string) => serviciosDb.find(s => s.id === id))
-        .filter((s: any): s is NonNullable<typeof s> => !!s);
-
-      if (serviciosDbOrdenados.length === 0) {
-        return NextResponse.json({ error: 'No se encontraron los servicios seleccionados' }, { status: 400 });
-      }
-      serviciosParaCita = serviciosDbOrdenados.map((s: any) => ({
-        id: s.id,
-        duracion: s.duracion,
-        precio: s.precio ? Number(s.precio) : 0
-      }));
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
 
     const duracionCalculada = serviciosParaCita.reduce((sum, s) => sum + s.duracion, 0);
-    const montoCalculado = serviciosParaCita.reduce((sum, s) => sum + s.precio, 0);
+    const montoCalculado = calcularTotalCita(serviciosParaCita);
     const primerServicioId  = serviciosParaCita[0].id;
 
     // ─── VALIDACIÓN DE DISPONIBILIDAD ───────────────────────────────────────

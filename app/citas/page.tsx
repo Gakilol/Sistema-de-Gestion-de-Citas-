@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { cn, formatColones } from '@/lib/utils';
+import { cn, formatColones, calcularTotalCita } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -1229,7 +1229,7 @@ export default function Citas() {
                     {servicios
                       .filter(s => s.activo || form.servicio_ids.includes(s.id))
                       .map(s => (
-                        <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min)</option>
+                        <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min) - {formatColones(s.precio)}</option>
                       ))}
                   </select>
 
@@ -1246,7 +1246,10 @@ export default function Citas() {
                                 <span className="text-xs font-semibold bg-primary/10 text-primary w-5 h-5 flex items-center justify-center rounded-full">
                                   {index + 1}
                                 </span>
-                                <span className="font-medium text-foreground">{s.nombre}</span>
+                                 <span className="font-medium text-foreground">{s.nombre}</span>
+                                 <span className="text-xs font-semibold text-muted-foreground ml-1.5">
+                                   ({formatColones(s.precio)})
+                                 </span>
                                 {currentDur !== s.duracion && (
                                   <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/25 px-1.5 py-0.5 rounded font-semibold">
                                     ⏱ personalizado
@@ -1429,10 +1432,9 @@ export default function Citas() {
                     <span className="text-muted-foreground">Precio estimado:</span>{' '}
                     <strong className="text-primary text-base font-bold">
                       {formatColones(
-                        form.servicio_ids.reduce((sum: number, id: string) => {
-                          const s = servicios.find(srv => srv.id === id);
-                          return sum + (s?.precio ? Number(s.precio) : 0);
-                        }, 0)
+                        calcularTotalCita(
+                          form.servicio_ids.map((id: string) => servicios.find(srv => srv.id === id))
+                        )
                       )}
                     </strong>
                   </p>
