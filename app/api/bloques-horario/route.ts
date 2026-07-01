@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const empleadoId = req.nextUrl.searchParams.get('empleado_id');
 
     // Obtener empleados activos
-    const empleados = await prisma.empleado.findMany({
+    const rawEmpleados = await prisma.empleado.findMany({
       where: {
         activo: true,
         ...(empleadoId ? { id: empleadoId } : {}),
@@ -29,8 +29,35 @@ export async function GET(req: NextRequest) {
         especialidad: true,
         rol: true,
       },
-      orderBy: { nombre: 'asc' },
     });
+
+    const empleados = rawEmpleados
+      .filter((emp) => {
+        const name = emp.nombre.toLowerCase().trim();
+        return (
+          name.startsWith('alvaro') ||
+          name.startsWith('vanessa') ||
+          name.startsWith('vannesa') ||
+          name.startsWith('daniel') ||
+          name.startsWith('charlie') ||
+          emp.rol === 'EMPLEADO'
+        );
+      })
+      .sort((a, b) => {
+        const nameA = a.nombre.toLowerCase().trim();
+        const nameB = b.nombre.toLowerCase().trim();
+        const getPriority = (name: string) => {
+          if (name.startsWith('alvaro')) return 1;
+          if (name.startsWith('vanessa') || name.startsWith('vannesa')) return 2;
+          if (name.startsWith('daniel')) return 3;
+          if (name.startsWith('charlie')) return 4;
+          return 5;
+        };
+        const prioA = getPriority(nameA);
+        const prioB = getPriority(nameB);
+        if (prioA !== prioB) return prioA - prioB;
+        return nameA.localeCompare(nameB);
+      });
 
     const results = [];
 

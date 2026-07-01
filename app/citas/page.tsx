@@ -234,7 +234,35 @@ export default function Citas() {
     const cD = await cR.json();
     
     setServicios(sD.servicios || []);
-    setEmpleados(eD.empleados || []);
+    const rawEmpleados = eD.empleados || [];
+    const sortedAndFilteredEmps = rawEmpleados
+      .filter((emp: any) => {
+        const name = emp.nombre.toLowerCase().trim();
+        return (
+          name.startsWith('alvaro') ||
+          name.startsWith('vanessa') ||
+          name.startsWith('vannesa') ||
+          name.startsWith('daniel') ||
+          name.startsWith('charlie') ||
+          emp.rol === 'EMPLEADO'
+        );
+      })
+      .sort((a: any, b: any) => {
+        const nameA = a.nombre.toLowerCase().trim();
+        const nameB = b.nombre.toLowerCase().trim();
+        const getPriority = (name: string) => {
+          if (name.startsWith('alvaro')) return 1;
+          if (name.startsWith('vanessa') || name.startsWith('vannesa')) return 2;
+          if (name.startsWith('daniel')) return 3;
+          if (name.startsWith('charlie')) return 4;
+          return 5;
+        };
+        const prioA = getPriority(nameA);
+        const prioB = getPriority(nameB);
+        if (prioA !== prioB) return prioA - prioB;
+        return nameA.localeCompare(nameB);
+      });
+    setEmpleados(sortedAndFilteredEmps);
     setClientesList(cD.clientes || []);
   };
 
