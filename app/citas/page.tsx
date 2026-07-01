@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn, formatColones } from '@/lib/utils';
-import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
+import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
@@ -768,15 +768,28 @@ export default function Citas() {
                             </td>
                           </tr>
                         ) : paginated.map((cita) => {
-                          const waUrl = cita.cliente_telefono ? urlWhatsAppConfirmacion({
-                            cliente_nombre: cita.cliente_nombre,
-                            cliente_telefono: cita.cliente_telefono,
-                            servicio: cita.servicio?.nombre || '',
-                            empleado: cita.empleado?.nombre || '',
-                            empleado_titulo: cita.empleado?.tituloCliente || null,
-                            fecha: cita.fecha,
-                            hora: cita.hora,
-                          }) : null;
+                          const waUrl = cita.cliente_telefono
+                            ? (cita.estado === 'PENDIENTE'
+                                ? urlWhatsAppRecordatorio({
+                                    cliente_nombre: cita.cliente_nombre,
+                                    cliente_telefono: cita.cliente_telefono,
+                                    servicio: cita.servicio?.nombre || '',
+                                    empleado: cita.empleado?.nombre || '',
+                                    empleado_titulo: cita.empleado?.tituloCliente || null,
+                                    fecha: cita.fecha,
+                                    hora: cita.hora,
+                                  })
+                                : urlWhatsAppConfirmacion({
+                                    cliente_nombre: cita.cliente_nombre,
+                                    cliente_telefono: cita.cliente_telefono,
+                                    servicio: cita.servicio?.nombre || '',
+                                    empleado: cita.empleado?.nombre || '',
+                                    empleado_titulo: cita.empleado?.tituloCliente || null,
+                                    fecha: cita.fecha,
+                                    hora: cita.hora,
+                                  })
+                              )
+                            : null;
                           const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
                           return (
                             <tr key={cita.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
@@ -905,15 +918,28 @@ export default function Citas() {
                     </div>
                   ) : (
                     paginated.map((cita) => {
-                      const waUrl = cita.cliente_telefono ? urlWhatsAppConfirmacion({
-                        cliente_nombre: cita.cliente_nombre,
-                        cliente_telefono: cita.cliente_telefono,
-                        servicio: cita.servicio?.nombre || '',
-                        empleado: cita.empleado?.nombre || '',
-                        empleado_titulo: cita.empleado?.tituloCliente || null,
-                        fecha: cita.fecha,
-                        hora: cita.hora,
-                      }) : null;
+                      const waUrl = cita.cliente_telefono
+                            ? (cita.estado === 'PENDIENTE'
+                                ? urlWhatsAppRecordatorio({
+                                    cliente_nombre: cita.cliente_nombre,
+                                    cliente_telefono: cita.cliente_telefono,
+                                    servicio: cita.servicio?.nombre || '',
+                                    empleado: cita.empleado?.nombre || '',
+                                    empleado_titulo: cita.empleado?.tituloCliente || null,
+                                    fecha: cita.fecha,
+                                    hora: cita.hora,
+                                  })
+                                : urlWhatsAppConfirmacion({
+                                    cliente_nombre: cita.cliente_nombre,
+                                    cliente_telefono: cita.cliente_telefono,
+                                    servicio: cita.servicio?.nombre || '',
+                                    empleado: cita.empleado?.nombre || '',
+                                    empleado_titulo: cita.empleado?.tituloCliente || null,
+                                    fecha: cita.fecha,
+                                    hora: cita.hora,
+                                  })
+                              )
+                            : null;
                       const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
                       return (
                         <Card key={cita.id} className="p-4 border-border/45 bg-card/60 hover:bg-secondary/15 transition-colors space-y-3">
