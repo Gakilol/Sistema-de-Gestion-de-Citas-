@@ -100,6 +100,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       cancel_reason,
     } = body;
 
+    // Validar que el nuevo empleado sea agendable
+    if (empleado_id) {
+      const targetEmpleado = await prisma.empleado.findUnique({
+        where: { id: empleado_id }
+      });
+      if (!targetEmpleado || !targetEmpleado.activo) {
+        return NextResponse.json({ error: 'El estilista seleccionado no existe o no está activo.' }, { status: 400 });
+      }
+      if (!targetEmpleado.esAgendable) {
+        return NextResponse.json({ error: 'No se permiten citas para personal no agendable o de soporte técnico.' }, { status: 400 });
+      }
+    }
+
     const dataToUpdate: any = {};
     if (estado)               dataToUpdate.estado      = estado;
     if (notas !== undefined)  dataToUpdate.notas       = notas;
@@ -121,7 +134,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // ─── GESTIÓN DE CLIENTE EN EDICIÓN ──────────────────────────────────────
     let idClienteFinal = cliente_id;
-    if (cliente_nombre && !idClienteFinal) {
+    let finalClienteNombre = cliente_nombre;
+    let finalClienteTelefono = cliente_telefono;
+
+    if (idClienteFinal) {
+      const dbCliente = await prisma.cliente.findUnique({
+        where: { id: idClienteFinal }
+      });
+      if (dbCliente) {
+        finalClienteNombre = dbCliente.nombre;
+        finalClienteTelefono = dbCliente.telefono;
+      }
+    } else if (cliente_nombre && !idClienteFinal) {
       const existe = await prisma.cliente.findFirst({
         where: {
           nombre: cliente_nombre.trim(),
@@ -130,20 +154,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       });
       if (existe) {
         idClienteFinal = existe.id;
+        finalClienteNombre = existe.nombre;
+        finalClienteTelefono = existe.telefono;
       } else {
         const nuevoC = await prisma.cliente.create({
           data: {
             nombre:   cliente_nombre.trim(),
             telefono: cliente_telefono?.trim() || null,
+            createdByUserId: userId,
           }
         });
         idClienteFinal = nuevoC.id;
+        finalClienteNombre = nuevoC.nombre;
+        finalClienteTelefono = nuevoC.telefono;
       }
     }
 
     if (idClienteFinal)             dataToUpdate.cliente_id       = idClienteFinal;
-    if (cliente_nombre)             dataToUpdate.cliente_nombre   = cliente_nombre.trim();
-    if (cliente_telefono !== undefined) dataToUpdate.cliente_telefono = cliente_telefono?.trim() || null;
+    if (finalClienteNombre)         dataToUpdate.cliente_nombre   = finalClienteNombre.trim();
+    if (finalClienteTelefono !== undefined) dataToUpdate.cliente_telefono = finalClienteTelefono?.trim() || null;
 
     let finalServicioIds = servicio_ids;
     if (!finalServicioIds && servicio_id) {

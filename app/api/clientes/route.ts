@@ -1,23 +1,50 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext, maskClientDataIfRestricted } from '@/lib/auth-helpers';
 
 // ─── GET /api/clientes
 // Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas.
 // Soporta búsqueda por nombre, teléfono y correo electrónico.
 export async function GET(req: NextRequest) {
   try {
+    const { userId, userRole } = getUserContext(req);
     const busqueda = req.nextUrl.searchParams.get('q') ?? '';
 
-    let whereClause = {};
+    let whereClause: any = {};
     if (busqueda) {
-      whereClause = {
-        OR: [
-          { nombre:  { contains: busqueda, mode: 'insensitive' } },
-          { telefono: { contains: busqueda, mode: 'insensitive' } },
-          { correo:  { contains: busqueda, mode: 'insensitive' } },
-        ],
-      };
+      if (userRole === 'EMPLEADO') {
+        // Un empleado no debe poder buscar por teléfono o correo de clientes ajenos
+        whereClause = {
+          OR: [
+            { nombre: { contains: busqueda, mode: 'insensitive' } },
+            {
+              AND: [
+                {
+                  OR: [
+                    { telefono: { contains: busqueda, mode: 'insensitive' } },
+                    { correo: { contains: busqueda, mode: 'insensitive' } },
+                  ]
+                },
+                {
+                  OR: [
+                    { createdByUserId: userId },
+                    { citas: { some: { empleado_id: userId ?? '' } } }
+                  ]
+                }
+              ]
+            }
+          ]
+        };
+      } else {
+        whereClause = {
+          OR: [
+            { nombre:  { contains: busqueda, mode: 'insensitive' } },
+            { telefono: { contains: busqueda, mode: 'insensitive' } },
+            { correo:  { contains: busqueda, mode: 'insensitive' } },
+          ],
+        };
+      }
     }
 
     const clientesData = await prisma.cliente.findMany({
@@ -29,6 +56,7 @@ export async function GET(req: NextRequest) {
             fecha: true,
             hora: true,
             estado: true,
+            empleado_id: true,
             servicio: { select: { nombre: true } },
             empleado: { select: { nombre: true } },
           },
@@ -60,12 +88,14 @@ export async function GET(req: NextRequest) {
       const servicioFavorito =
         Object.entries(serviciosFrecuentes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-      return {
+      const rawCliente = {
         id: c.id,
         nombre: c.nombre,
         telefono: c.telefono,
         correo: c.correo,
         notas: c.notas,
+        createdByUserId: c.createdByUserId,
+        citas: c.citas,
         totalCitas: c.citas.length,
         citasCompletadas,
         ultimaCita,
@@ -74,6 +104,8 @@ export async function GET(req: NextRequest) {
         servicioFavorito,
         historial: c.citas.slice(0, 10),
       };
+
+      return maskClientDataIfRestricted(rawCliente, userId, userRole);
     });
 
     clientes.sort((a, b) => b.totalCitas - a.totalCitas);
@@ -95,8 +127,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-
-
     const body = await req.json();
     const { nombre, telefono, correo, notas } = body;
 
@@ -110,10 +140,10 @@ export async function POST(req: NextRequest) {
         where: { telefono: telefono.trim() },
       });
       if (duplicadoTel) {
-        return NextResponse.json(
-          { error: `Ya existe un cliente con el teléfono ${telefono.trim()} (${duplicadoTel.nombre})` },
-          { status: 409 }
-        );
+        const errorMsg = userRole === 'EMPLEADO'
+          ? 'Ya existe un cliente con estos datos. Contacte a un administrador para verificar la información.'
+          : `Ya existe un cliente con el teléfono ${telefono.trim()} (${duplicadoTel.nombre})`;
+        return NextResponse.json({ error: errorMsg }, { status: 409 });
       }
     }
 
@@ -123,10 +153,10 @@ export async function POST(req: NextRequest) {
         where: { correo: correo.trim().toLowerCase() },
       });
       if (duplicadoEmail) {
-        return NextResponse.json(
-          { error: `Ya existe un cliente con ese correo electrónico (${duplicadoEmail.nombre})` },
-          { status: 409 }
-        );
+        const errorMsg = userRole === 'EMPLEADO'
+          ? 'Ya existe un cliente con estos datos. Contacte a un administrador para verificar la información.'
+          : `Ya existe un cliente con ese correo electrónico (${duplicadoEmail.nombre})`;
+        return NextResponse.json({ error: errorMsg }, { status: 409 });
       }
     }
 
@@ -136,6 +166,7 @@ export async function POST(req: NextRequest) {
         telefono: telefono?.trim() || null,
         correo:   correo?.trim().toLowerCase() || null,
         notas:   notas?.trim() || null,
+        createdByUserId: userId,
       },
     });
 

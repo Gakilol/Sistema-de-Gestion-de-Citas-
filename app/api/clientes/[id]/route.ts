@@ -22,10 +22,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const clienteOriginal = await prisma.cliente.findUnique({
       where: { id },
+      include: {
+        citas: { select: { empleado_id: true } }
+      }
     });
 
     if (!clienteOriginal) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
+    }
+
+    if (userRole === 'EMPLEADO') {
+      const isRegisteredByMe = clienteOriginal.createdByUserId === userId;
+      if (!isRegisteredByMe) {
+        return NextResponse.json({ error: 'No tienes permiso para modificar este cliente por privacidad' }, { status: 403 });
+      }
     }
 
     // Validar teléfono duplicado (solo si se provee uno)
@@ -104,17 +114,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const ipAddress = getClientIp(req.headers);
     const userAgent = req.headers.get('user-agent') || undefined;
     
-    // Solo administradores pueden eliminar clientes
-    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
-      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar clientes' }, { status: 403 });
-    }
-
     const cliente = await prisma.cliente.findUnique({
       where: { id }
     });
 
     if (!cliente) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
+    }
+
+    // Validación de permisos para eliminación
+    if (userRole === 'EMPLEADO') {
+      if (cliente.createdByUserId !== userId) {
+        return NextResponse.json({ error: 'No tienes permiso para eliminar este cliente ya que no fue registrado por ti' }, { status: 403 });
+      }
+    } else if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar clientes' }, { status: 403 });
     }
 
     // 1. Desvincular las citas históricas poniendo cliente_id en null.

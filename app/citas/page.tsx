@@ -202,41 +202,17 @@ export default function Citas() {
 
 
   const fetchCatalogos = async () => {
-    const [sR, eR, cR] = await Promise.all([fetch('/api/servicios'), fetch('/api/empleados'), fetch('/api/clientes')]);
+    const [sR, eR, cR] = await Promise.all([
+      fetch('/api/servicios'),
+      fetch('/api/empleados?schedulable=true'),
+      fetch('/api/clientes')
+    ]);
     const sD = await sR.json();
     const eD = await eR.json();
     const cD = await cR.json();
     
     setServicios(sD.servicios || []);
-    const rawEmpleados = eD.empleados || [];
-    const sortedAndFilteredEmps = rawEmpleados
-      .filter((emp: any) => {
-        const name = emp.nombre.toLowerCase().trim();
-        return (
-          name.startsWith('alvaro') ||
-          name.startsWith('vanessa') ||
-          name.startsWith('vannesa') ||
-          name.startsWith('daniel') ||
-          name.startsWith('charlie') ||
-          emp.rol === 'EMPLEADO'
-        );
-      })
-      .sort((a: any, b: any) => {
-        const nameA = a.nombre.toLowerCase().trim();
-        const nameB = b.nombre.toLowerCase().trim();
-        const getPriority = (name: string) => {
-          if (name.startsWith('alvaro')) return 1;
-          if (name.startsWith('vanessa') || name.startsWith('vannesa')) return 2;
-          if (name.startsWith('daniel')) return 3;
-          if (name.startsWith('charlie')) return 4;
-          return 5;
-        };
-        const prioA = getPriority(nameA);
-        const prioB = getPriority(nameB);
-        if (prioA !== prioB) return prioA - prioB;
-        return nameA.localeCompare(nameB);
-      });
-    setEmpleados(sortedAndFilteredEmps);
+    setEmpleados(eD.empleados || []);
     setClientesList(cD.clientes || []);
   };
 
@@ -257,15 +233,20 @@ export default function Citas() {
 
   const openCreate = () => {
     const activeServs = servicios.filter(s => s.activo);
-    const activeEmps  = empleados.filter(e => e.activo);
-    if (!activeServs.length || !activeEmps.length) {
+    if (!activeServs.length || !empleados.length) {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
     const emptyForm = getEmptyForm();
-    if (user?.rol === 'EMPLEADO') {
+    
+    // Seleccionar por defecto el colaborador logueado si es agendable, de lo contrario el primero disponible
+    const isLogueadoAgendable = empleados.some(e => e.id === user?.id);
+    if (isLogueadoAgendable && user?.id) {
       emptyForm.empleado_id = user.id;
+    } else {
+      emptyForm.empleado_id = empleados[0]?.id || '';
     }
+
     setForm(emptyForm);
     setClienteBusqueda('');
     setForzar(false);
@@ -1387,7 +1368,8 @@ export default function Citas() {
                   value={form.empleado_id}
                   onChange={e => setForm({ ...form, empleado_id: e.target.value, hora: '' })}
                   required
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  disabled={user?.rol === 'EMPLEADO'}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-80 disabled:cursor-not-allowed"
                 >
                   <option value="">Seleccionar empleado...</option>
                   {/* Permitimos el empleado actual si estamos editando, e incluimos solo empleados ACTIVOS para nuevas citas */}

@@ -89,7 +89,11 @@ function Skeleton() {
 }
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
-function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: Cliente) => void; isAdmin: boolean }) {
+function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { cliente: any; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: any) => void; isAdmin: boolean }) {
+  const { user } = useAuth();
+  const canEdit = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
+  const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
@@ -135,29 +139,41 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
         {/* Historial */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Historial de citas</p>
-          {cliente.historial.map((cita: any) => (
-            <div key={cita.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Scissors className="w-3.5 h-3.5 text-primary" />
+          {cliente.historial && cliente.historial.length > 0 ? (
+            cliente.historial.map((cita: any) => (
+              <div key={cita.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Scissors className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{cita.servicio.nombre}</p>
+                  <p className="text-xs text-muted-foreground">con {cita.empleado.nombre}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs font-semibold text-foreground">{fmtDate(cita.fecha)}</p>
+                  <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', ESTADO_BADGE[cita.estado])}>
+                    {ESTADO_LABEL[cita.estado]}
+                  </span>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{cita.servicio.nombre}</p>
-                <p className="text-xs text-muted-foreground">con {cita.empleado.nombre}</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs font-semibold text-foreground">{fmtDate(cita.fecha)}</p>
-                <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', ESTADO_BADGE[cita.estado])}>
-                  {ESTADO_LABEL[cita.estado]}
-                </span>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-xs text-muted-foreground italic text-center py-4">Sin citas en el historial visible</p>
+          )}
         </div>
 
+        {/* Notas Privadas si no son privadas en backend */}
+        {cliente.notas && (
+          <div className="px-5 py-3 border-t border-border/30 bg-secondary/10">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Notas / Observaciones</p>
+            <p className="text-xs text-foreground mt-1 whitespace-pre-wrap leading-relaxed">{cliente.notas}</p>
+          </div>
+        )}
+
         {/* Footer con WhatsApp, Edición y Eliminación */}
-        <div className="p-4 border-t border-border/50 flex flex-col gap-2">
+        <div className="p-4 border-t border-border/50 flex flex-col gap-2 bg-secondary/5">
           <div className="flex gap-2">
-            {cliente.telefono ? (
+            {cliente.telefono && cliente.telefono !== '••••••••' ? (
               <a
                 href={urlWhatsAppConfirmacion({
                   cliente_nombre: cliente.nombre,
@@ -175,21 +191,25 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
                 WhatsApp
               </a>
             ) : (
-              <p className="text-xs text-center text-muted-foreground flex-1 self-center">Sin número registrado</p>
+              <p className="text-xs text-center text-muted-foreground flex-1 self-center border border-border/30 rounded-xl py-2.5 bg-background/50">
+                Sin número registrado
+              </p>
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit(cliente)}
-              className="flex items-center justify-center gap-2 flex-1 border border-border/50 hover:bg-secondary rounded-xl py-2.5 text-sm font-semibold transition-all"
-            >
-              <Edit className="w-4 h-4" />
-              Editar Datos
-            </Button>
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(cliente)}
+                className="flex items-center justify-center gap-2 flex-1 border border-border/50 hover:bg-secondary rounded-xl py-2.5 text-sm font-semibold transition-all"
+              >
+                <Edit className="w-4 h-4" />
+                Editar Datos
+              </Button>
+            )}
           </div>
 
-          {isAdmin && (
+          {canDelete && (
             <Button
               variant="destructive"
               size="sm"
@@ -207,7 +227,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
 }
 
 // ─── Cliente Card ─────────────────────────────────────────────────────────────
-function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => void }) {
+function ClienteCard({ cliente, onSelect }: { cliente: any; onSelect: () => void }) {
   return (
     <div
       className="rounded-xl border border-border/50 bg-card p-5 hover-lift cursor-pointer group"
@@ -223,12 +243,16 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
             )}
           </div>
           {cliente.telefono ? (
-            <p className="text-xs text-muted-foreground mt-0.5">{cliente.telefono}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {cliente.telefono}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground/50 mt-0.5 italic">Sin teléfono</p>
           )}
           {cliente.correo && (
-            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{cliente.correo}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+              {cliente.correo}
+            </p>
           )}
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
@@ -505,6 +529,7 @@ export default function Clientes() {
               </Button>
             </div>
           </div>
+
 
           {/* ── KPI mini ─────────────────────────────────────────── */}
           <div className="grid grid-cols-3 gap-3">

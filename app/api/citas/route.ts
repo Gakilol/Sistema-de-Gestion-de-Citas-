@@ -95,6 +95,19 @@ export async function POST(req: NextRequest) {
       finalEmpleadoId = userId;
     }
 
+    // Validar que el empleado sea agendable
+    const targetEmpleado = await prisma.empleado.findUnique({
+      where: { id: finalEmpleadoId }
+    });
+
+    if (!targetEmpleado || !targetEmpleado.activo) {
+      return NextResponse.json({ error: 'El estilista seleccionado no existe o no está activo.' }, { status: 400 });
+    }
+
+    if (!targetEmpleado.esAgendable) {
+      return NextResponse.json({ error: 'No se permiten citas para personal no agendable o de soporte técnico.' }, { status: 400 });
+    }
+
     // Resolver servicios
     let serviciosParaCita: { id: string; duracion: number; precio: number }[] = [];
     try {
@@ -183,7 +196,18 @@ export async function POST(req: NextRequest) {
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
     let idClienteFinal = cliente_id;
-    if (!idClienteFinal && cliente_nombre) {
+    let finalClienteNombre = cliente_nombre;
+    let finalClienteTelefono = cliente_telefono;
+
+    if (idClienteFinal) {
+      const dbCliente = await prisma.cliente.findUnique({
+        where: { id: idClienteFinal }
+      });
+      if (dbCliente) {
+        finalClienteNombre = dbCliente.nombre;
+        finalClienteTelefono = dbCliente.telefono;
+      }
+    } else if (cliente_nombre) {
       const existe = await prisma.cliente.findFirst({
         where: {
           nombre: cliente_nombre.trim(),
@@ -192,14 +216,19 @@ export async function POST(req: NextRequest) {
       });
       if (existe) {
         idClienteFinal = existe.id;
+        finalClienteNombre = existe.nombre;
+        finalClienteTelefono = existe.telefono;
       } else {
         const nuevoC = await prisma.cliente.create({
           data: {
             nombre:   cliente_nombre.trim(),
             telefono: cliente_telefono?.trim() || null,
+            createdByUserId: userId,
           }
         });
         idClienteFinal = nuevoC.id;
+        finalClienteNombre = nuevoC.nombre;
+        finalClienteTelefono = nuevoC.telefono;
       }
     }
 
@@ -208,8 +237,8 @@ export async function POST(req: NextRequest) {
       const c = await tx.cita.create({
         data: {
           cliente_id:       idClienteFinal,
-          cliente_nombre:   cliente_nombre.trim(),
-          cliente_telefono: cliente_telefono?.trim() || null,
+          cliente_nombre:   finalClienteNombre.trim(),
+          cliente_telefono: finalClienteTelefono?.trim() || null,
           servicio_id:      primerServicioId,
           empleado_id:      finalEmpleadoId,
           fecha:            parseLocalDateToUTC(fecha.split('T')[0]),

@@ -6,16 +6,48 @@ import { registrarAuditoria } from '@/lib/auditoria';
 export async function GET(req: NextRequest) {
   try {
     const busqueda = req.nextUrl.searchParams.get('q') || '';
-    const empleados = await prisma.empleado.findMany({
-      where: {
-        OR: busqueda ? [
-          { nombre: { contains: busqueda, mode: 'insensitive' } },
-          { correo: { contains: busqueda, mode: 'insensitive' } },
-        ] : undefined,
-      },
+    const schedulable = req.nextUrl.searchParams.get('schedulable') === 'true';
+
+    let whereClause: any = {};
+    if (busqueda) {
+      whereClause.OR = [
+        { nombre: { contains: busqueda, mode: 'insensitive' } },
+        { correo: { contains: busqueda, mode: 'insensitive' } },
+      ];
+    }
+
+    if (schedulable) {
+      whereClause.activo = true;
+      whereClause.esAgendable = true;
+    }
+
+    let empleados = await prisma.empleado.findMany({
+      where: whereClause,
       select: { id: true, nombre: true, correo: true, telefono: true, especialidad: true, tituloCliente: true, horario: true, rol: true, activo: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' }, // default asc for chronological order of new users
     });
+
+    if (schedulable) {
+      const getPriority = (nombre: string) => {
+        const name = nombre.toLowerCase().trim();
+        if (name.startsWith('alvaro')) return 1;
+        if (name.startsWith('vanessa') || name.startsWith('vannesa')) return 2;
+        if (name.startsWith('daniel')) return 3;
+        if (name.startsWith('charlie')) return 4;
+        return 5;
+      };
+
+      empleados = empleados.sort((a, b) => {
+        const prioA = getPriority(a.nombre);
+        const prioB = getPriority(b.nombre);
+        if (prioA !== prioB) return prioA - prioB;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+    } else {
+      // default sorting for general list
+      empleados = empleados.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
     return NextResponse.json({ empleados }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

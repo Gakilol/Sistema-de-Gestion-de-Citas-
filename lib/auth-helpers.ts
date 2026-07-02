@@ -44,3 +44,69 @@ export function getScopedAppointmentWhere(
   // Default scope is 'mine'
   return { empleado_id: userId };
 }
+
+export interface ClienteObjeto {
+  id: string;
+  nombre: string;
+  telefono: string | null;
+  correo: string | null;
+  notas: string | null;
+  createdByUserId: string | null;
+  citas?: any[];
+  [key: string]: any;
+}
+
+export function maskClientDataIfRestricted(
+  cliente: ClienteObjeto,
+  userId: string | null,
+  userRole: string | null
+): any {
+  if (!userRole || userRole === 'ADMIN' || userRole === 'TECH_SUPPORT') {
+    return {
+      ...cliente,
+      _privado: false
+    };
+  }
+
+  // Si es Empleado, tiene acceso si:
+  // 1. Él lo registró (createdByUserId === userId)
+  // 2. Tiene o tuvo alguna cita asignada con él
+  const isRegisteredByMe = cliente.createdByUserId === userId;
+  
+  // Buscar si alguna cita está asignada a este empleado
+  const hasCitasWithMe = Array.isArray(cliente.citas) && cliente.citas.some((cita: any) => {
+    // Si la cita tiene empleado_id directamente o en un objeto anidado
+    const empId = cita.empleado_id || (cita.empleado && cita.empleado.id);
+    return empId === userId;
+  });
+
+  if (isRegisteredByMe || hasCitasWithMe) {
+    return {
+      ...cliente,
+      _privado: false
+    };
+  }
+
+  // Enmascarar datos sensibles y filtrar el historial de citas para mostrar solo las suyas
+  const filteredHistorial = Array.isArray(cliente.historial)
+    ? cliente.historial.filter((cita: any) => {
+        const empId = cita.empleado_id || (cita.empleado && cita.empleado.id);
+        return empId === userId;
+      })
+    : (Array.isArray(cliente.citas)
+        ? cliente.citas.filter((cita: any) => {
+            const empId = cita.empleado_id || (cita.empleado && cita.empleado.id);
+            return empId === userId;
+          })
+        : []);
+
+  return {
+    ...cliente,
+    telefono: cliente.telefono ? '••••••••' : null,
+    correo: cliente.correo ? '••••••••' : null,
+    notas: cliente.notas ? '••••••••' : null,
+    historial: filteredHistorial, // Mostrar solo citas asociadas a este empleado
+    _privado: true
+  };
+}
+

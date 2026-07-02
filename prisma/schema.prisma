@@ -18,9 +18,11 @@ model Empleado {
   horario       Json?
   rol           RolUsuario @default(EMPLEADO)
   activo        Boolean  @default(true)
+  esAgendable   Boolean  @default(true)
   
   citas        Cita[]   @relation("EmpleadoAsignado")
   citasCreadas Cita[]   @relation("CreadorCita")
+  clientesCreados Cliente[] @relation("ClienteCreador")
   descansos    DescansoEmpleado[]
   bloqueos     BloqueoHorario[]
   vacaciones   VacacionesEmpleado[]
@@ -190,15 +192,19 @@ model AuditLog {
 }
 
 model Cliente {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
-  nombre    String
-  telefono  String?
-  correo    String?
-  notas     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre          String
+  telefono        String?
+  correo          String?
+  notas           String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   
   citas     Cita[]
+  creador   Empleado? @relation("ClienteCreador", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
 }
 
 model Categoria {
