@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const userRole = req.headers.get('x-user-role');
+    const { userId, userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden agregar empleados' }, { status: 403 });
     }

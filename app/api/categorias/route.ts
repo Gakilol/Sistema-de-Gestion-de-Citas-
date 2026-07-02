@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const userRole = req.headers.get('x-user-role');
+    const { userId, userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden crear categorías' }, { status: 403 });
     }
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       entidadId: categoria.id,
       accion: 'CREAR',
       detalles: { nombre: categoria.nombre, color: categoria.color },
-      realizadoPor: req.headers.get('x-user-id'),
+      realizadoPor: userId,
     });
 
     return NextResponse.json({ categoria, mensaje: 'Categoría creada exitosamente' }, { status: 201 });

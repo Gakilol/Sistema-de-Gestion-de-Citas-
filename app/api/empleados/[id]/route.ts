@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -33,9 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId = req.headers.get('x-user-id');
-    const userEmail = req.headers.get('x-user-email');
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar empleados' }, { status: 403 });
@@ -108,9 +107,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId = req.headers.get('x-user-id');
-    const userEmail = req.headers.get('x-user-email');
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar empleados' }, { status: 403 });

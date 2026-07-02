@@ -3,13 +3,11 @@ import { prisma } from '@/lib/db';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
-import { parseCurrencyCRC, calcularTotalCita } from '@/lib/utils';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role') || '';
-    const userId   = req.headers.get('x-user-id');
+    const { userId, userRole } = getUserContext(req);
 
     if (!userId || !userRole) {
       return NextResponse.json({ error: 'Usuario no autorizado' }, { status: 401 });
@@ -260,7 +258,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
     const cita = await prisma.$transaction(async (tx) => {
-      let serviciosParaActualizar: { id: string; duracion: number; precio: number }[] = [];
+      let serviciosParaActualizar: { id: string; duracion: number }[] = [];
       let flagActualizarServicios = false;
 
       if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
@@ -278,7 +276,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return {
             id:       sel.id,
             duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb.duracion || 30),
-            precio:   parseCurrencyCRC(sDb.precio),
           };
         });
 
@@ -296,7 +293,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return {
             id:       sid,
             duracion: sDb.duracion || 30,
-            precio:   parseCurrencyCRC(sDb.precio),
           };
         });
       }
@@ -304,11 +300,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (flagActualizarServicios && serviciosParaActualizar.length > 0) {
         const duracionCalculada = serviciosParaActualizar.reduce((sum, s) => sum + s.duracion, 0);
         const primerServicioId  = serviciosParaActualizar[0].id;
-        const montoCalculado    = calcularTotalCita(serviciosParaActualizar);
 
         dataToUpdate.servicio_id = primerServicioId;
         dataToUpdate.duracion    = duracionCalculada;
-        dataToUpdate.monto       = montoCalculado;
 
         await tx.citaServicio.deleteMany({ where: { cita_id: id } });
 
@@ -318,7 +312,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             servicio_id: s.id,
             duracion:    s.duracion,
             orden:       index,
-            precio:      s.precio,
           }))
         });
       }
@@ -385,7 +378,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       status: 'SUCCESS',
       userId: userId || undefined,
       userRole: userRole || undefined,
-      userEmail: req.headers.get('x-user-email'),
+      userEmail: userEmail || undefined,
       entityType: 'Cita',
       entityId: id,
       entityName: cita.cliente_nombre,
@@ -406,8 +399,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id }   = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId   = req.headers.get('x-user-id');
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar citas' }, { status: 403 });
@@ -430,7 +422,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       status: 'SUCCESS',
       userId: userId || undefined,
       userRole: userRole || undefined,
-      userEmail: req.headers.get('x-user-email'),
+      userEmail: userEmail || undefined,
       entityType: 'Cita',
       entityId: id,
       entityName: cita.cliente_nombre,

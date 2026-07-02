@@ -43,12 +43,6 @@ export class AdminServicio {
       actividadReciente,
       citasHoyDetalle,
       productividadEmpleados,
-      ingresosHoyRaw,
-      ingresosSemanaRaw,
-      ingresosMesRaw,
-      ingresosProyectadosRaw,
-      ingresosRealesRaw,
-      servicioMasGeneradorRaw,
       citasCanceladasTotales, // Nueva métrica para empleado
     ] = await Promise.all([
       // Total citas
@@ -156,55 +150,13 @@ export class AdminServicio {
         orderBy: { _count: { id: 'desc' } },
         take: 5,
       }),
-
-      // Ingresos de Hoy
-      prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: dateToday, lte: dateToday }, ...filterCita },
-        _sum: { monto: true }
-      }),
-      // Ingresos de la Semana
-      prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioSemana, lte: finSemana }, ...filterCita },
-        _sum: { monto: true }
-      }),
-      // Ingresos del Mes
-      prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, fecha: { gte: inicioMes, lte: finMes }, ...filterCita },
-        _sum: { monto: true }
-      }),
-      // Ingresos Proyectados
-      prisma.cita.aggregate({
-        where: { estado: { in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO, EstadoCita.REPROGRAMADA] }, ...filterCita },
-        _sum: { monto: true }
-      }),
-      // Ingresos Reales Totales
-      prisma.cita.aggregate({
-        where: { estado: EstadoCita.COMPLETADA, ...filterCita },
-        _sum: { monto: true }
-      }),
-      // Servicio que más dinero genera (Top 1)
-      prisma.citaServicio.groupBy({
-        by: ['servicio_id'],
-        where: { cita: { estado: EstadoCita.COMPLETADA, ...filterCita } },
-        _sum: { precio: true },
-        orderBy: { _sum: { precio: 'desc' } },
-        take: 1
-      }),
       // Citas canceladas totales (para empleado)
       prisma.cita.count({
         where: { estado: EstadoCita.CANCELADA, ...filterCita }
       }),
     ]);
 
-    // Resolver nombre del servicio que más genera
-    let servicioMasGeneradorNombre = 'N/A';
-    if (servicioMasGeneradorRaw.length > 0) {
-      const s = await prisma.servicio.findUnique({
-        where: { id: servicioMasGeneradorRaw[0].servicio_id },
-        select: { nombre: true }
-      });
-      servicioMasGeneradorNombre = s?.nombre || 'N/A';
-    }
+
 
     // ── Resolver nombres de servicios populares ───────────────────────
     const servicioIds = serviciosPopularesRaw.map((s) => s.servicio_id);
@@ -249,12 +201,6 @@ export class AdminServicio {
         citasCompletadasHoy,
         tasaCompletadas,
         citasCanceladasTotales,
-        ingresosHoy: ingresosHoyRaw._sum.monto ? Number(ingresosHoyRaw._sum.monto) : 0,
-        ingresosSemana: ingresosSemanaRaw._sum.monto ? Number(ingresosSemanaRaw._sum.monto) : 0,
-        ingresosMes: ingresosMesRaw._sum.monto ? Number(ingresosMesRaw._sum.monto) : 0,
-        ingresosProyectados: ingresosProyectadosRaw._sum.monto ? Number(ingresosProyectadosRaw._sum.monto) : 0,
-        ingresosReales: ingresosRealesRaw._sum.monto ? Number(ingresosRealesRaw._sum.monto) : 0,
-        servicioMasGenerador: servicioMasGeneradorNombre,
         // Legado
         totalAppointments: totalCitas,
         completedAppointments: citasCompletadas,

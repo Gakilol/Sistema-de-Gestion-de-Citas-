@@ -1,12 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId = req.headers.get('x-user-id');
-    const userEmail = req.headers.get('x-user-email');
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar servicios' }, { status: 403 });
@@ -21,21 +20,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, categoria, categoria_id, activo, precio } = body;
+    const { nombre, descripcion, duracion, categoria, categoria_id, activo } = body;
 
     const dataToUpdate: any = {};
     if (nombre) dataToUpdate.nombre = nombre;
     if (descripcion !== undefined) dataToUpdate.descripcion = descripcion;
     if (duracion !== undefined) dataToUpdate.duracion = Number(duracion);
     if (activo !== undefined) dataToUpdate.activo = activo;
-
-    if (precio !== undefined) {
-      const precioNum = Number(precio);
-      if (precio === null || isNaN(precioNum) || precioNum < 0) {
-        return NextResponse.json({ error: 'El precio debe ser un número válido no negativo' }, { status: 400 });
-      }
-      dataToUpdate.precio = precioNum;
-    }
 
     if (categoria_id !== undefined) {
       dataToUpdate.categoria_id = categoria_id;
@@ -86,9 +77,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId = req.headers.get('x-user-id');
-    const userEmail = req.headers.get('x-user-email');
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar servicios' }, { status: 403 });

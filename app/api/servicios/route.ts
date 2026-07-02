@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,19 +27,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const userRole = req.headers.get('x-user-role');
+    const { userId, userRole, userEmail } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden crear servicios' }, { status: 403 });
     }
 
     const body = await req.json();
-    const { nombre, descripcion, duracion, categoria_id, precio } = body;
-
-    // Validaciones de precio
-    const precioNum = Number(precio);
-    if (precio === undefined || precio === null || isNaN(precioNum) || precioNum < 0) {
-      return NextResponse.json({ error: 'El precio debe ser un número válido no negativo' }, { status: 400 });
-    }
+    const { nombre, descripcion, duracion, categoria_id } = body;
 
     let legacyCategoria = body.categoria || null;
     if (categoria_id) {
@@ -55,7 +50,6 @@ export async function POST(req: NextRequest) {
         duracion: Number(duracion),
         categoria: legacyCategoria,
         categoria_id: categoria_id || null,
-        precio: precioNum,
       },
     });
 
@@ -64,9 +58,9 @@ export async function POST(req: NextRequest) {
       action: 'SERVICE_CREATED',
       module: 'SERVICIOS',
       status: 'SUCCESS',
-      userId: req.headers.get('x-user-id'),
-      userRole: userRole,
-      userEmail: req.headers.get('x-user-email'),
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail,
       entityType: 'Servicio',
       entityId: servicio.id,
       entityName: servicio.nombre,

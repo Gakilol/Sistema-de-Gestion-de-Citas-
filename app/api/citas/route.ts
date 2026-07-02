@@ -4,7 +4,6 @@ import { syncCitaEstados } from '@/lib/automatizacion';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
-import { parseCurrencyCRC, calcularTotalCita } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   try {
@@ -109,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolver servicios
-    let serviciosParaCita: { id: string; duracion: number; precio: number }[] = [];
+    let serviciosParaCita: { id: string; duracion: number }[] = [];
     try {
       if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
         const ids = servicios_seleccionados.map((s: any) => s.id);
@@ -123,7 +122,6 @@ export async function POST(req: NextRequest) {
           return {
             id: sel.id,
             duracion: typeof sel.duracion === 'number' && sel.duracion > 0 ? sel.duracion : (sDb.duracion || 30),
-            precio: parseCurrencyCRC(sDb.precio)
           };
         });
       } else {
@@ -141,7 +139,6 @@ export async function POST(req: NextRequest) {
           return {
             id: sDb.id,
             duracion: sDb.duracion,
-            precio: parseCurrencyCRC(sDb.precio)
           };
         });
       }
@@ -150,7 +147,6 @@ export async function POST(req: NextRequest) {
     }
 
     const duracionCalculada = serviciosParaCita.reduce((sum, s) => sum + s.duracion, 0);
-    const montoCalculado = calcularTotalCita(serviciosParaCita);
     const primerServicioId  = serviciosParaCita[0].id;
 
     // ─── VALIDACIÓN DE DISPONIBILIDAD ───────────────────────────────────────
@@ -245,7 +241,6 @@ export async function POST(req: NextRequest) {
           hora,
           duracion:         duracionCalculada,
           notas,
-          monto:            montoCalculado,
           created_by:       userId,
         },
       });
@@ -256,7 +251,6 @@ export async function POST(req: NextRequest) {
           servicio_id: s.id,
           duracion:    s.duracion,
           orden:       index,
-          precio:      s.precio,
         }))
       });
 

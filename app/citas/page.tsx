@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { cn, formatColones, calcularTotalCita } from '@/lib/utils';
+import { cn, formatTo12h } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -703,7 +703,7 @@ export default function Citas() {
                     <table className="w-full text-sm text-left">
                       <thead className="bg-secondary/70 text-secondary-foreground border-b border-border/50">
                         <tr>
-                          {['Cliente', 'Servicios', 'Empleado', 'Fecha y Hora', 'Monto', 'Estado', 'Acciones'].map(h => (
+                          {['Cliente', 'Servicios', 'Empleado', 'Fecha y Hora', 'Estado', 'Acciones'].map(h => (
                             <th key={h} className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wide">{h}</th>
                           ))}
                         </tr>
@@ -729,9 +729,6 @@ export default function Citas() {
                                 <div className="skeleton h-3 w-16" />
                               </td>
                               <td className="px-4 py-4">
-                                <div className="skeleton h-4 w-16" />
-                              </td>
-                              <td className="px-4 py-4">
                                 <div className="skeleton h-6 w-20 rounded-full" />
                               </td>
                               <td className="px-4 py-4">
@@ -744,7 +741,7 @@ export default function Citas() {
                           ))
                         ) : paginated.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                            <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground text-sm">
                               {busqueda || filtroEstado || filtroEmpleado ? 'Sin resultados para los filtros aplicados' : 'No hay citas registradas'}
                             </td>
                           </tr>
@@ -838,9 +835,6 @@ export default function Citas() {
                                     </span>
                                   )}
                                 </p>
-                              </td>
-                              <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
-                                {formatColones(cita.monto)}
                               </td>
                               <td className="px-4 py-3.5">
                                 <select
@@ -1000,7 +994,6 @@ export default function Citas() {
                             <div className="text-xs flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
                               <span className="text-muted-foreground">· {to12h(cita.hora)}</span>
-                              <span className="font-semibold text-foreground ml-1">{formatColones(cita.monto)}</span>
                             </div>
                             <div className="flex gap-1.5">
                               <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
@@ -1210,7 +1203,7 @@ export default function Citas() {
                     {servicios
                       .filter(s => s.activo || form.servicio_ids.includes(s.id))
                       .map(s => (
-                        <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min) - {formatColones(s.precio)}</option>
+                        <option key={s.id} value={s.id}>{s.nombre} ({s.duracion} min)</option>
                       ))}
                   </select>
 
@@ -1228,9 +1221,6 @@ export default function Citas() {
                                   {index + 1}
                                 </span>
                                  <span className="font-medium text-foreground">{s.nombre}</span>
-                                 <span className="text-xs font-semibold text-muted-foreground ml-1.5">
-                                   ({formatColones(s.precio)})
-                                 </span>
                                 {currentDur !== s.duracion && (
                                   <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/25 px-1.5 py-0.5 rounded font-semibold">
                                     ⏱ personalizado
@@ -1408,16 +1398,6 @@ export default function Citas() {
                     <strong className="text-foreground">
                       {form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}{' '}
                       minutos
-                    </strong>
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Precio estimado:</span>{' '}
-                    <strong className="text-primary text-base font-bold">
-                      {formatColones(
-                        calcularTotalCita(
-                          form.servicio_ids.map((id: string) => servicios.find(srv => srv.id === id))
-                        )
-                      )}
                     </strong>
                   </p>
                 </div>

@@ -18,7 +18,6 @@ export async function GET(req: NextRequest) {
       by: ['empleado_id', 'estado'],
       where: baseWhere,
       _count: { id: true },
-      _sum: { monto: true },
     });
 
     const empIds = [...new Set(empleadoGroupBy.map(r => r.empleado_id))];
@@ -36,26 +35,18 @@ export async function GET(req: NextRequest) {
           nombre: empMap[row.empleado_id]?.nombre || '—',
           especialidad: empMap[row.empleado_id]?.especialidad || '—',
           total: 0, completadas: 0, canceladas: 0, noShow: 0, otras: 0,
-          ingresosReales: 0, ingresosProyectados: 0, perdidasEstimadas: 0,
         };
       }
       const count = row._count.id;
-      const monto = row._sum.monto ? Number(row._sum.monto) : 0;
       empleadoStats[row.empleado_id].total += count;
       if (row.estado === 'COMPLETADA') {
         empleadoStats[row.empleado_id].completadas += count;
-        empleadoStats[row.empleado_id].ingresosReales += monto;
       } else if (row.estado === 'CANCELADA') {
         empleadoStats[row.empleado_id].canceladas += count;
-        empleadoStats[row.empleado_id].perdidasEstimadas += monto;
       } else if (row.estado === 'NO_SHOW') {
         empleadoStats[row.empleado_id].noShow += count;
-        empleadoStats[row.empleado_id].perdidasEstimadas += monto;
       } else {
         empleadoStats[row.empleado_id].otras += count;
-        if (['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'REPROGRAMADA'].includes(row.estado)) {
-          empleadoStats[row.empleado_id].ingresosProyectados += monto;
-        }
       }
     }
 
@@ -66,7 +57,7 @@ export async function GET(req: NextRequest) {
         tasaAsistencia:  safeRate(e.completadas, citasPasadas),
         tasaCancelacion: safeRate(e.canceladas,  e.total),
       };
-    }).sort((a, b) => b.ingresosReales - a.ingresosReales); // Ordenar por ingresos reales
+    }).sort((a, b) => b.total - a.total); // Ordenar por total de citas
 
     // Performance by service
     const citaServicios = await prisma.citaServicio.findMany({
@@ -75,7 +66,6 @@ export async function GET(req: NextRequest) {
       },
       select: {
         servicio_id: true,
-        precio: true,
         cita: {
           select: {
             estado: true
@@ -95,7 +85,6 @@ export async function GET(req: NextRequest) {
     for (const cs of citaServicios) {
       const sId = cs.servicio_id;
       const estado = cs.cita.estado;
-      const precio = cs.precio ? Number(cs.precio) : 0;
 
       if (!servicioStats[sId]) {
         servicioStats[sId] = {
@@ -103,24 +92,16 @@ export async function GET(req: NextRequest) {
           nombre: servMap[sId]?.nombre || '—',
           categoria: servMap[sId]?.categoria || '—',
           total: 0, completadas: 0, canceladas: 0, noShow: 0,
-          ingresosReales: 0, ingresosProyectados: 0, perdidasEstimadas: 0,
         };
       }
 
       servicioStats[sId].total += 1;
       if (estado === 'COMPLETADA') {
         servicioStats[sId].completadas += 1;
-        servicioStats[sId].ingresosReales += precio;
       } else if (estado === 'CANCELADA') {
         servicioStats[sId].canceladas += 1;
-        servicioStats[sId].perdidasEstimadas += precio;
       } else if (estado === 'NO_SHOW') {
         servicioStats[sId].noShow += 1;
-        servicioStats[sId].perdidasEstimadas += precio;
-      } else {
-        if (['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'REPROGRAMADA'].includes(estado)) {
-          servicioStats[sId].ingresosProyectados += precio;
-        }
       }
     }
 
@@ -131,7 +112,7 @@ export async function GET(req: NextRequest) {
         tasaAsistencia:  safeRate(s.completadas, citasPasadas),
         tasaCancelacion: safeRate(s.canceladas, s.total),
       };
-    }).sort((a, b) => b.ingresosReales - a.ingresosReales); // Ordenar por ingresos reales
+    }).sort((a, b) => b.total - a.total); // Ordenar por total de citas
 
     return NextResponse.json({
       porEmpleado,

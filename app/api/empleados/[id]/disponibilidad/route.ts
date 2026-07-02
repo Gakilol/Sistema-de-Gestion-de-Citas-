@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { calcularDisponibilidad } from '@/lib/disponibilidad';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Falta el parámetro fecha' }, { status: 400 });
     }
 
-    const userRole = req.headers.get('x-user-role');
+    const { userRole } = getUserContext(req);
     const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
 
     const resultado = await calcularDisponibilidad(

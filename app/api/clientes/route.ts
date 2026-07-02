@@ -120,8 +120,7 @@ export async function GET(req: NextRequest) {
 // Registra un cliente de forma independiente en la tabla Cliente.
 export async function POST(req: NextRequest) {
   try {
-    const userRole = req.headers.get('x-user-role');
-    const userId   = req.headers.get('x-user-id');
+    const { userId, userRole } = getUserContext(req);
 
     if (!userRole) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });

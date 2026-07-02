@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn, formatColones } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface AgendaCalendarioProps {
   citas: any[];
@@ -502,14 +502,14 @@ export function AgendaCalendario({
                                     
                                     {isSmall && (
                                       <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                        {formatTime12h(cita.hora)} · <span className="font-extrabold text-primary">{formatColones(cita.monto)}</span>
+                                        {formatTime12h(cita.hora)}
                                       </p>
                                     )}
 
                                     {isMedium && (
                                       <>
                                         <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                          {formatTime12h(cita.hora)} · {cita.duracion}m · <span className="font-extrabold text-primary">{formatColones(cita.monto)}</span>
+                                          {formatTime12h(cita.hora)} · {cita.duracion}m
                                         </p>
                                         <span className="flex items-center gap-1 mt-1 text-[8px] font-bold text-foreground/70 truncate">
                                           <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
@@ -521,7 +521,7 @@ export function AgendaCalendario({
                                     {isLarge && (
                                       <>
                                         <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                          {formatTime12h(cita.hora)} · {cita.duracion} min · <span className="font-extrabold text-primary">{formatColones(cita.monto)}</span>
+                                          {formatTime12h(cita.hora)} · {cita.duracion} min
                                         </p>
                                         <div className="flex flex-col gap-1 mt-1.5 opacity-90 text-[8px] font-medium truncate">
                                           <span className="flex items-center gap-1 text-foreground/80 truncate font-semibold">

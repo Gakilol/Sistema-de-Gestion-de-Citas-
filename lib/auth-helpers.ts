@@ -7,13 +7,44 @@ export interface UserContext {
   userEmail: string | null;
 }
 
+function decodeJwtSync(token: string): any {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payloadBase64 = parts[1];
+    const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return null;
+  }
+}
+
 export function getUserContext(req: NextRequest): UserContext {
+  let userId = req.headers.get('x-user-id');
+  let userRole = req.headers.get('x-user-role');
+  let userEmail = req.headers.get('x-user-email');
+
+  // Fallback: Si los headers inyectados por el middleware se pierden (ej. bug de Next.js en solicitudes POST)
+  if (!userId || !userRole) {
+    const token = req.cookies.get('access_token')?.value;
+    if (token) {
+      const payload = decodeJwtSync(token);
+      if (payload) {
+        userId = userId || (payload.id as string) || null;
+        userRole = userRole || (payload.rol as string) || null;
+        userEmail = userEmail || (payload.email as string) || null;
+      }
+    }
+  }
+
   return {
-    userId: req.headers.get('x-user-id'),
-    userRole: req.headers.get('x-user-role'),
-    userEmail: req.headers.get('x-user-email'),
+    userId,
+    userRole,
+    userEmail,
   };
 }
+
 
 export function canViewAllAppointments(role: string | null): boolean {
   return role === 'ADMIN' || role === 'TECH_SUPPORT';

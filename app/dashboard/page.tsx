@@ -14,7 +14,7 @@ import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
-import { cn, formatColones, formatTo12h } from '@/lib/utils';
+import { cn, formatTo12h } from '@/lib/utils';
 import Link from 'next/link';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
@@ -29,10 +29,6 @@ interface DashboardData {
     citasCompletadasHoy: number;
     tasaCompletadas: number;
     citasCanceladasTotales?: number;
-    ingresosHoy?: number;
-    ingresosMes?: number;
-    ingresosProyectados?: number;
-    servicioMasGenerador?: string;
   };
   upcomingAppointments: any[];
   citasHoy: any[];
@@ -247,24 +243,24 @@ export default function Dashboard() {
                   accent="gold"
                 />
                 <KpiCard
-                  title="Ingresos Hoy"
-                  value={formatColones(stats?.ingresosHoy ?? 0)}
-                  sub={`${stats?.citasCompletadasHoy ?? 0} completadas`}
+                  title="Completadas Hoy"
+                  value={String(stats?.citasCompletadasHoy ?? 0)}
+                  sub="Citas finalizadas hoy"
                   icon={CheckCircle2}
                   accent="emerald"
                 />
                 <KpiCard
-                  title="Ingresos Mes"
-                  value={formatColones(stats?.ingresosMes ?? 0)}
-                  sub={`${stats?.citasCompletadasMes ?? 0} citas este mes`}
-                  icon={Coins}
+                  title="Completadas Mes"
+                  value={String(stats?.citasCompletadasMes ?? 0)}
+                  sub="Citas finalizadas este mes"
+                  icon={Calendar}
                   accent="blue"
                 />
                 <KpiCard
-                  title="Ingresos Proyectados"
-                  value={formatColones(stats?.ingresosProyectados ?? 0)}
-                  sub="Agendas pendientes y activas"
-                  icon={Clock}
+                  title="Personal Activo"
+                  value={String(stats?.empleadosActivos ?? 0)}
+                  sub="Estilistas activos"
+                  icon={Users}
                   accent="purple"
                 />
               </>

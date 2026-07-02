@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getUserContext } from '@/lib/auth-helpers';
 
 function parseYYYYMMDD(fechaYYYYMMDD: string): Date {
   const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
+    const { userId, userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar horarios y bloqueos' }, { status: 403 });
     }

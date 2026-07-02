@@ -1,13 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
+import { getUserContext } from '@/lib/auth-helpers';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId = req.headers.get('x-user-id');
-    const userEmail = req.headers.get('x-user-email');
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (!userRole) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -108,9 +107,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userRole = req.headers.get('x-user-role');
-    const userId = req.headers.get('x-user-id');
-    const userEmail = req.headers.get('x-user-email');
+    const { userId, userRole, userEmail } = getUserContext(req);
     const ipAddress = getClientIp(req.headers);
     const userAgent = req.headers.get('user-agent') || undefined;
     

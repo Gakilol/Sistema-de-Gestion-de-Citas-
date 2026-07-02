@@ -35,15 +35,6 @@ export async function GET(req: NextRequest) {
       completadasPrev,
       canceladasPrev,
       noShowPrev,
-      // Current period financials
-      ingresosRealesRaw,
-      ingresosProyectadosRaw,
-      perdidasCancelacionRaw,
-      perdidasNoShowRaw,
-      // Previous period financials
-      ingresosRealesPrevRaw,
-      perdidasCancelacionPrevRaw,
-      perdidasNoShowPrevRaw,
     ] = await Promise.all([
       // Current counts
       prisma.cita.count({ where: buildWhere(filters.from, filters.to) }),
@@ -58,28 +49,9 @@ export async function GET(req: NextRequest) {
       filters.compare ? prisma.cita.count({ where: { ...buildWhere(filters.fromPrev, filters.toPrev), estado: 'COMPLETADA' } }) : Promise.resolve(0),
       filters.compare ? prisma.cita.count({ where: { ...buildWhere(filters.fromPrev, filters.toPrev), estado: 'CANCELADA' } }) : Promise.resolve(0),
       filters.compare ? prisma.cita.count({ where: { ...buildWhere(filters.fromPrev, filters.toPrev), estado: 'NO_SHOW' } }) : Promise.resolve(0),
-      // Current financials
-      prisma.cita.aggregate({ where: { ...buildWhere(filters.from, filters.to), estado: 'COMPLETADA' }, _sum: { monto: true } }),
-      prisma.cita.aggregate({ where: { ...buildWhere(filters.from, filters.to), estado: { in: ['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'REPROGRAMADA'] } }, _sum: { monto: true } }),
-      prisma.cita.aggregate({ where: { ...buildWhere(filters.from, filters.to), estado: 'CANCELADA' }, _sum: { monto: true } }),
-      prisma.cita.aggregate({ where: { ...buildWhere(filters.from, filters.to), estado: 'NO_SHOW' }, _sum: { monto: true } }),
-      // Previous financials
-      filters.compare ? prisma.cita.aggregate({ where: { ...buildWhere(filters.fromPrev, filters.toPrev), estado: 'COMPLETADA' }, _sum: { monto: true } }) : Promise.resolve({ _sum: { monto: null } }),
-      filters.compare ? prisma.cita.aggregate({ where: { ...buildWhere(filters.fromPrev, filters.toPrev), estado: 'CANCELADA' }, _sum: { monto: true } }) : Promise.resolve({ _sum: { monto: null } }),
-      filters.compare ? prisma.cita.aggregate({ where: { ...buildWhere(filters.fromPrev, filters.toPrev), estado: 'NO_SHOW' }, _sum: { monto: true } }) : Promise.resolve({ _sum: { monto: null } }),
     ]);
 
-    const ingresosReales = ingresosRealesRaw._sum.monto ? Number(ingresosRealesRaw._sum.monto) : 0;
-    const ingresosProyectados = ingresosProyectadosRaw._sum.monto ? Number(ingresosProyectadosRaw._sum.monto) : 0;
-    const perdidasCancelacion = perdidasCancelacionRaw._sum.monto ? Number(perdidasCancelacionRaw._sum.monto) : 0;
-    const perdidasNoShow = perdidasNoShowRaw._sum.monto ? Number(perdidasNoShowRaw._sum.monto) : 0;
 
-    const ingresosRealesPrev = ingresosRealesPrevRaw._sum.monto ? Number(ingresosRealesPrevRaw._sum.monto) : 0;
-    const perdidasCancelacionPrev = perdidasCancelacionPrevRaw._sum.monto ? Number(perdidasCancelacionPrevRaw._sum.monto) : 0;
-    const perdidasNoShowPrev = perdidasNoShowPrevRaw._sum.monto ? Number(perdidasNoShowPrevRaw._sum.monto) : 0;
-
-    const ticketPromedio = completadas > 0 ? Math.round(ingresosReales / completadas) : 0;
-    const ticketPromedioPrev = completadasPrev > 0 ? Math.round(ingresosRealesPrev / completadasPrev) : 0;
 
     // Citas pasadas = completadas + canceladas + no_show (denominador para tasas)
     const citasPasadas = completadas + canceladas + noShow;
@@ -214,12 +186,6 @@ export async function GET(req: NextRequest) {
       servicioMasSolicitado,
       empleadoTop,
       cancelacionesTardias,
-      // Métricas financieras
-      ingresosReales,
-      ingresosProyectados,
-      perdidasCancelacion,
-      perdidasNoShow,
-      ticketPromedio,
     };
 
     const deltas = filters.compare ? {
@@ -230,11 +196,6 @@ export async function GET(req: NextRequest) {
       tasaAsistencia:   computeDelta(tasaAsistencia,   tasaAsistenciaPrev),
       tasaCancelacion:  computeDelta(tasaCancelacion,  tasaCancelacionPrev),
       tasaNoShow:       computeDelta(tasaNoShow,       tasaNoShowPrev),
-      // Deltas financieros
-      ingresosReales:   computeDelta(ingresosReales,   ingresosRealesPrev),
-      perdidasCancelacion: computeDelta(perdidasCancelacion, perdidasCancelacionPrev),
-      perdidasNoShow:   computeDelta(perdidasNoShow,   perdidasNoShowPrev),
-      ticketPromedio:   computeDelta(ticketPromedio,   ticketPromedioPrev),
     } : null;
 
     return NextResponse.json({

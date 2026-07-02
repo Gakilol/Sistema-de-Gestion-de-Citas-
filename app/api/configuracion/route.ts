@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { getUserContext } from '@/lib/auth-helpers';
 
 // ─── GET /api/configuracion
 export async function GET() {
@@ -15,7 +16,7 @@ export async function GET() {
 // ─── PATCH /api/configuracion
 export async function PATCH(req: NextRequest) {
   try {
-    const userRole = req.headers.get('x-user-role');
+    const { userId, userRole, userEmail } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo administradores y soporte técnico pueden modificar la configuración' }, { status: 403 });
     }
@@ -59,9 +60,9 @@ export async function PATCH(req: NextRequest) {
       action: finalAction,
       module: 'CONFIGURACION',
       status: 'SUCCESS',
-      userId: req.headers.get('x-user-id'),
-      userRole: userRole,
-      userEmail: req.headers.get('x-user-email'),
+      userId: userId || undefined,
+      userRole: userRole || undefined,
+      userEmail,
       entityType: 'Configuracion',
       entityId: 'default',
       entityName: 'Configuración General',
