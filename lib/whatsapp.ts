@@ -46,20 +46,18 @@ export function mensajeConfirmacion(cita: CitaWA): string {
 
 // ─── Recordatorio ───────────────────────────────────────────────────────────
 export function mensajeRecordatorio(cita: CitaWA): string {
-  const titulo = cita.empleado_titulo || 'Colaborador asignado para su cita';
-  const lines = [
-    `*${SALON_NAME}*`,
+  return [
+    `HAIR STYLE Salon & Barber`,
     ``,
-    `Hola ${cita.cliente_nombre},`,
-    `*Recordarle su cita*. Aqui estan los detalles:`,
+    `Hola ${cita.cliente_nombre}, Recordarle su cita. `,
+    `Aqui estan los detalles:`,
+    `Profesional: ${cita.empleado}`,
+    `Fecha: ${fmtFecha(cita.fecha)}`,
+    `Hora: ${formatTo12h(cita.hora)}`,
     ``,
-    `*${titulo}:* ${cita.empleado}`,
-    `*Fecha:* ${fmtFecha(cita.fecha)}`,
-    `*Hora:* ${formatTo12h(cita.hora)}`,
-    ``,
-    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
-  ];
-  return lines.filter(Boolean).join('\n');
+    `Le agradecemos presentarse 5 minutos`,
+    ` antes de su cita para una mejor atenció`
+  ].join('\n');
 }
 
 // ─── Recordatorio 1 Hora Antes ───────────────────────────────────────────────
