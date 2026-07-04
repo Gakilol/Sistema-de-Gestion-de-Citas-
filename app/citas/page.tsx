@@ -238,13 +238,18 @@ export default function Citas() {
       return;
     }
     const emptyForm = getEmptyForm();
+    emptyForm.fecha = getBusinessTodayString();
     
-    // Seleccionar por defecto el colaborador logueado si es agendable, de lo contrario el primero disponible
-    const isLogueadoAgendable = empleados.some(e => e.id === user?.id);
-    if (isLogueadoAgendable && user?.id) {
-      emptyForm.empleado_id = user.id;
+    // Seleccionar por defecto el colaborador logueado si es agendable (o si es Empleado, forzosamente él mismo), de lo contrario el primero disponible
+    if (user?.rol === 'EMPLEADO') {
+      emptyForm.empleado_id = user.id || '';
     } else {
-      emptyForm.empleado_id = empleados[0]?.id || '';
+      const isLogueadoAgendable = empleados.some(e => e.id === user?.id);
+      if (isLogueadoAgendable && user?.id) {
+        emptyForm.empleado_id = user.id;
+      } else {
+        emptyForm.empleado_id = empleados[0]?.id || '';
+      }
     }
 
     setForm(emptyForm);
@@ -753,6 +758,8 @@ export default function Citas() {
                                     cliente_telefono: cita.cliente_telefono,
                                     servicio: cita.servicio?.nombre || '',
                                     empleado: cita.empleado?.nombre || '',
+                                    empleado_id: cita.empleado_id,
+                                    empleado_email: cita.empleado?.correo || null,
                                     empleado_titulo: cita.empleado?.tituloCliente || null,
                                     fecha: cita.fecha,
                                     hora: cita.hora,
@@ -762,6 +769,8 @@ export default function Citas() {
                                     cliente_telefono: cita.cliente_telefono,
                                     servicio: cita.servicio?.nombre || '',
                                     empleado: cita.empleado?.nombre || '',
+                                    empleado_id: cita.empleado_id,
+                                    empleado_email: cita.empleado?.correo || null,
                                     empleado_titulo: cita.empleado?.tituloCliente || null,
                                     fecha: cita.fecha,
                                     hora: cita.hora,
@@ -900,6 +909,8 @@ export default function Citas() {
                                     cliente_telefono: cita.cliente_telefono,
                                     servicio: cita.servicio?.nombre || '',
                                     empleado: cita.empleado?.nombre || '',
+                                    empleado_id: cita.empleado_id,
+                                    empleado_email: cita.empleado?.correo || null,
                                     empleado_titulo: cita.empleado?.tituloCliente || null,
                                     fecha: cita.fecha,
                                     hora: cita.hora,
@@ -909,6 +920,8 @@ export default function Citas() {
                                     cliente_telefono: cita.cliente_telefono,
                                     servicio: cita.servicio?.nombre || '',
                                     empleado: cita.empleado?.nombre || '',
+                                    empleado_id: cita.empleado_id,
+                                    empleado_email: cita.empleado?.correo || null,
                                     empleado_titulo: cita.empleado?.tituloCliente || null,
                                     fecha: cita.fecha,
                                     hora: cita.hora,
@@ -1362,10 +1375,12 @@ export default function Citas() {
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-80 disabled:cursor-not-allowed"
                 >
                   <option value="">Seleccionar empleado...</option>
-                  {/* Permitimos el empleado actual si estamos editando, e incluimos solo empleados ACTIVOS para nuevas citas */}
-                  {empleados.filter(e => e.activo || e.id === form.empleado_id).map(e => (
-                    <option key={e.id} value={e.id}>{e.nombre}{e.especialidad ? ` (${e.especialidad})` : ''}</option>
-                  ))}
+                  {/* Permitimos el empleado actual si estamos editando, e incluimos solo empleados ACTIVOS y no Soporte Técnico para nuevas citas */}
+                  {empleados
+                    .filter(e => (e.activo && e.rol !== 'TECH_SUPPORT') || e.id === form.empleado_id)
+                    .map(e => (
+                      <option key={e.id} value={e.id}>{e.nombre}{e.especialidad ? ` (${e.especialidad})` : ''}</option>
+                    ))}
                 </select>
               </div>
               <div>
@@ -1375,7 +1390,7 @@ export default function Citas() {
                   value={form.fecha}
                   onChange={e => setForm({ ...form, fecha: e.target.value, hora: '' })}
                   required
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getBusinessTodayString()}
                 />
               </div>
               {form.fecha && form.empleado_id && form.servicio_ids.length > 0 && (

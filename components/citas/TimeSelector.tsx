@@ -402,7 +402,18 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
     const handleHourChange = (val: string) => {
       const h12New  = parseInt(val, 10);
-      const h24New  = isPM
+      let isPMNew = isPM;
+      
+      // Regla de AM/PM automática del negocio (8:00 AM - 6:00 PM)
+      if (h12New >= 8 && h12New <= 11) {
+        isPMNew = false; // AM
+      } else if (h12New === 12) {
+        isPMNew = true;  // PM
+      } else if (h12New >= 1 && h12New <= 6) {
+        isPMNew = true;  // PM
+      }
+
+      const h24New  = isPMNew
         ? (h12New === 12 ? 12 : h12New + 12)
         : (h12New === 12 ? 0 : h12New);
       setHour(h24New);
@@ -480,11 +491,18 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
               onChange={e => handleMinuteChange(e.target.value)}
               className="w-16 h-11 text-center text-xl font-bold rounded-xl bg-card border border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
             >
-              {Array.from({ length: 60 }, (_, i) => i).map(m => (
-                <option key={m} value={String(m).padStart(2, '0')}>
-                  {String(m).padStart(2, '0')}
-                </option>
-              ))}
+              {(() => {
+                const options = [0, 15, 30, 45];
+                if (!options.includes(currentM)) {
+                  options.push(currentM);
+                  options.sort((a, b) => a - b);
+                }
+                return options.map(m => (
+                  <option key={m} value={String(m).padStart(2, '0')}>
+                    {String(m).padStart(2, '0')}
+                  </option>
+                ));
+              })()}
             </select>
           </div>
 

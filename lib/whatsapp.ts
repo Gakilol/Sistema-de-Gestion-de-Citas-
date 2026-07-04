@@ -7,6 +7,8 @@ export interface CitaWA {
   cliente_telefono?: string | null;
   servicio: string;
   empleado: string;
+  empleado_id?: string | null;
+  empleado_email?: string | null;
   empleado_titulo?: string | null;
   fecha: string | Date;
   hora: string;
@@ -45,19 +47,48 @@ export function mensajeConfirmacion(cita: CitaWA): string {
 }
 
 // ─── Recordatorio ───────────────────────────────────────────────────────────
+/**
+ * Mensaje de Recordatorio de WhatsApp
+ * 
+ * NOTA DE CONFIGURACIÓN:
+ * Este recordatorio oculta la línea de "Profesional" para ciertos profesionales basándose en:
+ * - WHATSAPP_HIDE_PROFESSIONAL_EMAILS: lista de correos separados por comas.
+ * - WHATSAPP_HIDE_PROFESSIONAL_USER_IDS: lista de UUIDs separados por comas.
+ * 
+ * Si necesitas obtener el UUID de un colaborador como Álvaro para configurarlo en el .env,
+ * puedes realizar la siguiente consulta SQL en tu base de datos:
+ * 
+ * SELECT id, nombre, correo, rol
+ * FROM "Empleado"
+ * WHERE LOWER(nombre) LIKE '%alvaro%'
+ * OR LOWER(correo) LIKE '%alvaro%';
+ */
 export function mensajeRecordatorio(cita: CitaWA): string {
-  return [
+  const hideEmailsEnv = process.env.WHATSAPP_HIDE_PROFESSIONAL_EMAILS || '';
+  const hideUserIdsEnv = process.env.WHATSAPP_HIDE_PROFESSIONAL_USER_IDS || '';
+
+  const hideEmails = hideEmailsEnv.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const hideUserIds = hideUserIdsEnv.split(',').map(id => id.trim()).filter(Boolean);
+
+  const matchedByEmail = cita.empleado_email && hideEmails.includes(cita.empleado_email.toLowerCase());
+  const matchedById = cita.empleado_id && hideUserIds.includes(cita.empleado_id);
+
+  const ocultarProfesional = matchedByEmail || matchedById;
+
+  const lines = [
     `HAIR STYLE Salon & Barber`,
     ``,
     `Hola ${cita.cliente_nombre}, Recordarle su cita. `,
     `Aqui estan los detalles:`,
-    `Profesional: ${cita.empleado}`,
+    ocultarProfesional ? null : `Profesional: ${cita.empleado}`,
     `Fecha: ${fmtFecha(cita.fecha)}`,
     `Hora: ${formatTo12h(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos`,
     ` antes de su cita para una mejor atenció`
-  ].join('\n');
+  ];
+
+  return lines.filter(line => line !== null).join('\n');
 }
 
 // ─── Recordatorio 1 Hora Antes ───────────────────────────────────────────────

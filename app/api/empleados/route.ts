@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     if (schedulable) {
       whereClause.activo = true;
       whereClause.esAgendable = true;
+      whereClause.rol = { not: 'TECH_SUPPORT' };
     }
 
     let empleados = await prisma.empleado.findMany({

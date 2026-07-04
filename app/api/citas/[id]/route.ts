@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const cita = await prisma.cita.findUnique({
       where: { id },
       include: {
-        empleado: { select: { nombre: true, tituloCliente: true } },
+        empleado: { select: { id: true, nombre: true, correo: true, tituloCliente: true } },
         servicio: {
           select: {
             nombre: true,
@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id }   = await params;
     const body     = await req.json();
-    const { userId, userRole } = getUserContext(req);
+    const { userId, userRole, userEmail } = getUserContext(req);
 
     if (!userId || !userRole) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
