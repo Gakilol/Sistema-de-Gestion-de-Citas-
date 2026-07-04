@@ -63,6 +63,14 @@ export function mensajeConfirmacion(cita: CitaWA): string {
  * WHERE LOWER(nombre) LIKE '%alvaro%'
  * OR LOWER(correo) LIKE '%alvaro%';
  */
+function cleanString(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 export function mensajeRecordatorio(cita: CitaWA): string {
   const hideEmailsEnv = process.env.WHATSAPP_HIDE_PROFESSIONAL_EMAILS || '';
   const hideUserIdsEnv = process.env.WHATSAPP_HIDE_PROFESSIONAL_USER_IDS || '';
@@ -73,7 +81,11 @@ export function mensajeRecordatorio(cita: CitaWA): string {
   const matchedByEmail = cita.empleado_email && hideEmails.includes(cita.empleado_email.toLowerCase());
   const matchedById = cita.empleado_id && hideUserIds.includes(cita.empleado_id);
 
-  const ocultarProfesional = matchedByEmail || matchedById;
+  // Fallback seguro: si el nombre o el email del empleado contiene "alvaro" (ignorando tildes y mayúsculas)
+  const isAlvaroByName = cita.empleado && cleanString(cita.empleado).includes("alvaro");
+  const isAlvaroByEmail = cita.empleado_email && cleanString(cita.empleado_email).includes("alvaro");
+
+  const ocultarProfesional = matchedByEmail || matchedById || isAlvaroByName || isAlvaroByEmail;
 
   const lines = [
     `HAIR STYLE Salon & Barber`,
