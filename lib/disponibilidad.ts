@@ -315,3 +315,62 @@ export async function calcularDisponibilidad(
     turnosEmpleado: turnosEmpleadoDia
   };
 }
+
+export interface ConflictoCita {
+  appointmentId: string;
+  clientName: string;
+  serviceName: string;
+  startTime: string;
+  endTime: string;
+  professionalName: string;
+}
+
+export async function detectarConflictos(
+  empleadoId: string,
+  fechaYYYYMMDD: string,
+  hora: string,
+  duracion: number,
+  excludeCitaId?: string | null
+): Promise<ConflictoCita[]> {
+  const startMin = timeToMinutes(hora);
+  const endMin = startMin + duracion;
+  const fechaDate = parseYYYYMMDD(fechaYYYYMMDD);
+
+  const citasWhere: any = {
+    empleado_id: empleadoId,
+    fecha: fechaDate,
+    estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] }
+  };
+  if (excludeCitaId) {
+    citasWhere.id = { not: excludeCitaId };
+  }
+
+  const citas = await prisma.cita.findMany({
+    where: citasWhere,
+    include: {
+      servicio: { select: { nombre: true } },
+      empleado: { select: { nombre: true } }
+    }
+  });
+
+  const conflictos: ConflictoCita[] = [];
+
+  for (const c of citas) {
+    const cStart = timeToMinutes(c.hora);
+    const cEnd = cStart + c.duracion;
+
+    if (startMin < cEnd && endMin > cStart) {
+      conflictos.push({
+        appointmentId: c.id,
+        clientName: c.cliente_nombre,
+        serviceName: c.servicio.nombre,
+        startTime: c.hora,
+        endTime: minutesToTime(cEnd),
+        professionalName: c.empleado.nombre
+      });
+    }
+  }
+
+  return conflictos;
+}
+

@@ -96,7 +96,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       cliente_telefono,
       forzar,
       cancel_reason,
+      allowOverlap,
+      overlapReason,
     } = body;
+
+    let conflictos: any[] = [];
 
     // Validar que el nuevo empleado sea agendable
     if (empleado_id) {
@@ -176,14 +180,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!finalServicioIds && servicio_id) {
       finalServicioIds = [servicio_id];
     }
-
     // ─── VALIDACIÓN DE DISPONIBILIDAD AL EDITAR ─────────────────────────────
     const cambiaHorario =
       hora || fecha || empleado_id ||
       (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) ||
       (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0);
-
-    const esForzado = forzar === true && (userRole === 'ADMIN' || userRole === 'TECH_SUPPORT');
 
     if (cambiaHorario) {
       const citaActual = await prisma.cita.findUnique({ where: { id } });
@@ -197,9 +198,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         : new Date(citaActual.fecha).toISOString().split('T')[0];
       const horaFinal     = hora || citaActual.hora;
 
-      // ─── Calcular duración final, conservando duplicados ─────────────────
-      // CORRECCIÓN: Si el cliente envía servicios_seleccionados con duplicados,
-      // la duración se suma para cada elemento (no para IDs únicos).
+      // Calcular duracion final, preservando duplicados
       let duracionFinal = citaActual.duracion;
       if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
         duracionFinal = servicios_seleccionados.reduce(
@@ -207,7 +206,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           0
         );
       } else if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
-        // Para IDs, preservar duplicados en la suma
         const idsUnicos = [...new Set(finalServicioIds)] as string[];
         const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: idsUnicos } } });
         duracionFinal = finalServicioIds.reduce((sum: number, sid: string) => {
@@ -218,7 +216,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
-      const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
+      const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
+      
+      conflictos = await detectarConflictos(
+        empleadoFinal,
+        fechaFinal,
+        horaFinal,
+        duracionFinal,
+        id // excludeCitaId
+      );
+
       const disponibilidad = await calcularDisponibilidad(
         empleadoFinal,
         fechaFinal,
@@ -236,14 +243,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         );
       }
 
-      if (disponibilidad.jornada && !esForzado) {
-        // Solo validar colisiones si NO se está forzando
+      const isOverlapRequested = allowOverlap === true;
+
+      if (conflictos.length > 0) {
+        if (!isOverlapRequested) {
+          return NextResponse.json({
+            type: 'SCHEDULE_OVERLAP',
+            message: 'El horario se cruza con otra cita.',
+            conflicts: conflictos
+          }, { status: 409 });
+        }
+
+        // Validar permisos para traslape
+        if (userRole === 'EMPLEADO' && empleadoFinal !== userId) {
+          return NextResponse.json({ error: 'No tienes permiso para crear traslapes en la agenda de otros empleados.' }, { status: 403 });
+        }
+        if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT' && userRole !== 'EMPLEADO') {
+          return NextResponse.json({ error: 'No tienes permiso para confirmar traslapes.' }, { status: 403 });
+        }
+      }
+
+      if (disponibilidad.jornada) {
+        // Si hay traslape confirmado, filtramos las citas para que no bloqueen la validación,
+        // pero mantenemos bloqueos y descansos.
+        const intervalosFiltrados = (conflictos.length > 0 && isOverlapRequested)
+          ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
+          : disponibilidad.intervalosOcupados;
+
         const validacion = validarHoraExacta(
           horaFinal,
           duracionFinal,
           disponibilidad.jornada.inicio,
           disponibilidad.jornada.fin,
-          disponibilidad.intervalosOcupados,
+          intervalosFiltrados,
           permitirHorarioExtendido,
           disponibilidad.turnosEmpleado
         );
@@ -251,6 +283,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!validacion.valida) {
           return NextResponse.json({ error: 'Hora no disponible: ' + validacion.motivo }, { status: 400 });
         }
+      }
+
+      // Guardar información de traslape si hay conflictos y se solicita el overlap
+      if (conflictos.length > 0 && isOverlapRequested) {
+        dataToUpdate.allowOverlap = true;
+        dataToUpdate.overlapReason = overlapReason || null;
+        dataToUpdate.overlapConfirmedById = userId;
+        dataToUpdate.overlapConfirmedAt = new Date();
+      } else {
+        // Resetear traslape si ya no hay conflictos o no se solicita traslape en el nuevo horario
+        dataToUpdate.allowOverlap = false;
+        dataToUpdate.overlapReason = null;
+        dataToUpdate.overlapConfirmedById = null;
+        dataToUpdate.overlapConfirmedAt = null;
       }
     }
 
@@ -389,6 +435,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       userAgent: req.headers.get('user-agent') || undefined,
       metadata: { cambios: dataToUpdate, forzado: esForzado }
     });
+
+    if (cita.allowOverlap && dataToUpdate.allowOverlap) {
+      await logAudit({
+        action: 'APPOINTMENT_OVERLAP_CONFIRMED',
+        module: 'CITAS',
+        status: 'SUCCESS',
+        userId: userId || undefined,
+        userRole: userRole || undefined,
+        userEmail: userEmail || undefined,
+        entityType: 'Cita',
+        entityId: id,
+        entityName: cita.cliente_nombre,
+        description: `Traslape de horario confirmado al editar la cita de ${cita.cliente_nombre} con el motivo: "${cita.overlapReason || 'Sin motivo'}"`,
+        afterData: cita,
+        ipAddress: getClientIp(req.headers),
+        userAgent: req.headers.get('user-agent') || undefined,
+        metadata: {
+          conflicts: conflictos,
+          overlapReason: cita.overlapReason,
+          confirmedById: cita.overlapConfirmedById,
+          confirmedAt: cita.overlapConfirmedAt
+        }
+      });
+    }
 
     return NextResponse.json({ cita, mensaje: 'Cita actualizada exitosamente con sus servicios' }, { status: 200 });
   } catch (error: any) {

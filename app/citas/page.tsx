@@ -222,6 +222,10 @@ function CitasContent() {
   const [clienteBusqueda, setClienteBusqueda] = useState('');
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false);
   const [forzar, setForzar]       = useState(false);
+  const [showOverlapModal, setShowOverlapModal] = useState(false);
+  const [overlapConflicts, setOverlapConflicts] = useState<any[]>([]);
+  const [selectedOverlapReason, setSelectedOverlapReason] = useState('Cliente en tiempo de espera');
+  const [customOverlapReason, setCustomOverlapReason] = useState('');
 
   // Ref para cerrar el buscador de clientes al hacer click fuera
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -380,8 +384,8 @@ function CitasContent() {
     sessionStorage.setItem('citas_filtro_smart', filtroSmart);
   }, [filtroSmart]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, bypassOverlap = false) => {
+    if (e) e.preventDefault();
     if (!form.servicio_ids || form.servicio_ids.length === 0) {
       toast.error('Selecciona al menos un servicio');
       return;
@@ -395,6 +399,7 @@ function CitasContent() {
       return;
     }
     setSaving(true);
+    const reasonText = selectedOverlapReason === 'Otro' ? customOverlapReason : selectedOverlapReason;
     const payload = {
       cliente_id: form.cliente_id || null,
       cliente_nombre: form.cliente_nombre,
@@ -410,6 +415,8 @@ function CitasContent() {
       hora: form.hora,
       notas: form.notas || null,
       forzar: forzar && isAdmin,
+      allowOverlap: bypassOverlap,
+      overlapReason: bypassOverlap ? reasonText : null,
     };
     try {
       const url  = editingId ? `/api/citas/${editingId}` : '/api/citas';
@@ -421,10 +428,17 @@ function CitasContent() {
       });
       if (!res.ok) {
         const d = await res.json();
+        if (res.status === 409 && d.type === 'SCHEDULE_OVERLAP') {
+          setOverlapConflicts(d.conflicts || []);
+          setShowOverlapModal(true);
+          setSaving(false);
+          return;
+        }
         throw new Error(d.error);
       }
       toast.success(editingId ? 'Cita actualizada' : 'Cita creada exitosamente');
       setShowModal(false);
+      setShowOverlapModal(false);
       setForzar(false);
       fetchCitas();
     } catch (err: any) {
@@ -1477,24 +1491,6 @@ function CitasContent() {
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas / Comentarios</label>
                 <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones o peticiones especiales..." />
               </div>
-              {/* Checkbox forzar agendamiento (solo para ADMIN cuando hay conflicto) */}
-              {isAdmin && (
-                <label className="flex items-start gap-3 px-3 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 cursor-pointer hover:bg-amber-500/10 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={forzar}
-                    onChange={e => setForzar(e.target.checked)}
-                    className="mt-0.5 accent-amber-500 w-4 h-4 flex-shrink-0"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Forzar agendamiento (ignorar conflictos)
-                    </span>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Solo disponible para administradores. Se registrará en la auditoría.</p>
-                  </div>
-                </label>
-              )}
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
                 <Button type="submit" disabled={saving} className="glow-gold">
@@ -1603,6 +1599,122 @@ function CitasContent() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Confirmación de Traslape Controlado ────────────────────────── */}
+      {showOverlapModal && (
+        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-border/50 bg-amber-500/5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 border border-amber-500/20">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground">Advertencia de Traslape</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">El horario se cruza con otra cita existente.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOverlapModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="text-sm space-y-2.5">
+                <p className="text-muted-foreground leading-relaxed">
+                  Este horario se cruza con la siguiente cita del mismo profesional:
+                </p>
+
+                {overlapConflicts.map((c, idx) => (
+                  <div key={c.appointmentId || idx} className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-1.5 shadow-inner">
+                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Cita en Conflicto</p>
+                    <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-xs">
+                      <span className="text-muted-foreground font-semibold">Cliente:</span>
+                      <span className="font-bold text-foreground">{c.clientName}</span>
+                      <span className="text-muted-foreground font-semibold">Servicio:</span>
+                      <span className="font-semibold text-foreground">{c.serviceName}</span>
+                      <span className="text-muted-foreground font-semibold">Horario:</span>
+                      <span className="font-semibold text-foreground tabular-nums">{to12h(c.startTime)} - {to12h(c.endTime)}</span>
+                      <span className="text-muted-foreground font-semibold">Profesional:</span>
+                      <span className="font-semibold text-foreground">{c.professionalName}</span>
+                    </div>
+                  </div>
+                ))}
+
+                <p className="text-xs text-muted-foreground leading-relaxed border-t border-border/20 pt-3">
+                  ¿Deseas agendar de todas formas? Usa esta opción solo si el profesional puede atender ambas citas por tiempos de espera, servicios rápidos o traslape controlado.
+                </p>
+              </div>
+
+              {/* Selector de Motivos */}
+              <div className="space-y-2 border-t border-border/20 pt-3">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">
+                  Selecciona el Motivo
+                </label>
+                <select
+                  value={selectedOverlapReason}
+                  onChange={e => setSelectedOverlapReason(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="Cliente en tiempo de espera">Cliente en tiempo de espera</option>
+                  <option value="Servicio rápido">Servicio rápido</option>
+                  <option value="Tinte/decoloración en proceso">Tinte/decoloración en proceso</option>
+                  <option value="Confirmado manualmente por el profesional">Confirmado manualmente por el profesional</option>
+                  <option value="Otro">Otro (especificar abajo)</option>
+                </select>
+              </div>
+
+              {selectedOverlapReason === 'Otro' && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">
+                    Especificar motivo *
+                  </label>
+                  <Input
+                    value={customOverlapReason}
+                    onChange={e => setCustomOverlapReason(e.target.value)}
+                    placeholder="Ej. Tiempo libre del estilista..."
+                    required
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex flex-col sm:flex-row justify-end gap-2 p-5 border-t border-border/30 bg-secondary/10">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowOverlapModal(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowOverlapModal(false);
+                }}
+                className="w-full sm:w-auto text-foreground"
+              >
+                Cambiar horario
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleSubmit(undefined, true)}
+                disabled={saving || (selectedOverlapReason === 'Otro' && !customOverlapReason.trim())}
+                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 border-amber-600 hover:border-amber-700 text-white font-bold"
+              >
+                {saving ? 'Guardando...' : 'Agendar de todas formas'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

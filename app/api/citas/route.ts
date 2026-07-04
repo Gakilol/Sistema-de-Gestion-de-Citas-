@@ -87,6 +87,8 @@ export async function POST(req: NextRequest) {
       hora,
       notas,
       forzar,
+      allowOverlap,
+      overlapReason,
     } = body;
 
     let finalEmpleadoId = empleado_id;
@@ -150,11 +152,9 @@ export async function POST(req: NextRequest) {
     const primerServicioId  = serviciosParaCita[0].id;
 
     // ─── VALIDACIÓN DE DISPONIBILIDAD ───────────────────────────────────────
-    // Si el admin o tech support manda forzar: true, se omite la validación de colisiones
-    const esForzado = forzar === true && (userRole === 'ADMIN' || userRole === 'TECH_SUPPORT');
     const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
-    const { calcularDisponibilidad, validarHoraExacta } = await import('@/lib/disponibilidad');
+    const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
     const disponibilidad = await calcularDisponibilidad(
       finalEmpleadoId,
       fecha.split('T')[0],
@@ -173,21 +173,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No se pudo determinar la jornada laboral' }, { status: 400 });
     }
 
-    if (!esForzado) {
-      // Solo validar colisiones si NO se está forzando
-      const validacion = validarHoraExacta(
-        hora,
-        duracionCalculada,
-        disponibilidad.jornada.inicio,
-        disponibilidad.jornada.fin,
-        disponibilidad.intervalosOcupados,
-        permitirHorarioExtendido,
-        disponibilidad.turnosEmpleado
-      );
+    // ─── DETECCIÓN Y VALIDACIÓN DE TRASLAPES CONTROLADOS ───────────────────
+    const conflictos = await detectarConflictos(
+      finalEmpleadoId,
+      fecha.split('T')[0],
+      hora,
+      duracionCalculada,
+      null
+    );
 
-      if (!validacion.valida) {
-        return NextResponse.json({ error: 'Hora no disponible: ' + validacion.motivo }, { status: 400 });
+    const isOverlapRequested = allowOverlap === true;
+
+    if (conflictos.length > 0) {
+      if (!isOverlapRequested) {
+        // Devolver un error controlado con los detalles de la cita en conflicto
+        return NextResponse.json({
+          type: 'SCHEDULE_OVERLAP',
+          message: 'El horario se cruza con otra cita.',
+          conflicts: conflictos
+        }, { status: 409 });
       }
+
+      // Validar que un empleado solo pueda confirmar traslapes en su propia agenda
+      if (userRole === 'EMPLEADO' && finalEmpleadoId !== userId) {
+        return NextResponse.json({ error: 'No tienes permiso para crear traslapes en la agenda de otros empleados.' }, { status: 403 });
+      }
+      if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT' && userRole !== 'EMPLEADO') {
+        return NextResponse.json({ error: 'No tienes permiso para confirmar traslapes.' }, { status: 403 });
+      }
+    }
+
+    // Ejecutar validación de hora exacta
+    // Si hay traslape confirmado, filtramos las citas para que no bloqueen la validación,
+    // pero mantenemos bloqueos y descansos.
+    const intervalosFiltrados = (conflictos.length > 0 && isOverlapRequested)
+      ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
+      : disponibilidad.intervalosOcupados;
+
+    const validacion = validarHoraExacta(
+      hora,
+      duracionCalculada,
+      disponibilidad.jornada.inicio,
+      disponibilidad.jornada.fin,
+      intervalosFiltrados,
+      permitirHorarioExtendido,
+      disponibilidad.turnosEmpleado
+    );
+
+    if (!validacion.valida) {
+      return NextResponse.json({ error: 'Hora no disponible: ' + validacion.motivo }, { status: 400 });
     }
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
@@ -229,6 +263,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── TRANSACCIÓN: Guardar cita + relaciones ──────────────────────────────
+    const hasConflict = conflictos.length > 0;
     const cita = await prisma.$transaction(async (tx) => {
       const c = await tx.cita.create({
         data: {
@@ -242,6 +277,11 @@ export async function POST(req: NextRequest) {
           duracion:         duracionCalculada,
           notas,
           created_by:       userId,
+          // Guardar información de traslape
+          allowOverlap:     hasConflict && isOverlapRequested,
+          overlapReason:    hasConflict && isOverlapRequested ? overlapReason : null,
+          overlapConfirmedById: hasConflict && isOverlapRequested ? userId : null,
+          overlapConfirmedAt:   hasConflict && isOverlapRequested ? new Date() : null,
         },
       });
 
@@ -268,12 +308,36 @@ export async function POST(req: NextRequest) {
       entityType: 'Cita',
       entityId: cita.id,
       entityName: cliente_nombre,
-      description: `Cita creada para ${cliente_nombre}.${esForzado ? ' (Acción forzada)' : ''}`,
+      description: `Cita creada para ${cliente_nombre}.${cita.allowOverlap ? ' (Traslape controlado permitido)' : ''}`,
       afterData: cita,
       ipAddress: getClientIp(req.headers),
       userAgent: req.headers.get('user-agent') || undefined,
-      metadata: { forzado: esForzado }
+      metadata: { allowOverlap: cita.allowOverlap }
     });
+
+    if (cita.allowOverlap) {
+      await logAudit({
+        action: 'APPOINTMENT_OVERLAP_CONFIRMED',
+        module: 'CITAS',
+        status: 'SUCCESS',
+        userId: userId || undefined,
+        userRole: userRole || undefined,
+        userEmail: req.headers.get('x-user-email'),
+        entityType: 'Cita',
+        entityId: cita.id,
+        entityName: cliente_nombre,
+        description: `Traslape de horario confirmado para la cita de ${cliente_nombre} con el motivo: "${cita.overlapReason || 'Sin motivo'}"`,
+        afterData: cita,
+        ipAddress: getClientIp(req.headers),
+        userAgent: req.headers.get('user-agent') || undefined,
+        metadata: {
+          conflicts: conflictos,
+          overlapReason: cita.overlapReason,
+          confirmedById: cita.overlapConfirmedById,
+          confirmedAt: cita.overlapConfirmedAt
+        }
+      });
+    }
 
     return NextResponse.json({ cita, mensaje: 'Cita creada exitosamente con sus servicios' }, { status: 201 });
   } catch (error: any) {

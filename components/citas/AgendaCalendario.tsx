@@ -469,8 +469,10 @@ export function AgendaCalendario({
                             const isMedium = heightPx >= 48 && heightPx < 78;
                             const isLarge = heightPx >= 78;
 
-                            // Tooltip nativo
-                            const tooltipText = `${cita.cliente_nombre}\nHora: ${formatTime12h(cita.hora)} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
+                            let tooltipText = `${cita.cliente_nombre}\nHora: ${formatTime12h(cita.hora)} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
+                            if (cita.allowOverlap) {
+                              tooltipText += `\n[Traslape Confirmado: ${cita.overlapReason || 'Sin motivo'}]`;
+                            }
 
                             return (
                               <div
@@ -484,7 +486,9 @@ export function AgendaCalendario({
                                   left: `calc(${leftPct}% + ${gapPx}px)`,
                                   width: `calc(${widthPct}% - ${gapPx * 2}px)`,
                                   backgroundColor: `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
-                                  borderColor: `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
+                                  borderColor: cita.allowOverlap ? `color-mix(in srgb, ${catColor} 45%, var(--color-border))` : `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
+                                  borderStyle: cita.allowOverlap ? 'dashed' : 'solid',
+                                  borderWidth: cita.allowOverlap ? '1.5px' : '1px',
                                 }}
                               >
                                 {/* Indicador lateral */}
@@ -496,9 +500,16 @@ export function AgendaCalendario({
                                 {/* Contenido */}
                                 <div className="pl-1.5 flex flex-col h-full justify-between overflow-hidden">
                                   <div className="overflow-hidden">
-                                    <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
-                                      {cita.cliente_nombre}
-                                    </p>
+                                    <div className="flex items-center gap-1 overflow-hidden">
+                                      {cita.allowOverlap && (
+                                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 font-extrabold text-[8px] shrink-0" title={`Traslape controlado: ${cita.overlapReason || 'Sin motivo'}`}>
+                                          ⚠️
+                                        </span>
+                                      )}
+                                      <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
+                                        {cita.cliente_nombre}
+                                      </p>
+                                    </div>
                                     
                                     {isSmall && (
                                       <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">

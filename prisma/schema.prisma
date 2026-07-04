@@ -77,6 +77,12 @@ model Cita {
   whatsapp_reminder_sent    Boolean   @default(false)
   whatsapp_reminder_sent_at DateTime?
 
+  // Traslape Controlado
+  allowOverlap          Boolean   @default(false)
+  overlapReason         String?
+  overlapConfirmedById  String?
+  overlapConfirmedAt    DateTime?
+
   @@index([empleado_id])
   @@index([estado])
   @@index([fecha])
