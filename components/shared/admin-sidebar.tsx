@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Tag,
+  UserX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -154,6 +155,13 @@ const menuGroups: MenuGroup[] = [
         title: 'Clientes',
         href: '/clientes',
         icon: Users,
+        roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
+        isNew: true,
+      },
+      {
+        title: 'Clientes Inactivos',
+        href: '/clientes-inactivos',
+        icon: UserX,
         roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
         isNew: true,
       },
@@ -346,6 +354,7 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/dashboard': 'Dashboard',
     '/citas': 'Citas',
     '/clientes': 'Clientes',
+    '/clientes-inactivos': 'Clientes Inactivos',
     '/servicios': 'Servicios',
     '/categorias': 'Categorías',
     '/empleados': 'Personal',

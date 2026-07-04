@@ -175,3 +175,32 @@ export function urlWhatsAppCancelacion(cita: CitaWA): string | null {
   if (!cita.cliente_telefono) return null;
   return generarEnlaceWA(cita.cliente_telefono, mensajeCancelacion(cita));
 }
+
+// ─── Reactivación de clientes inactivos ──────────────────────────────────────
+export interface InactiveClientWA {
+  cliente_nombre: string;
+  cliente_telefono?: string | null;
+  dias_inactividad: number;
+  ultimo_servicio: string;
+  empleado_nombre?: string | null;
+}
+
+export function mensajeReactivacion(params: InactiveClientWA): string {
+  const empText = params.empleado_nombre ? ` con ${params.empleado_nombre}` : '';
+  const lines = [
+    `Hola ${params.cliente_nombre}, esperamos que estés muy bien.`,
+    ``,
+    `Te recordamos que ya han pasado ${params.dias_inactividad} días desde tu último servicio de ${params.ultimo_servicio}${empText} en HAIR STYLE Salon & Barber.`,
+    ``,
+    `Si deseas, podemos ayudarte a agendar nuevamente el mismo servicio o cualquier otro que necesites.`,
+    ``,
+    `¿Te gustaría programar una nueva cita?`
+  ];
+  return lines.join('\n');
+}
+
+export function urlWhatsAppReactivacion(params: InactiveClientWA): string | null {
+  if (!params.cliente_telefono) return null;
+  return generarEnlaceWA(params.cliente_telefono, mensajeReactivacion(params));
+}
+

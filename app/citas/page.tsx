@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
@@ -129,7 +130,7 @@ function sortCitas(citasList: any[], ascending: boolean) {
 
 const PAGE_SIZE = 15;
 
-export default function Citas() {
+function CitasContent() {
   const [citas, setCitas]         = useState<any[]>([]);
   const [servicios, setServicios] = useState<any[]>([]);
   const [empleados, setEmpleados] = useState<any[]>([]);
@@ -155,6 +156,61 @@ export default function Citas() {
   const isAdmin                   = user?.rol === 'ADMIN';
   const isTechSupport             = user?.rol === 'TECH_SUPPORT';
   const canSeeAll                 = isAdmin || isTechSupport;
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (servicios.length > 0 && empleados.length > 0 && clientesList.length > 0) {
+      const qClienteId = searchParams.get('clienteId');
+      const qServicioId = searchParams.get('servicioId');
+      const qEmpleadoId = searchParams.get('empleadoId');
+
+      if (qClienteId || qServicioId || qEmpleadoId) {
+        const client = clientesList.find(c => c.id === qClienteId);
+        const employee = empleados.find(e => e.id === qEmpleadoId);
+        const service = servicios.find(s => s.id === qServicioId);
+
+        const newForm = { ...getEmptyForm() };
+        newForm.fecha = getBusinessTodayString();
+
+        if (client) {
+          newForm.cliente_id = client.id;
+          newForm.cliente_nombre = client.nombre;
+          newForm.cliente_telefono = client.telefono || '';
+          setClienteBusqueda(client.nombre);
+        }
+
+        if (employee) {
+          newForm.empleado_id = employee.id;
+        } else {
+          if (user?.rol === 'EMPLEADO') {
+            newForm.empleado_id = user.id || '';
+          } else {
+            const isLogueadoAgendable = empleados.some(e => e.id === user?.id);
+            if (isLogueadoAgendable && user?.id) {
+              newForm.empleado_id = user.id;
+            } else {
+              newForm.empleado_id = empleados[0]?.id || '';
+            }
+          }
+        }
+
+        if (service) {
+          newForm.servicio_id = service.id;
+          newForm.servicio_ids = [service.id];
+          newForm.servicio_duraciones = [service.duracion];
+        }
+
+        setForm(newForm);
+        setEditingId(null);
+        setForzar(false);
+        setShowModal(true);
+
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [searchParams, servicios, empleados, clientesList, user]);
 
   // ─── Estado para modal inline de nuevo cliente ─────────────────────────
   const [showCrearCliente, setShowCrearCliente] = useState(false);
@@ -1551,5 +1607,20 @@ export default function Citas() {
         </div>
       )}
     </>
+  );
+}
+
+export default function Citas() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <span className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></span>
+          <p className="text-sm text-muted-foreground">Cargando citas...</p>
+        </div>
+      </div>
+    }>
+      <CitasContent />
+    </Suspense>
   );
 }
