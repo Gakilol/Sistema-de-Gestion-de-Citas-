@@ -29,3 +29,6 @@ pnpm-debug.log*
 
 # Prisma
 # /prisma/migrations is not ignored to track historical migrations in Git
+
+# TypeScript
+*.tsbuildinfo
