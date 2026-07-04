@@ -1606,7 +1606,7 @@ function CitasContent() {
       {/* ─── Modal: Confirmación de Traslape Controlado ────────────────────────── */}
       {showOverlapModal && (
         <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
             <div className="flex items-center gap-3 p-5 border-b border-border/50 bg-amber-500/5">
               <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 border border-amber-500/20">
@@ -1626,7 +1626,7 @@ function CitasContent() {
             </div>
 
             {/* Content */}
-            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="flex-1 p-5 space-y-4 overflow-y-auto custom-scrollbar">
               <div className="text-sm space-y-2.5">
                 <p className="text-muted-foreground leading-relaxed">
                   Este horario se cruza con la siguiente cita del mismo profesional:
