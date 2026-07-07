@@ -433,7 +433,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       afterData: cita,
       ipAddress: getClientIp(req.headers),
       userAgent: req.headers.get('user-agent') || undefined,
-      metadata: { cambios: dataToUpdate, forzado: esForzado }
+      metadata: { cambios: dataToUpdate, forzado: forzar }
     });
 
     if (cita.allowOverlap && dataToUpdate.allowOverlap) {

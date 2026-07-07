@@ -377,12 +377,6 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
-                  {isAdmin && stats?.servicioMasGenerador && (
-                    <div className="mt-3 pt-3 border-t border-border/40 text-xs text-muted-foreground flex items-center justify-between">
-                      <span className="font-semibold text-primary">Top Facturación:</span>
-                      <span className="text-foreground font-medium">{stats.servicioMasGenerador}</span>
-                    </div>
-                  )}
                 </>
               ) : (
                 <div className="h-[180px] flex items-center justify-center text-muted-foreground text-xs">Sin datos suficientes</div>

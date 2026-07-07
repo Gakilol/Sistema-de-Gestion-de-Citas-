@@ -229,7 +229,6 @@ function ReportesContent() {
     });
     const endpoints: Record<Tab, string> = {
       resumen:       `/api/reportes/resumen?${params}`,
-      finanzas:      `/api/reportes/resumen?${params}`,
       demanda:       `/api/reportes/demanda?${params}`,
       asistencia:    `/api/reportes/asistencia?${params}`,
       cancelaciones: `/api/reportes/cancelaciones?${params}`,
@@ -246,23 +245,10 @@ function ReportesContent() {
     setLoading(true);
     setError(null);
     try {
-      if (currentTab === 'finanzas') {
-        const paramsStr = buildUrl('resumen').split('?')[1];
-        const [resResumen, resProf] = await Promise.all([
-          fetch(`/api/reportes/resumen?${paramsStr}`, { signal: abortRef.current.signal }),
-          fetch(`/api/reportes/profesionales?${paramsStr}`, { signal: abortRef.current.signal })
-        ]);
-        const jsonResumen = await resResumen.json();
-        const jsonProf = await resProf.json();
-        if (!resResumen.ok) { setError(jsonResumen.error || 'Error al cargar resumen'); return; }
-        if (!resProf.ok) { setError(jsonProf.error || 'Error al cargar rendimiento'); return; }
-        setData({ ...jsonResumen, ...jsonProf });
-      } else {
-        const res  = await fetch(buildUrl(currentTab), { signal: abortRef.current.signal });
-        const json = await res.json();
-        if (!res.ok) { setError(json.error || 'Error al cargar datos'); return; }
-        setData(json);
-      }
+      const res  = await fetch(buildUrl(currentTab), { signal: abortRef.current.signal });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error || 'Error al cargar datos'); return; }
+      setData(json);
     } catch (e: any) {
       if (e.name !== 'AbortError') setError('Error de conexión con el servidor.');
     } finally {
