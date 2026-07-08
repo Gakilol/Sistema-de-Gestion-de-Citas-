@@ -12,23 +12,27 @@ const ServicioSeleccionadoSchema = z.object({
 }).passthrough();
 
 const CreateCitaSchema = z.object({
-  cliente_id:              z.string().uuid().optional(),
+  cliente_id:              z.string().uuid().nullish(),
   cliente_nombre:          z.string().min(1).max(150).trim(),
-  cliente_telefono:        z.string().max(30).trim().optional(),
-  servicio_id:             z.string().uuid().optional(),
-  servicio_ids:            z.array(z.string().uuid()).optional(),
-  servicios_seleccionados: z.array(ServicioSeleccionadoSchema).optional(),
-  empleado_id:             z.string().uuid().optional(),
+  cliente_telefono:        z.string().max(30).trim().nullish(),
+  servicio_id:             z.string().uuid().nullish(),
+  servicio_ids:            z.array(z.string().uuid()).nullish(),
+  servicios_seleccionados: z.array(ServicioSeleccionadoSchema).nullish(),
+  empleado_id:             z.string().uuid().nullish(),
   fecha:                   z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Formato de fecha inválido'),
   hora:                    z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Formato de hora inválido'),
-  notas:                   z.string().max(2000).optional(),
-  forzar:                  z.boolean().optional(),
-  allowOverlap:            z.boolean().optional(),
-  overlapReason:           z.string().max(500).optional(),
-}).transform(data => ({
+  notas:                   z.string().max(2000).nullish(),
+  forzar:                  z.boolean().nullish(),
+  allowOverlap:            z.boolean().nullish(),
+  overlapReason:           z.string().max(500).nullish(),
+}).transform(data => {
   // Normalizar null -> undefined para compatibilidad con el código existente
-  ...data,
-}));
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(data)) {
+    cleaned[key] = value === null ? undefined : value;
+  }
+  return cleaned;
+});
 
 
 export async function GET(req: NextRequest) {
@@ -103,6 +107,7 @@ export async function POST(req: NextRequest) {
 
     const parseResult = CreateCitaSchema.safeParse(rawBody);
     if (!parseResult.success) {
+      console.error('[CITAS_VALIDATION_ERROR]', parseResult.error.flatten().fieldErrors);
       return NextResponse.json(
         { error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors },
         { status: 400 }
