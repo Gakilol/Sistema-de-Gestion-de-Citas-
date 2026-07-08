@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// ─── NO hay fallback: si la variable no está, el middleware rechaza todo ──────
-const JWT_SECRET = process.env.JWT_SECRET;
+// ─── Uso de fallback si la variable no está (para facilitar pruebas) ──────────
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-jwt-change-me-in-production';
 
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;

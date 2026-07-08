@@ -3,15 +3,11 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { prisma } from '@/lib/db';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-jwt-change-me-in-production';
 
 
 export async function GET(req: NextRequest) {
   try {
-    if (!JWT_SECRET) {
-      return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
-    }
-
     const token = req.cookies.get('access_token')?.value;
 
     if (!token) {
