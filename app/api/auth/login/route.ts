@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
+    console.error('[LOGIN_ERROR]', error);
     // Log LOGIN_FAILED (la contraseña fue incorrecta o el usuario no existe)
     const attemptedEmail = body.correo || body.email || 'desconocido';
     await logAudit({
@@ -117,11 +118,11 @@ export async function POST(req: NextRequest) {
       module: 'AUTH',
       status: 'FAILED',
       description: `Intento de inicio de sesión fallido para ${attemptedEmail}`,
-      errorMessage: 'Credenciales inválidas', // No exponer el motivo real
+      errorMessage: error.message || 'Credenciales inválidas', // Registrar el error real en BD internamente
       ipAddress,
       userAgent,
       userEmail: typeof attemptedEmail === 'string' ? attemptedEmail : undefined,
-      metadata: { email: attemptedEmail },
+      metadata: { email: attemptedEmail, internalError: error.message || String(error) },
     });
 
     // Mensaje genérico: no revelar si el correo existe o no
