@@ -26,6 +26,7 @@ interface TimeSelectorProps {
   duracionTotal?: number;
   selectedTime: string;
   onTimeSelect: (time: string) => void;
+  excludeCitaId?: string | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ function validarLocal(
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, selectedTime, onTimeSelect }: TimeSelectorProps) {
+export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, selectedTime, onTimeSelect, excludeCitaId }: TimeSelectorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jornada, setJornada] = useState<Jornada | null>(null);
@@ -117,6 +118,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
         const query = new URLSearchParams({ fecha });
         if (servicioId) query.append('servicio_id', servicioId);
         if (duracionTotal) query.append('duracion_total', duracionTotal.toString());
+        if (excludeCitaId) query.append('exclude_cita_id', excludeCitaId);
 
         const res = await fetch(`/api/empleados/${empleadoId}/disponibilidad?${query.toString()}`);
         const data = await res.json();
@@ -157,7 +159,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
     fetchDisponibilidad();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empleadoId, fecha, servicioId, duracionTotal]);
+  }, [empleadoId, fecha, servicioId, duracionTotal, excludeCitaId]);
 
   // ─── Derived state ──────────────────────────────────────────────────────
   const jornadaInicioMin = jornada ? timeToMinutes(jornada.inicio) : 480; // 08:00 default

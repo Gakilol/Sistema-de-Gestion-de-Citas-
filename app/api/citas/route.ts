@@ -1,9 +1,35 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { z } from 'zod';
 import { syncCitaEstados } from '@/lib/automatizacion';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
+
+const ServicioSeleccionadoSchema = z.object({
+  id: z.string().uuid(),
+  duracion: z.number().int().positive().optional(),
+}).passthrough();
+
+const CreateCitaSchema = z.object({
+  cliente_id:              z.string().uuid().optional(),
+  cliente_nombre:          z.string().min(1).max(150).trim(),
+  cliente_telefono:        z.string().max(30).trim().optional(),
+  servicio_id:             z.string().uuid().optional(),
+  servicio_ids:            z.array(z.string().uuid()).optional(),
+  servicios_seleccionados: z.array(ServicioSeleccionadoSchema).optional(),
+  empleado_id:             z.string().uuid().optional(),
+  fecha:                   z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Formato de fecha inválido'),
+  hora:                    z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Formato de hora inválido'),
+  notas:                   z.string().max(2000).optional(),
+  forzar:                  z.boolean().optional(),
+  allowOverlap:            z.boolean().optional(),
+  overlapReason:           z.string().max(500).optional(),
+}).transform(data => ({
+  // Normalizar null -> undefined para compatibilidad con el código existente
+  ...data,
+}));
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,13 +94,21 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body     = await req.json();
+    const rawBody = await req.json();
     const { userId, userRole } = getUserContext(req);
 
     if (!userId || !userRole) {
       return NextResponse.json({ error: 'Usuario no identificado' }, { status: 401 });
     }
 
+    const parseResult = CreateCitaSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const body = parseResult.data;
     const {
       cliente_id,
       cliente_nombre,
@@ -97,6 +131,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar que el empleado sea agendable
+    // Asegurarse que finalEmpleadoId está definido en este punto del flujo
+    if (!finalEmpleadoId) {
+      return NextResponse.json({ error: 'Debe especificar el empleado para la cita' }, { status: 400 });
+    }
     const targetEmpleado = await prisma.empleado.findUnique({
       where: { id: finalEmpleadoId }
     });
@@ -131,9 +169,14 @@ export async function POST(req: NextRequest) {
         if (!ids[0]) {
           return NextResponse.json({ error: 'No se especificaron servicios para la cita' }, { status: 400 });
         }
-        const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
+        // Filtrar posibles undefined antes de pasar a Prisma
+        const idsDefinidos = ids.filter((id): id is string => id !== undefined && id !== null);
+        if (idsDefinidos.length === 0) {
+          return NextResponse.json({ error: 'No se especificaron servicios para la cita' }, { status: 400 });
+        }
+        const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: idsDefinidos } } });
         
-        serviciosParaCita = ids.map((id: string) => {
+        serviciosParaCita = idsDefinidos.map((id: string) => {
           const sDb = serviciosDb.find(s => s.id === id);
           if (!sDb) {
             throw new Error(`El servicio con ID ${id} no fue encontrado`);
@@ -183,14 +226,15 @@ export async function POST(req: NextRequest) {
     );
 
     const isOverlapRequested = allowOverlap === true;
+    const conflictosBloqueantes = conflictos.filter(c => !c.allowOverlap);
 
-    if (conflictos.length > 0) {
+    if (conflictosBloqueantes.length > 0) {
       if (!isOverlapRequested) {
         // Devolver un error controlado con los detalles de la cita en conflicto
         return NextResponse.json({
           type: 'SCHEDULE_OVERLAP',
           message: 'El horario se cruza con otra cita.',
-          conflicts: conflictos
+          conflicts: conflictosBloqueantes
         }, { status: 409 });
       }
 
@@ -206,7 +250,7 @@ export async function POST(req: NextRequest) {
     // Ejecutar validación de hora exacta
     // Si hay traslape confirmado, filtramos las citas para que no bloqueen la validación,
     // pero mantenemos bloqueos y descansos.
-    const intervalosFiltrados = (conflictos.length > 0 && isOverlapRequested)
+    const intervalosFiltrados = (conflictosBloqueantes.length > 0 && isOverlapRequested)
       ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
       : disponibilidad.intervalosOcupados;
 
@@ -235,7 +279,7 @@ export async function POST(req: NextRequest) {
       });
       if (dbCliente) {
         finalClienteNombre = dbCliente.nombre;
-        finalClienteTelefono = dbCliente.telefono;
+        finalClienteTelefono = dbCliente.telefono ?? undefined;
       }
     } else if (cliente_nombre) {
       const existe = await prisma.cliente.findFirst({
@@ -247,7 +291,7 @@ export async function POST(req: NextRequest) {
       if (existe) {
         idClienteFinal = existe.id;
         finalClienteNombre = existe.nombre;
-        finalClienteTelefono = existe.telefono;
+        finalClienteTelefono = existe.telefono ?? undefined;
       } else {
         const nuevoC = await prisma.cliente.create({
           data: {
@@ -258,12 +302,12 @@ export async function POST(req: NextRequest) {
         });
         idClienteFinal = nuevoC.id;
         finalClienteNombre = nuevoC.nombre;
-        finalClienteTelefono = nuevoC.telefono;
+        finalClienteTelefono = nuevoC.telefono ?? undefined;
       }
     }
 
     // ─── TRANSACCIÓN: Guardar cita + relaciones ──────────────────────────────
-    const hasConflict = conflictos.length > 0;
+    const hasConflict = conflictosBloqueantes.length > 0;
     const cita = await prisma.$transaction(async (tx) => {
       const c = await tx.cita.create({
         data: {

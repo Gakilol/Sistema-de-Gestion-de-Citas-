@@ -3,10 +3,15 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { prisma } from '@/lib/db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-muy-seguro-para-jwt-saas';
+const JWT_SECRET = process.env.JWT_SECRET;
+
 
 export async function GET(req: NextRequest) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
+    }
+
     const token = req.cookies.get('access_token')?.value;
 
     if (!token) {
@@ -14,6 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+
     
     const empleado = await prisma.empleado.findUnique({
       where: { id: payload.id as string },

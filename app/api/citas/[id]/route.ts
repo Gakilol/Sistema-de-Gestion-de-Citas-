@@ -101,6 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } = body;
 
     let conflictos: any[] = [];
+    let hasOrphanedIntercalada = false;
 
     // Validar que el nuevo empleado sea agendable
     if (empleado_id) {
@@ -182,7 +183,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     // ─── VALIDACIÓN DE DISPONIBILIDAD AL EDITAR ─────────────────────────────
     const cambiaHorario =
-      hora || fecha || empleado_id ||
+      hora || fecha || empleado_id || (duracion !== undefined) ||
       (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) ||
       (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0);
 
@@ -198,9 +199,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         : new Date(citaActual.fecha).toISOString().split('T')[0];
       const horaFinal     = hora || citaActual.hora;
 
-      // Calcular duracion final, preservando duplicados
       let duracionFinal = citaActual.duracion;
-      if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+      if (duracion !== undefined) {
+        duracionFinal = Number(duracion);
+      } else if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
         duracionFinal = servicios_seleccionados.reduce(
           (sum: number, s: any) => sum + (typeof s.duracion === 'number' && s.duracion > 0 ? s.duracion : 30),
           0
@@ -243,14 +245,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         );
       }
 
+      const conflictosBloqueantes = conflictos.filter(c => !c.allowOverlap);
       const isOverlapRequested = allowOverlap === true;
 
-      if (conflictos.length > 0) {
+      if (conflictosBloqueantes.length > 0) {
         if (!isOverlapRequested) {
           return NextResponse.json({
             type: 'SCHEDULE_OVERLAP',
             message: 'El horario se cruza con otra cita.',
-            conflicts: conflictos
+            conflicts: conflictosBloqueantes
           }, { status: 409 });
         }
 
@@ -266,7 +269,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (disponibilidad.jornada) {
         // Si hay traslape confirmado, filtramos las citas para que no bloqueen la validación,
         // pero mantenemos bloqueos y descansos.
-        const intervalosFiltrados = (conflictos.length > 0 && isOverlapRequested)
+        const intervalosFiltrados = (conflictosBloqueantes.length > 0 && isOverlapRequested)
           ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
           : disponibilidad.intervalosOcupados;
 
@@ -285,8 +288,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
       }
 
-      // Guardar información de traslape si hay conflictos y se solicita el overlap
-      if (conflictos.length > 0 && isOverlapRequested) {
+      // Guardar información de traslape si hay conflictos bloqueantes y se solicita el overlap
+      if (conflictosBloqueantes.length > 0 && isOverlapRequested) {
         dataToUpdate.allowOverlap = true;
         dataToUpdate.overlapReason = overlapReason || null;
         dataToUpdate.overlapConfirmedById = userId;
@@ -297,6 +300,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         dataToUpdate.overlapReason = null;
         dataToUpdate.overlapConfirmedById = null;
         dataToUpdate.overlapConfirmedAt = null;
+      }
+
+      // Detectar si acortamos la cita principal y dejamos huérfana una intercalada
+      const originalDate = new Date(citaActual.fecha).toISOString().split('T')[0];
+      const allCitasOnDate = await prisma.cita.findMany({
+        where: {
+          empleado_id: empleadoFinal,
+          fecha: parseLocalDateToUTC(originalDate),
+          estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] },
+          id: { not: id }
+        }
+      });
+
+      const { timeToMinutes } = await import('@/lib/disponibilidad');
+      const startMinOrig = timeToMinutes(citaActual.hora);
+      const endMinOrig = startMinOrig + citaActual.duracion;
+
+      const startMinNew = timeToMinutes(horaFinal);
+      const endMinNew = startMinNew + duracionFinal;
+
+      for (const otherC of allCitasOnDate) {
+        if (otherC.allowOverlap) {
+          const otherStart = timeToMinutes(otherC.hora);
+          const otherEnd = otherStart + otherC.duracion;
+          
+          const wasContained = otherStart >= startMinOrig && otherEnd <= endMinOrig;
+          const isStillContained = (fechaFinal === originalDate) && (otherStart >= startMinNew && otherEnd <= endMinNew);
+
+          if (wasContained && !isStillContained) {
+            hasOrphanedIntercalada = true;
+            break;
+          }
+        }
       }
     }
 
@@ -460,7 +496,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       });
     }
 
-    return NextResponse.json({ cita, mensaje: 'Cita actualizada exitosamente con sus servicios' }, { status: 200 });
+    return NextResponse.json({ 
+      cita, 
+      mensaje: 'Cita actualizada exitosamente con sus servicios',
+      warning: hasOrphanedIntercalada ? 'Esta cita tiene una cita intercalada dentro del horario anterior. Revise si desea mantenerla, moverla o editarla.' : null
+    }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

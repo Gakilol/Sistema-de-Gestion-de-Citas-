@@ -27,14 +27,17 @@ function fmtDate(d: string | null) {
 }
 
 // ─── Stat Card Component ─────────────────────────────────────────────────────
-function StatCard({ title, value, icon: Icon, colorClass }: { title: string; value: string | number; icon: any; colorClass: string }) {
+function StatCard({ title, value, icon: Icon, colorClass, description }: { title: string; value: string | number; icon: any; colorClass: string; description?: string }) {
   return (
     <Card className="p-4 border-border/50 flex items-center justify-between hover:shadow-md transition-all duration-200">
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
         <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
+        {description && (
+          <p className="text-[10px] text-muted-foreground">{description}</p>
+        )}
       </div>
-      <div className={cn("p-3 rounded-xl", colorClass)}>
+      <div className={cn("p-3 rounded-xl flex-shrink-0", colorClass)}>
         <Icon className="w-5 h-5" />
       </div>
     </Card>
@@ -264,33 +267,40 @@ export default function ClientesInactivos() {
             </div>
           </div>
 
+
           {/* ── Resumen Cards ───────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              title="Total Inactivos"
-              value={stats.totalInactivos}
-              icon={UserX}
-              colorClass="bg-red-500/10 text-red-500"
-            />
-            <StatCard
-              title="Sin Recordatorio"
-              value={stats.sinRecordatorio}
-              icon={HelpCircle}
-              colorClass="bg-amber-500/10 text-amber-500"
-            />
-            <StatCard
-              title="Enviados Este Mes"
-              value={stats.enviadosEsteMes}
-              icon={MessageSquare}
-              colorClass="bg-blue-500/10 text-blue-500"
-            />
-            <StatCard
-              title="Reagendados"
-              value={stats.reagendados}
-              icon={Star}
-              colorClass="bg-emerald-500/10 text-emerald-500"
-            />
-          </div>
+          {!loading && stats.totalInactivos > 0 && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                title="Inactivos"
+                value={stats.totalInactivos}
+                icon={UserX}
+                colorClass="bg-red-500/10 text-red-500"
+                description={`Sin visita +${diasInactividad} días`}
+              />
+              <StatCard
+                title="Sin Recordatorio"
+                value={stats.sinRecordatorio}
+                icon={HelpCircle}
+                colorClass="bg-amber-500/10 text-amber-500"
+                description="Nunca contactados"
+              />
+              <StatCard
+                title="Enviados Este Mes"
+                value={stats.enviadosEsteMes}
+                icon={MessageSquare}
+                colorClass="bg-blue-500/10 text-blue-500"
+                description="Recordatorios enviados"
+              />
+              <StatCard
+                title="Reagendados"
+                value={stats.reagendados}
+                icon={Star}
+                colorClass="bg-emerald-500/10 text-emerald-500"
+                description="Han vuelto a agendar"
+              />
+            </div>
+          )}
 
           {/* ── Filtros ─────────────────────────────────────────── */}
           <Card className="p-5 border-border/50 space-y-4">
@@ -398,12 +408,22 @@ export default function ClientesInactivos() {
               <p className="text-sm text-muted-foreground font-medium">Buscando clientes inactivos...</p>
             </Card>
           ) : clientes.length === 0 ? (
-            <Card className="py-16 border-border/50 text-center text-muted-foreground space-y-3">
-              <UserX className="w-12 h-12 mx-auto opacity-20" />
-              <p className="font-semibold text-foreground">No hay clientes inactivos</p>
-              <p className="text-xs max-w-md mx-auto">
-                No se encontraron clientes que cumplan los criterios de inactividad o filtros especificados.
-              </p>
+            <Card className="py-16 border-border/50 text-center space-y-3">
+              <UserX className="w-12 h-12 mx-auto empty-state-icon" />
+              <div>
+                <p className="font-semibold text-foreground">
+                  {busqueda || telefono || servicioFiltro || estadoRecordatorio
+                    ? 'Sin resultados para tu búsqueda'
+                    : 'No se encontraron clientes inactivos'
+                  }
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                  {busqueda || telefono || servicioFiltro || estadoRecordatorio
+                    ? 'Prueba ajustando los filtros o el período de inactividad.'
+                    : `Ningún cliente lleva más de ${diasInactividad} días sin visitar el salón. ¡Excelente retención!`
+                  }
+                </p>
+              </div>
             </Card>
           ) : (
             <div className="space-y-4">

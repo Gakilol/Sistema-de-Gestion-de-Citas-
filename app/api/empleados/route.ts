@@ -1,8 +1,21 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
+
+const CreateEmpleadoSchema = z.object({
+  nombre: z.string().min(2, 'El nombre es obligatorio').max(100),
+  correo: z.string().email('Correo inválido').max(254),
+  telefono: z.string().max(30).optional().nullable(),
+  password: z.string().min(6).max(128).optional(),
+  especialidad: z.string().max(100).optional().nullable(),
+  tituloCliente: z.string().max(100).optional().nullable(),
+  horario: z.record(z.any()).optional(),
+  rol: z.enum(['ADMIN', 'EMPLEADO', 'TECH_SUPPORT']).optional(),
+  esAgendable: z.boolean().optional(),
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,8 +76,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden agregar empleados' }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { nombre, correo, telefono, password, especialidad, tituloCliente, horario, rol } = body;
+    const rawBody = await req.json();
+    const parseResult = CreateEmpleadoSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const { nombre, correo, telefono, password, especialidad, tituloCliente, horario, rol } = parseResult.data;
+
+    // TECH_SUPPORT no puede crear usuarios con rol ADMIN
+    if (userRole === 'TECH_SUPPORT' && rol === 'ADMIN') {
+      return NextResponse.json(
+        { error: 'El soporte técnico no puede crear usuarios con rol de Administrador.' },
+        { status: 403 }
+      );
+    }
 
     const existe = await prisma.empleado.findUnique({ where: { correo } });
     if (existe) {

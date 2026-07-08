@@ -1,5 +1,6 @@
 // lib/auth-helpers.ts
 import { NextRequest } from 'next/server';
+import { verifyJwtSync } from '@/lib/jwt';
 
 export interface UserContext {
   userId: string | null;
@@ -7,41 +8,47 @@ export interface UserContext {
   userEmail: string | null;
 }
 
-function decodeJwtSync(token: string): any {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payloadBase64 = parts[1];
-    const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
-    return JSON.parse(jsonStr);
-  } catch (e) {
-    return null;
-  }
-}
-
+/**
+ * Obtiene el contexto del usuario autenticado desde la solicitud.
+ *
+ * SEGURIDAD:
+ * 1. Lee las cabeceras x-user-* inyectadas por el middleware (que ya verificó el JWT).
+ * 2. Si las cabeceras no están (ej. rutas /api/auth/* que son públicas), como fallback
+ *    verifica criptográficamente el JWT de la cookie usando HMAC-SHA256.
+ * 3. NUNCA confía en datos enviados directamente por el cliente sin verificación.
+ *    Las cabeceras son eliminadas del cliente en middleware antes de inyectar las propias.
+ */
 export function getUserContext(req: NextRequest): UserContext {
-  let userId = req.headers.get('x-user-id');
-  let userRole = req.headers.get('x-user-role');
-  let userEmail = req.headers.get('x-user-email');
+  // Las cabeceras x-user-* fueron inyectadas por el middleware DESPUÉS de verificar el JWT.
+  // El middleware también elimina cualquier cabecera x-user-* enviada por el cliente.
+  const userId = req.headers.get('x-user-id');
+  const userRole = req.headers.get('x-user-role');
+  const userEmail = req.headers.get('x-user-email');
 
-  // Fallback: Si los headers inyectados por el middleware se pierden (ej. bug de Next.js en solicitudes POST)
-  if (!userId || !userRole) {
-    const token = req.cookies.get('access_token')?.value;
-    if (token) {
-      const payload = decodeJwtSync(token);
-      if (payload) {
-        userId = userId || (payload.id as string) || null;
-        userRole = userRole || (payload.rol as string) || null;
-        userEmail = userEmail || (payload.email as string) || null;
-      }
+  // Si el middleware inyectó los datos, los usamos directamente (ya fueron verificados)
+  if (userId && userRole) {
+    return { userId, userRole, userEmail };
+  }
+
+  // Fallback SEGURO: Verificar el JWT criptográficamente desde la cookie.
+  // Esto aplica para rutas /api/auth/* que son públicas y el middleware no inyecta cabeceras,
+  // pero que aún necesitan leer el usuario si está autenticado (ej. /api/auth/me).
+  const token = req.cookies.get('access_token')?.value;
+  if (token) {
+    const payload = verifyJwtSync(token); // Verifica firma HMAC-SHA256 + expiración
+    if (payload) {
+      return {
+        userId: payload.id,
+        userRole: payload.rol,
+        userEmail: payload.email,
+      };
     }
   }
 
   return {
-    userId,
-    userRole,
-    userEmail,
+    userId: null,
+    userRole: null,
+    userEmail: null,
   };
 }
 
@@ -103,7 +110,7 @@ export function maskClientDataIfRestricted(
   // 1. Él lo registró (createdByUserId === userId)
   // 2. Tiene o tuvo alguna cita asignada con él
   const isRegisteredByMe = cliente.createdByUserId === userId;
-  
+
   // Buscar si alguna cita está asignada a este empleado
   const hasCitasWithMe = Array.isArray(cliente.citas) && cliente.citas.some((cita: any) => {
     // Si la cita tiene empleado_id directamente o en un objeto anidado
@@ -140,4 +147,3 @@ export function maskClientDataIfRestricted(
     _privado: true
   };
 }
-

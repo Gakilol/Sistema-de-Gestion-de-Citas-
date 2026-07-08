@@ -26,15 +26,19 @@ export interface ReportFilters {
 
 /**
  * Validates that the requesting user has ADMIN or TECH_SUPPORT role.
+ * Uses getUserContext which verifies the JWT cryptographically.
  * Returns a 403 response if unauthorized, otherwise returns null.
  */
 export function requireReporteRole(req: NextRequest): NextResponse | null {
-  const role = req.headers.get('x-user-role');
-  if (!role || !ALLOWED_ROLES.includes(role as any)) {
+  // Importamos getUserContext aquí para evitar dependencias circulares
+  const { getUserContext } = require('@/lib/auth-helpers');
+  const { userRole } = getUserContext(req);
+  if (!userRole || !ALLOWED_ROLES.includes(userRole as any)) {
     return NextResponse.json({ error: 'Acceso denegado. Solo ADMIN y TECH_SUPPORT pueden acceder a los reportes.' }, { status: 403 });
   }
   return null;
 }
+
 
 /**
  * Validates and parses report filter query parameters.

@@ -148,7 +148,7 @@ function CitasContent() {
   const [page, setPage]           = useState(1);
 
   // Modos de Vista y Scopes
-  const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('lista');
+  const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('agenda');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
   const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
 
@@ -435,6 +435,10 @@ function CitasContent() {
           return;
         }
         throw new Error(d.error);
+      }
+      const d = await res.json();
+      if (d.warning) {
+        toast.warning(d.warning, { duration: 8000 });
       }
       toast.success(editingId ? 'Cita actualizada' : 'Cita creada exitosamente');
       setShowModal(false);
@@ -1473,6 +1477,7 @@ function CitasContent() {
                     duracionTotal={form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}
                     selectedTime={form.hora}
                     onTimeSelect={h => setForm((prev: any) => ({ ...prev, hora: h }))}
+                    excludeCitaId={editingId}
                   />
                 </div>
               )}
@@ -1614,7 +1619,7 @@ function CitasContent() {
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-foreground">Advertencia de Traslape</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">El horario se cruza con otra cita existente.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Existe una cita en este horario. ¿Desea crearla como cita intercalada?</p>
               </div>
               <button
                 type="button"
@@ -1649,7 +1654,7 @@ function CitasContent() {
                 ))}
 
                 <p className="text-xs text-muted-foreground leading-relaxed border-t border-border/20 pt-3">
-                  ¿Deseas agendar de todas formas? Usa esta opción solo si el profesional puede atender ambas citas por tiempos de espera, servicios rápidos o traslape controlado.
+                  ¿Desea crearla como cita intercalada? Confirme si el profesional puede atender ambas citas por tiempos de espera, servicios rápidos o traslape controlado.
                 </p>
               </div>
 
@@ -1712,7 +1717,7 @@ function CitasContent() {
                 disabled={saving || (selectedOverlapReason === 'Otro' && !customOverlapReason.trim())}
                 className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 border-amber-600 hover:border-amber-700 text-white font-bold"
               >
-                {saving ? 'Guardando...' : 'Agendar de todas formas'}
+                {saving ? 'Guardando...' : 'Guardar como cita intercalada'}
               </Button>
             </div>
           </div>

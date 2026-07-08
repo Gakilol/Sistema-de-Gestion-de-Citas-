@@ -485,10 +485,12 @@ export function AgendaCalendario({
                                   height: `${heightPx}px`,
                                   left: `calc(${leftPct}% + ${gapPx}px)`,
                                   width: `calc(${widthPct}% - ${gapPx * 2}px)`,
-                                  backgroundColor: `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
-                                  borderColor: cita.allowOverlap ? `color-mix(in srgb, ${catColor} 45%, var(--color-border))` : `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
+                                  backgroundColor: cita.allowOverlap 
+                                    ? `color-mix(in srgb, ${catColor} 8%, color-mix(in srgb, #f59e0b 5%, var(--color-card)))` 
+                                    : `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
+                                  borderColor: cita.allowOverlap ? '#d97706' : `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
                                   borderStyle: cita.allowOverlap ? 'dashed' : 'solid',
-                                  borderWidth: cita.allowOverlap ? '1.5px' : '1px',
+                                  borderWidth: cita.allowOverlap ? '2px' : '1px',
                                 }}
                               >
                                 {/* Indicador lateral */}
@@ -510,6 +512,13 @@ export function AgendaCalendario({
                                         {cita.cliente_nombre}
                                       </p>
                                     </div>
+                                    {cita.allowOverlap && !isSmall && (
+                                      <div className="mt-0.5 flex items-center">
+                                        <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider scale-95 origin-left" title={cita.overlapReason || 'Traslape autorizado'}>
+                                          Intercalada
+                                        </span>
+                                      </div>
+                                    )}
                                     
                                     {isSmall && (
                                       <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">

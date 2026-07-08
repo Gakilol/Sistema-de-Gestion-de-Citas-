@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserContext } from '@/lib/auth-helpers';
 import { logAudit } from './audit-logger';
 
 export const ALLOWED_AUDIT_ROLES = ['ADMIN', 'TECH_SUPPORT'];
 
-export function checkAuditAuth(req: NextRequest): { error: NextResponse } | { userId: string; role: string; email: string } {
-  const role = req.headers.get('x-user-role');
-  const userId = req.headers.get('x-user-id');
-  const email = req.headers.get('x-user-email');
+/**
+ * Verifica que el usuario tiene permisos para acceder a los logs de auditoría.
+ *
+ * SEGURIDAD: Usa getUserContext que verifica el JWT criptográficamente.
+ * No confía directamente en las cabeceras x-user-* sin verificación.
+ */
+export function checkAuditAuth(
+  req: NextRequest
+): { error: NextResponse } | { userId: string; role: string; email: string } {
+  // getUserContext verifica el JWT criptográficamente (vía middleware o fallback seguro)
+  const { userId, userRole: role, userEmail: email } = getUserContext(req);
 
   if (!userId || !role || !ALLOWED_AUDIT_ROLES.includes(role)) {
-    // Determine IP and User Agent for safety log
+    // Enmascarar IP para el log
     const forwardedFor = req.headers.get('x-forwarded-for');
     const realIp = req.headers.get('x-real-ip');
     let ip = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || '');

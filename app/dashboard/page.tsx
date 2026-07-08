@@ -87,7 +87,7 @@ interface KpiCardProps {
   value: string;
   sub?: string;
   icon: React.ElementType;
-  accent: 'gold' | 'emerald' | 'blue' | 'purple';
+  accent: 'gold' | 'emerald' | 'blue' | 'wine';
   trend?: number; // positivo=subida, negativo=bajada
 }
 
@@ -96,7 +96,7 @@ function KpiCard({ title, value, sub, icon: Icon, accent, trend }: KpiCardProps)
     gold:    { card: 'card-accent-gold',    icon: 'metric-icon-gold',    text: 'text-amber-500' },
     emerald: { card: 'card-accent-emerald', icon: 'metric-icon-emerald', text: 'text-emerald-500' },
     blue:    { card: 'card-accent-blue',    icon: 'metric-icon-blue',    text: 'text-blue-500' },
-    purple:  { card: 'card-accent-purple',  icon: 'metric-icon-purple',  text: 'text-purple-500' },
+    wine:    { card: 'card-accent-wine',    icon: 'metric-icon-wine',    text: 'text-rose-600' },
   }[accent];
 
   return (
@@ -259,9 +259,9 @@ export default function Dashboard() {
                 <KpiCard
                   title="Personal Activo"
                   value={String(stats?.empleadosActivos ?? 0)}
-                  sub="Estilistas activos"
+                  sub="Profesionales disponibles"
                   icon={Users}
-                  accent="purple"
+                  accent="wine"
                 />
               </>
             ) : (
@@ -276,7 +276,7 @@ export default function Dashboard() {
                 <KpiCard
                   title="Completadas Hoy"
                   value={String(stats?.citasCompletadasHoy ?? 0)}
-                  sub={`${stats?.tasaCompletadas ?? 0}% tasa éxito`}
+                  sub={`${stats?.tasaCompletadas ?? 0}% tasa de éxito`}
                   icon={CheckCircle2}
                   accent="emerald"
                 />
@@ -284,15 +284,15 @@ export default function Dashboard() {
                   title="Completadas del Mes"
                   value={String(stats?.citasCompletadasMes ?? 0)}
                   sub="Mis citas finalizadas este mes"
-                  icon={Calendar}
+                  icon={TrendingUp}
                   accent="blue"
                 />
                 <KpiCard
                   title="Citas Canceladas"
                   value={String(stats?.citasCanceladasTotales ?? 0)}
-                  sub="Total de citas canceladas"
+                  sub="Total canceladas hasta hoy"
                   icon={Clock}
-                  accent="purple"
+                  accent="wine"
                 />
               </>
             )}
@@ -443,9 +443,10 @@ export default function Dashboard() {
                   )}
                 </div>
               ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  <Calendar className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Sin citas programadas para hoy</p>
+                <div className="py-10 text-center">
+                  <Calendar className="w-9 h-9 mx-auto mb-3 empty-state-icon" />
+                  <p className="text-sm font-medium text-foreground">La agenda de hoy está libre</p>
+                  <p className="text-xs text-muted-foreground mt-1">No hay citas programadas para hoy</p>
                 </div>
               )}
             </Card>
@@ -482,9 +483,10 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">No hay citas próximas</p>
+                <div className="py-10 text-center">
+                  <CheckCircle2 className="w-9 h-9 mx-auto mb-3 empty-state-icon" />
+                  <p className="text-sm font-medium text-foreground">Todo está al día</p>
+                  <p className="text-xs text-muted-foreground mt-1">No hay citas futuras por el momento</p>
                 </div>
               )}
             </Card>
@@ -519,7 +521,11 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">Sin actividad reciente</p>
+              <div className="py-10 text-center">
+                <Activity className="w-9 h-9 mx-auto mb-3 empty-state-icon" />
+                <p className="text-sm font-medium text-foreground">Sin actividad aún</p>
+                <p className="text-xs text-muted-foreground mt-1">Aquí aparecerán las últimas citas registradas</p>
+              </div>
             )}
           </Card>
 

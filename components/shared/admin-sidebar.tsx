@@ -17,12 +17,12 @@ import {
   Moon,
   Monitor,
   ChevronRight,
-  Sparkles,
   Clock,
   Menu,
   X,
   Tag,
   UserX,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -35,7 +35,6 @@ interface MenuItem {
   icon: React.ElementType;
   roles: string[];
   badge?: string;
-  isNew?: boolean;
 }
 
 interface MenuGroup {
@@ -53,13 +52,12 @@ function ThemeToggle() {
   }, []);
 
   const cycles = [
-    { value: 'light', icon: Sun,     label: 'Claro' },
-    { value: 'dark',  icon: Moon,    label: 'Oscuro' },
+    { value: 'light',  icon: Sun,     label: 'Claro' },
+    { value: 'dark',   icon: Moon,    label: 'Oscuro' },
     { value: 'system', icon: Monitor, label: 'Sistema' },
   ];
 
-  // Forzar una representación inicial neutral y coincidente con el servidor
-  const current = mounted 
+  const current = mounted
     ? (cycles.find((c) => c.value === theme) ?? cycles[2])
     : cycles[2];
 
@@ -71,19 +69,19 @@ function ThemeToggle() {
       onClick={() => setTheme(next.value)}
       title={mounted ? `Modo: ${current.label}. Clic para cambiar a ${next.label}` : ''}
       className={cn(
-        'flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-sm font-medium',
-        'text-[hsl(var(--sidebar-foreground)/0.7)] hover:text-[hsl(var(--sidebar-foreground))]',
+        'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-medium',
+        'text-[hsl(var(--sidebar-foreground)/0.65)] hover:text-[hsl(var(--sidebar-foreground))]',
         'hover:bg-[hsl(var(--sidebar-accent))] transition-all duration-200 group'
       )}
     >
       <span className={cn(
         'flex items-center justify-center w-7 h-7 rounded-md',
-        'bg-[hsl(var(--sidebar-accent))] group-hover:bg-[hsl(var(--sidebar-primary)/0.15)] transition-colors'
+        'bg-[hsl(var(--sidebar-accent))] group-hover:bg-[hsl(var(--sidebar-primary)/0.12)] transition-colors'
       )}>
         <Icon className="w-3.5 h-3.5" />
       </span>
       <span className="flex-1 text-left">{current.label}</span>
-      <ChevronRight className="w-3 h-3 opacity-40 rotate-90" />
+      <ChevronRight className="w-3 h-3 opacity-35 rotate-90" />
     </button>
   );
 }
@@ -110,9 +108,9 @@ function UserAvatar({ nombre, rol }: { nombre: string; rol: string }) {
   };
 
   return (
-    <div className="flex items-center gap-3 px-3 py-4 border-b border-[hsl(var(--sidebar-border))]">
+    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[hsl(var(--sidebar-border))]">
       <div className={cn(
-        'w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-lg',
+        'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0',
         roleColors[rol] ?? roleColors.EMPLEADO
       )}>
         {initials || <UserRound className="w-4 h-4" />}
@@ -156,14 +154,12 @@ const menuGroups: MenuGroup[] = [
         href: '/clientes',
         icon: Users,
         roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
-        isNew: true,
       },
       {
         title: 'Clientes Inactivos',
         href: '/clientes-inactivos',
         icon: UserX,
         roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
-        isNew: true,
       },
     ],
   },
@@ -193,7 +189,6 @@ const menuGroups: MenuGroup[] = [
         href: '/reportes',
         icon: BarChart3,
         roles: ['ADMIN', 'TECH_SUPPORT'],
-        isNew: true,
       },
       {
         title: 'Horarios',
@@ -202,9 +197,9 @@ const menuGroups: MenuGroup[] = [
         roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
-        title: 'Auditoría del Sistema',
+        title: 'Auditoría',
         href: '/auditoria',
-        icon: Clock,
+        icon: ShieldCheck,
         roles: ['ADMIN', 'TECH_SUPPORT'],
       },
     ],
@@ -259,8 +254,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={group.label} className="mb-2">
-              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--sidebar-foreground)/0.35)]">
+            <div key={group.label} className="mb-3">
+              <p className="px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-foreground)/0.3)] mb-0.5">
                 {group.label}
               </p>
               <div className="space-y-0.5">
@@ -275,34 +270,27 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative',
+                        'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 group relative',
                         isActive
-                          ? 'bg-[hsl(var(--sidebar-primary)/0.15)] text-[hsl(var(--sidebar-primary))]'
-                          : 'text-[hsl(var(--sidebar-foreground)/0.65)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'
+                          ? 'bg-[hsl(var(--sidebar-primary)/0.12)] text-[hsl(var(--sidebar-primary))]'
+                          : 'text-[hsl(var(--sidebar-foreground)/0.60)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'
                       )}
                     >
                       {/* Active indicator */}
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[hsl(var(--sidebar-primary))] rounded-r-full" />
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-[hsl(var(--sidebar-primary))] rounded-r-full" />
                       )}
 
                       <span className={cn(
-                        'flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0 transition-all',
+                        'flex items-center justify-center w-6 h-6 rounded-md flex-shrink-0 transition-all',
                         isActive
-                          ? 'bg-[hsl(var(--sidebar-primary)/0.2)]'
-                          : 'bg-[hsl(var(--sidebar-accent))] group-hover:bg-[hsl(var(--sidebar-primary)/0.1)]'
+                          ? 'bg-[hsl(var(--sidebar-primary)/0.18)]'
+                          : 'bg-[hsl(var(--sidebar-accent))] group-hover:bg-[hsl(var(--sidebar-primary)/0.08)]'
                       )}>
                         <item.icon className="w-3.5 h-3.5" />
                       </span>
 
                       <span className="flex-1">{item.title}</span>
-
-                      {item.isNew && (
-                        <span className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[hsl(var(--sidebar-primary)/0.2)] text-[hsl(var(--sidebar-primary))]">
-                          <Sparkles className="w-2 h-2" />
-                          Nuevo
-                        </span>
-                      )}
 
                       {item.badge && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]">
@@ -319,7 +307,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-[hsl(var(--sidebar-border))] space-y-1 flex-shrink-0">
+      <div className="px-3 py-2.5 border-t border-[hsl(var(--sidebar-border))] space-y-0.5 flex-shrink-0">
         {/* Theme toggle */}
         <ThemeToggle />
 
@@ -327,19 +315,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <button
           onClick={handleLogout}
           className={cn(
-            'flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-sm font-medium',
-            'text-[hsl(var(--sidebar-foreground)/0.55)] hover:text-red-500',
-            'hover:bg-red-500/10 transition-all duration-200 group'
+            'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-medium',
+            'text-[hsl(var(--sidebar-foreground)/0.50)] hover:text-red-400',
+            'hover:bg-red-500/8 transition-all duration-200 group'
           )}
         >
-          <span className="flex items-center justify-center w-7 h-7 rounded-md bg-[hsl(var(--sidebar-accent))] group-hover:bg-red-500/10 transition-colors">
+          <span className="flex items-center justify-center w-6 h-6 rounded-md bg-[hsl(var(--sidebar-accent))] group-hover:bg-red-500/10 transition-colors">
             <LogOut className="w-3.5 h-3.5" />
           </span>
           Cerrar Sesión
         </button>
 
         {/* Version */}
-        <p className="text-center text-[10px] text-[hsl(var(--sidebar-foreground)/0.2)] pt-1 pb-0.5">
+        <p className="text-center text-[9px] text-[hsl(var(--sidebar-foreground)/0.2)] pt-1.5">
           HAIR STYLE v1.2.0
         </p>
       </div>
@@ -351,16 +339,16 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 function MobileHeader({ onOpen }: { onOpen: () => void }) {
   const pathname = usePathname();
   const pageNames: Record<string, string> = {
-    '/dashboard': 'Dashboard',
-    '/citas': 'Citas',
-    '/clientes': 'Clientes',
+    '/dashboard':          'Dashboard',
+    '/citas':              'Citas',
+    '/clientes':           'Clientes',
     '/clientes-inactivos': 'Clientes Inactivos',
-    '/servicios': 'Servicios',
-    '/categorias': 'Categorías',
-    '/empleados': 'Personal',
-    '/reportes': 'Reportes',
-    '/configuracion': 'Horarios',
-    '/auditoria': 'Auditoría del Sistema',
+    '/servicios':          'Servicios',
+    '/categorias':         'Categorías',
+    '/empleados':          'Personal',
+    '/reportes':           'Reportes',
+    '/configuracion':      'Horarios',
+    '/auditoria':          'Auditoría',
   };
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';
 
@@ -368,12 +356,12 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar))] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-4">
       <button
         onClick={onOpen}
-        className="w-8 h-8 flex items-center justify-center rounded-lg text-[hsl(var(--sidebar-foreground)/0.7)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition-all"
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-[hsl(var(--sidebar-foreground)/0.65)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition-all"
       >
         <Menu className="w-5 h-5" />
       </button>
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md flex items-center justify-center">
+        <div className="w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md flex items-center justify-center">
           <Scissors className="w-3 h-3 text-white" />
         </div>
         <span className="text-[hsl(var(--sidebar-foreground))] font-bold text-sm">{currentPage}</span>
@@ -389,7 +377,7 @@ export function AdminSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-60 flex-shrink-0 h-screen sticky top-0 overflow-hidden border-r border-[hsl(var(--sidebar-border))]">
+      <aside className="hidden lg:flex w-56 flex-shrink-0 h-screen sticky top-0 overflow-hidden border-r border-[hsl(var(--sidebar-border))]">
         <SidebarContent />
       </aside>
 
@@ -400,10 +388,10 @@ export function AdminSidebar() {
       {mobileOpen && (
         <>
           <div
-            className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            className="lg:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 shadow-2xl animate-in slide-in-from-left duration-250">
+          <div className="lg:hidden fixed inset-y-0 left-0 z-50 w-60 shadow-2xl animate-in slide-in-from-left duration-250">
             <SidebarContent onClose={() => setMobileOpen(false)} />
           </div>
         </>

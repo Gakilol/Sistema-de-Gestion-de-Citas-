@@ -23,6 +23,7 @@ export interface IntervaloOcupado {
   inicio: number;  // minutos desde medianoche
   fin: number;     // minutos desde medianoche
   motivo: string;
+  allowOverlap?: boolean;
 }
 
 // ─── Interfaz de turno individual de empleado ───────────────────────────────
@@ -86,6 +87,7 @@ export function validarHoraExacta(
 
   // Validar conflictos con todos los intervalos ocupados (las colisiones de agenda se validan siempre)
   for (const int of intervalosOcupados) {
+    if (int.allowOverlap) continue;
     if (startMin < int.fin && endMin > int.inicio) {
       return {
         valida: false,
@@ -230,7 +232,8 @@ export async function calcularDisponibilidad(
     ...citas.map(c => ({
       inicio: timeToMinutes(c.hora),
       fin: timeToMinutes(c.hora) + c.duracion,
-      motivo: 'Cita reservada'
+      motivo: 'Cita reservada',
+      allowOverlap: c.allowOverlap
     })),
     ...descansosDia.map(d => ({
       inicio: timeToMinutes(d.hora_inicio),
@@ -323,6 +326,7 @@ export interface ConflictoCita {
   startTime: string;
   endTime: string;
   professionalName: string;
+  allowOverlap?: boolean;
 }
 
 export async function detectarConflictos(
@@ -366,7 +370,8 @@ export async function detectarConflictos(
         serviceName: c.servicio.nombre,
         startTime: c.hora,
         endTime: minutesToTime(cEnd),
-        professionalName: c.empleado.nombre
+        professionalName: c.empleado.nombre,
+        allowOverlap: c.allowOverlap
       });
     }
   }

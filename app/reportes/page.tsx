@@ -22,14 +22,14 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'resumen' | 'demanda' | 'asistencia' | 'cancelaciones' | 'clientes' | 'fidelizacion' | 'profesionales';
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'resumen',       label: 'Resumen',        icon: BarChart3    },
-  { id: 'demanda',       label: 'Demanda',         icon: Activity     },
-  { id: 'asistencia',    label: 'Asistencia',      icon: CheckCircle  },
-  { id: 'cancelaciones', label: 'Cancelaciones',   icon: XCircle      },
-  { id: 'clientes',      label: 'Clientes Inact.', icon: UserX        },
-  { id: 'fidelizacion',  label: 'Fidelización',    icon: Star         },
-  { id: 'profesionales', label: 'Rendimiento',     icon: Briefcase    },
+const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
+  { id: 'resumen',       label: 'Resumen',        icon: BarChart3,    desc: 'KPIs y métricas generales del período' },
+  { id: 'demanda',       label: 'Demanda',         icon: Activity,     desc: 'Horarios pico, días y servicios más solicitados' },
+  { id: 'asistencia',    label: 'Asistencia',      icon: CheckCircle,  desc: 'Tasas de asistencia y no-show por período' },
+  { id: 'cancelaciones', label: 'Cancelaciones',   icon: XCircle,      desc: 'Motivos y patrones de cancelación' },
+  { id: 'clientes',      label: 'Cl. Inactivos',   icon: UserX,        desc: 'Clientes que no han visitado el salón recientemente' },
+  { id: 'fidelizacion',  label: 'Fidelización',    icon: Star,         desc: 'Clientes frecuentes y retención' },
+  { id: 'profesionales', label: 'Rendimiento',     icon: Briefcase,    desc: 'Desempeño y carga de trabajo por profesional' },
 ];
 
 const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316', '#ef4444', '#06b6d4'];
@@ -162,11 +162,14 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
-function EmptyState({ message = 'No hay datos para el período seleccionado.' }: { message?: string }) {
+function EmptyState({ message }: { message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 text-muted-foreground gap-3">
-      <BarChart3 className="w-8 h-8 opacity-20" />
-      <p className="text-sm">{message}</p>
+    <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <BarChart3 className="w-10 h-10 empty-state-icon" />
+      <div className="text-center">
+        <p className="text-sm font-medium text-foreground">{message ?? 'Sin datos para este período'}</p>
+        <p className="text-xs text-muted-foreground mt-1">Prueba cambiando el rango de fechas o los filtros activos.</p>
+      </div>
     </div>
   );
 }
@@ -982,15 +985,17 @@ function ReportesContent() {
           </Card>
 
           {/* ─── Tabs ────────────────────────────────────────────────────── */}
-          <div className="overflow-x-auto">
-            <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl w-fit min-w-full sm:min-w-0">
+          <div className="overflow-x-auto -mx-1 px-1">
+            <div className="flex gap-0.5 border-b border-border/60 min-w-fit">
               {TABS.map(t => (
                 <button
                   key={t.id}
                   onClick={() => { setTab(t.id); setData(null); }}
                   className={cn(
-                    'flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
-                    tab === t.id ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                    'flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-all whitespace-nowrap relative',
+                    tab === t.id
+                      ? 'text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary after:rounded-t'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   <t.icon className="w-3.5 h-3.5" />
@@ -999,6 +1004,13 @@ function ReportesContent() {
               ))}
             </div>
           </div>
+
+          {/* Tab description */}
+          {TABS.find(t => t.id === tab)?.desc && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              {TABS.find(t => t.id === tab)!.desc}
+            </p>
+          )}
 
           {/* ─── Content ─────────────────────────────────────────────────── */}
           <div className="min-h-[400px]">

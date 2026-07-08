@@ -1,7 +1,15 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { z } from 'zod';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext, maskClientDataIfRestricted } from '@/lib/auth-helpers';
+
+const CreateClienteSchema = z.object({
+  nombre: z.string().min(2, 'El nombre es obligatorio (mínimo 2 caracteres)').max(150).trim(),
+  telefono: z.string().max(30).trim().optional().nullable(),
+  correo: z.string().email('Correo inválido').max(254).trim().optional().nullable(),
+  notas: z.string().max(1000).trim().optional().nullable(),
+});
 
 // ─── GET /api/clientes
 // Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas.
@@ -126,8 +134,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { nombre, telefono, correo, notas } = body;
+    const rawBody = await req.json();
+    const parseResult = CreateClienteSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const { nombre, telefono, correo, notas } = parseResult.data;
 
     if (!nombre || nombre.trim().length < 2) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
