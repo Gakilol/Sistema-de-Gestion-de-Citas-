@@ -21,8 +21,13 @@ function getRequiredSecret(envVar: string, fallbackForDev: string): string {
   return secret;
 }
 
-const JWT_SECRET = getRequiredSecret('JWT_SECRET', 'dev-only-secret-jwt-change-me-in-production');
-const JWT_REFRESH_SECRET = getRequiredSecret('JWT_REFRESH_SECRET', 'dev-only-secret-refresh-change-me-in-production');
+function getJwtSecret(): string {
+  return getRequiredSecret('JWT_SECRET', 'dev-only-secret-jwt-change-me-in-production');
+}
+
+function getJwtRefreshSecret(): string {
+  return getRequiredSecret('JWT_REFRESH_SECRET', 'dev-only-secret-refresh-change-me-in-production');
+}
 
 const getJwtSecretKey = (secret: string) => {
   return new TextEncoder().encode(secret);
@@ -33,7 +38,7 @@ export const signToken = async (payload: CustomJWTPayload): Promise<string> => {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('1h')
-    .sign(getJwtSecretKey(JWT_SECRET));
+    .sign(getJwtSecretKey(getJwtSecret()));
 };
 
 export const signRefreshToken = async (payload: { id: string }): Promise<string> => {
@@ -41,12 +46,12 @@ export const signRefreshToken = async (payload: { id: string }): Promise<string>
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(getJwtSecretKey(JWT_REFRESH_SECRET));
+    .sign(getJwtSecretKey(getJwtRefreshSecret()));
 };
 
 export const verifyToken = async (token: string): Promise<CustomJWTPayload | null> => {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecretKey(JWT_SECRET));
+    const { payload } = await jwtVerify(token, getJwtSecretKey(getJwtSecret()));
     return payload as CustomJWTPayload;
   } catch (error) {
     return null;
@@ -55,7 +60,7 @@ export const verifyToken = async (token: string): Promise<CustomJWTPayload | nul
 
 export const verifyRefreshToken = async (token: string): Promise<{ id: string } | null> => {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecretKey(JWT_REFRESH_SECRET));
+    const { payload } = await jwtVerify(token, getJwtSecretKey(getJwtRefreshSecret()));
     return payload as { id: string };
   } catch (error) {
     return null;
@@ -79,7 +84,7 @@ export function verifyJwtSync(token: string): CustomJWTPayload | null {
     // 1. Verificar firma HMAC-SHA256
     const signingInput = `${headerB64}.${payloadB64}`;
     const expectedSignature = crypto
-      .createHmac('sha256', JWT_SECRET)
+      .createHmac('sha256', getJwtSecret())
       .update(signingInput)
       .digest('base64url');
 
