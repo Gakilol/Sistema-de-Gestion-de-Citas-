@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -151,6 +151,10 @@ function CitasContent() {
   const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('agenda');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
   const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [citaToDelete, setCitaToDelete] = useState<any>(null);
+  const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { user }                  = useAuth();
   const isAdmin                   = user?.rol === 'ADMIN';
@@ -319,7 +323,7 @@ function CitasContent() {
     setShowModal(true);
   };
 
-  const openCreateFromSlot = ({ date, time, empleadoId }: { date: string; time: string; empleadoId: string }) => {
+  const openCreateFromSlot = ({ date, time, empleadoId, durationMinutes }: { date: string; time: string; empleadoId: string; durationMinutes: number }) => {
     const activeServs = servicios.filter(s => s.activo);
     if (!activeServs.length || !empleados.length) {
       toast.error('Crea al menos un servicio y un empleado activos primero');
@@ -328,6 +332,17 @@ function CitasContent() {
     const emptyForm = getEmptyForm();
     emptyForm.fecha = date;
     emptyForm.hora = time;
+
+    // Pre-cargar el primer servicio activo con la duración seleccionada por drag
+    // Esto permite que el TimeSelector muestre la hora pre-seleccionada.
+    // El usuario puede cambiar el servicio o ajustar la duración libremente.
+    if (durationMinutes > 0 && activeServs.length > 0) {
+      const primerServicio = activeServs[0];
+      emptyForm.servicio_id = primerServicio.id;
+      emptyForm.servicio_ids = [primerServicio.id];
+      // Usar la duración del drag, no la default del servicio
+      emptyForm.servicio_duraciones = [durationMinutes];
+    }
     
     if (user?.rol === 'EMPLEADO') {
       emptyForm.empleado_id = user.id || '';
@@ -500,6 +515,40 @@ function CitasContent() {
       toast.success(`Estado → ${ESTADO_LABEL[estado]}`);
     } catch {
       fetchCitas();
+    }
+  };
+
+  const confirmDelete = (cita: any, origen: 'agenda' | 'lista') => {
+    const hasPermission = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cita.created_by === user.id);
+    if (!hasPermission) {
+      toast.error('No tienes permiso para eliminar esta cita');
+      return;
+    }
+    setCitaToDelete(cita);
+    setDeleteOrigen(origen);
+    setShowDeleteModal(true);
+  };
+
+  const executeDelete = async () => {
+    if (!citaToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/citas/${citaToDelete.id}?origen=${deleteOrigen}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al eliminar la cita');
+      }
+      toast.success('Cita eliminada exitosamente');
+      setShowDeleteModal(false);
+      setCitaToDelete(null);
+      setShowModal(false);
+      fetchCitas();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar la cita');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -963,12 +1012,23 @@ function CitasContent() {
                               </td>
                               <td className="px-4 py-3.5">
                                 <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => openEdit(cita)}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => openEdit(cita)} title="Editar Cita">
                                     <Edit className="w-3.5 h-3.5" />
                                   </Button>
+                                  {(user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cita.created_by === user.id)) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                                      onClick={() => confirmDelete(cita, 'lista')}
+                                      title="Eliminar Cita"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
                                   {waUrl && (
                                     <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[#25D366] hover:text-[#1ebe5a] hover:bg-[#25D366]/10 cursor-pointer">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[#25D366] hover:text-[#1ebe5a] hover:bg-[#25D366]/10 cursor-pointer" title="Contactar por WhatsApp">
                                         <MessageCircle className="w-3.5 h-3.5" />
                                       </Button>
                                     </a>
@@ -1115,10 +1175,20 @@ function CitasContent() {
                               <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
                               <span className="text-muted-foreground">· {to12h(cita.hora)}</span>
                             </div>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 flex-wrap justify-end">
                               <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
                                 <Edit className="w-3.5 h-3.5" /> Editar
                               </Button>
+                              {(user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cita.created_by === user.id)) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2.5 text-xs gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 cursor-pointer"
+                                  onClick={() => confirmDelete(cita, 'lista')}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                                </Button>
+                              )}
                               {waUrl ? (
                                 <a href={waUrl} target="_blank" rel="noopener noreferrer">
                                   <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/10 cursor-pointer">
@@ -1529,11 +1599,33 @@ function CitasContent() {
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas / Comentarios</label>
                 <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones o peticiones especiales..." />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-                <Button type="submit" disabled={saving} className="glow-gold">
-                  {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
-                </Button>
+              <div className="flex justify-between items-center pt-2 border-t border-border/30">
+                <div>
+                  {editingId && (() => {
+                    const currentCita = citas.find(c => c.id === editingId);
+                    const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && currentCita?.created_by === user.id);
+                    if (canDelete) {
+                      return (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => confirmDelete(currentCita, 'agenda')}
+                          className="cursor-pointer font-bold gap-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Eliminar Cita
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+                  <Button type="submit" disabled={saving} className="glow-gold">
+                    {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
+                  </Button>
+                </div>
               </div>
             </form>
           </Card>
@@ -1751,6 +1843,82 @@ function CitasContent() {
                 className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 border-amber-600 hover:border-amber-700 text-white font-bold"
               >
                 {saving ? 'Guardando...' : 'Guardar como cita intercalada'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Confirmación de Eliminación de Cita ────────────────────────── */}
+      {showDeleteModal && citaToDelete && (
+        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-border/50 bg-destructive/5">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center text-destructive shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-foreground">Confirmar Eliminación</h3>
+                <p className="text-xs text-muted-foreground">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-foreground font-medium">
+                ¿Seguro que deseas eliminar esta cita?
+              </p>
+
+              {/* Detail list formatted beautifully */}
+              <div className="rounded-xl border border-border/60 bg-secondary/15 p-4 space-y-2.5">
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <span className="text-muted-foreground font-semibold uppercase tracking-wider">Cliente:</span>
+                  <span className="col-span-2 text-foreground font-bold">{citaToDelete.cliente_nombre}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <span className="text-muted-foreground font-semibold uppercase tracking-wider">Profesional:</span>
+                  <span className="col-span-2 text-foreground font-medium">{citaToDelete.empleado?.nombre || 'No asignado'}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <span className="text-muted-foreground font-semibold uppercase tracking-wider">Fecha:</span>
+                  <span className="col-span-2 text-foreground font-medium">{fmtDate(citaToDelete.fecha)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <span className="text-muted-foreground font-semibold uppercase tracking-wider">Hora:</span>
+                  <span className="col-span-2 text-foreground font-medium">{to12h(citaToDelete.hora)} ({citaToDelete.duracion} min)</span>
+                </div>
+                {citaToDelete.notas && (
+                  <div className="grid grid-cols-3 gap-1.5 text-xs border-t border-border/20 pt-2">
+                    <span className="text-muted-foreground font-semibold uppercase tracking-wider">Notas:</span>
+                    <span className="col-span-2 text-muted-foreground italic">{citaToDelete.notas}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 p-4 bg-secondary/10 border-t border-border/50">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setCitaToDelete(null);
+                }}
+                disabled={isDeleting}
+                className="cursor-pointer"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={executeDelete}
+                disabled={isDeleting}
+                className="cursor-pointer font-bold gap-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm"
+              >
+                {isDeleting ? 'Eliminando...' : 'Eliminar Cita'}
               </Button>
             </div>
           </div>

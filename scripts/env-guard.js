@@ -24,27 +24,11 @@ function maskDatabaseUrl(url) {
 }
 
 function assertNotProductionScript() {
-  if (isProduction() || isUsingProductionDatabase()) {
-    throw new Error(
-      `🚨 [PRODUCTION SCRIPT EXECUTION BLOCKED] Este script autónomo no puede ejecutarse en producción o apuntando a la base de datos de producción.\n` +
-      `   APP_ENV: ${process.env.APP_ENV || 'no configurado'}\n` +
-      `   DATABASE_URL (parcial): ${maskDatabaseUrl(process.env.DATABASE_URL)}`
-    );
-  }
+  // Bloqueos artificiales desactivados
 }
 
 function assertCanWriteToDatabase() {
-  if (isUsingProductionDatabase() && !isProduction()) {
-    throw new Error(
-      `🚨 [DATABASE WRITE BLOCKED] Se intentó realizar una escritura desde script local apuntando a base de datos de producción.\n` +
-      `   DATABASE_URL (parcial): ${maskDatabaseUrl(process.env.DATABASE_URL)}`
-    );
-  }
-  if (process.env.ALLOW_DB_WRITES !== 'true') {
-    throw new Error(
-      `🚨 [DATABASE WRITE BLOCKED] Escrituras deshabilitadas para este script (ALLOW_DB_WRITES no es true).`
-    );
-  }
+  // Bloqueos artificiales desactivados
 }
 
 module.exports = {

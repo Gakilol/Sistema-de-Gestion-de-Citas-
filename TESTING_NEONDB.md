@@ -211,14 +211,14 @@ Utilice esta checklist para guiar e identificar los resultados de las pruebas ma
   * **Captura:** 
   * **Prioridad:** 
 
-- [ ] **Prueba:** Editar un servicio (marcar como inactivo, cambiar precio/duración).
+- [ ] **Prueba:** Editar un servicio (marcar como inactivo, cambiar duración y/o categoría).
   * **Resultado:** 
   * **Evidencia:** 
   * **Error encontrado:** 
   * **Captura:** 
   * **Prioridad:** 
 
-- [ ] **Prueba:** Validar la suma automática de la duración y el precio total cuando se eligen múltiples servicios en una cita.
+- [ ] **Prueba:** Validar la suma automática de la duración cuando se eligen múltiples servicios en una cita.
   * **Resultado:** 
   * **Evidencia:** 
   * **Error encontrado:** 

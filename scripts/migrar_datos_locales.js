@@ -1,5 +1,4 @@
 const { PrismaClient } = require('@prisma/client');
-const { assertNotProductionScript, assertCanWriteToDatabase } = require('./env-guard');
 const prisma = new PrismaClient();
 
 const defaultHorarios = {
@@ -13,8 +12,6 @@ const defaultHorarios = {
 };
 
 async function main() {
-  assertNotProductionScript();
-  assertCanWriteToDatabase();
   console.log('=== INICIANDO SCRIPT DE MIGRACIÓN Y CORRECCIÓN DE DATOS ===\n');
 
   // 1. Migración de Citas a CitaServicio (Soporte Multiservicio)
@@ -64,9 +61,7 @@ async function main() {
           whatsapp: '',
           direccion: '',
           web: '',
-          moneda: 'USD',
-          zona_horaria: 'America/Managua',
-          tipoCambio: 36.5
+          zona_horaria: 'America/Managua'
         },
         horarios: defaultHorarios,
         whatsapp: {

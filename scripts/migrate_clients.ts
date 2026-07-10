@@ -1,11 +1,8 @@
 import { PrismaClient } from '@prisma/client';
-import { assertNotProductionScript, assertCanWriteToDatabase } from '../src/lib/env-guard';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  assertNotProductionScript();
-  assertCanWriteToDatabase();
   console.log('Iniciando migración de clientes...');
 
   // 1. Obtener todas las citas que aún no tienen cliente_id

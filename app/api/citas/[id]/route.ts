@@ -511,8 +511,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id }   = await params;
     const { userId, userRole, userEmail } = getUserContext(req);
 
-    if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
-      return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar citas' }, { status: 403 });
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'Usuario no autorizado' }, { status: 401 });
     }
 
     const cita = await prisma.cita.findUnique({
@@ -522,6 +522,38 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!cita) {
       return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 });
     }
+
+    // Validar permisos según rol
+    if (userRole === 'EMPLEADO') {
+      if (cita.created_by !== userId) {
+        return NextResponse.json({ error: 'No tienes permiso para eliminar esta cita' }, { status: 403 });
+      }
+    } else if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
+      return NextResponse.json({ error: 'No tienes permiso para eliminar esta cita' }, { status: 403 });
+    }
+
+    // Obtener origen de la acción
+    const origenParam = req.nextUrl.searchParams.get('origen') || '';
+    let friendlyOrigen = 'el sistema';
+    if (origenParam === 'agenda') {
+      friendlyOrigen = 'Agenda/Calendario';
+    } else if (origenParam === 'lista') {
+      friendlyOrigen = 'Lista de Citas';
+    }
+
+    // Guardar los datos antes de eliminar (evitando datos sensibles redundantes)
+    const beforeData = {
+      id: cita.id,
+      cliente_nombre: cita.cliente_nombre,
+      cliente_id: cita.cliente_id,
+      empleado_id: cita.empleado_id,
+      fecha: cita.fecha,
+      hora: cita.hora,
+      duracion: cita.duracion,
+      estado: cita.estado,
+      created_by: cita.created_by,
+      created_at: cita.created_at
+    };
 
     await prisma.cita.delete({ where: { id } });
 
@@ -536,13 +568,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       entityType: 'Cita',
       entityId: id,
       entityName: cita.cliente_nombre,
-      description: `Cita de ${cita.cliente_nombre} eliminada permanentemente.`,
-      beforeData: cita,
+      description: `Cita de ${cita.cliente_nombre} para el ${cita.fecha.toISOString().split('T')[0]} a las ${cita.hora} con profesional ${cita.empleado_id} eliminada permanentemente desde ${friendlyOrigen}.`,
+      beforeData,
+      metadata: {
+        origen: friendlyOrigen,
+        cliente_nombre: cita.cliente_nombre,
+        empleado_id: cita.empleado_id,
+        fecha: cita.fecha,
+        hora: cita.hora
+      },
       ipAddress: getClientIp(req.headers),
       userAgent: req.headers.get('user-agent') || undefined
     });
 
-    return NextResponse.json({ mensaje: 'Cita eliminada' }, { status: 200 });
+    return NextResponse.json({ mensaje: 'Cita eliminada exitosamente' }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

@@ -79,7 +79,6 @@ export default function Configuracion() {
     whatsapp: '',
     direccion: '',
     web: '',
-    moneda: 'USD',
     zona_horaria: 'America/Managua',
   });
 
@@ -98,9 +97,6 @@ export default function Configuracion() {
     branding: true,
   });
 
-  // ── Divisa ──────────────────────────────────────────────────────────────
-  const [divisa, setDivisa] = useState({ moneda: 'USD', tipoCambio: 36.5 });
-  const [divisaSaving, setDivisaSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // ── Dispositivos Recordados ─────────────────────────────────────────────
@@ -180,37 +176,16 @@ export default function Configuracion() {
           if (d.config.horarios && Object.keys(d.config.horarios).length > 0) setHorarios(d.config.horarios);
           if (d.config.whatsapp && Object.keys(d.config.whatsapp).length > 0) setWaConfig(d.config.whatsapp);
           if (d.config.apariencia && Object.keys(d.config.apariencia).length > 0) setApariencia(d.config.apariencia);
-          if (d.config.negocio?.moneda) setDivisa(prev => ({ ...prev, moneda: d.config.negocio.moneda, tipoCambio: d.config.negocio.tipoCambio ?? 36.5 }));
         }
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSaveDivisa = async () => {
-    setDivisaSaving(true);
-    try {
-      const res = await fetch('/api/divisa', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(divisa),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      toast.success('Tipo de cambio guardado');
-      setNegocio(prev => ({ ...prev, moneda: divisa.moneda, tipoCambio: divisa.tipoCambio }));
-    } catch (err: any) {
-      toast.error(err.message || 'Error al guardar');
-    } finally { setDivisaSaving(false); }
-  };
-  // ────────────────────────────────────────────────────────────────────────
-
   const handleSave = async () => {
     setSaved(true);
     try {
       const payload = {
-        negocio: {
-          ...negocio,
-          tipoCambio: divisa.tipoCambio,
-        },
+        negocio: { ...negocio },
         horarios,
         whatsapp: waConfig,
         apariencia,
@@ -245,7 +220,7 @@ export default function Configuracion() {
       case 'negocio':
         return {
           title: 'Configuración del Negocio',
-          desc: 'Gestiona la información de contacto, ubicación y divisa de HAIR STYLE',
+          desc: 'Gestiona la información de contacto y ubicación de HAIR STYLE',
         };
       case 'whatsapp':
         return {
