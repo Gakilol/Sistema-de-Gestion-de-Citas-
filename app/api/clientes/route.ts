@@ -7,7 +7,10 @@ import { getUserContext, maskClientDataIfRestricted } from '@/lib/auth-helpers';
 const CreateClienteSchema = z.object({
   nombre: z.string().min(2, 'El nombre es obligatorio (mínimo 2 caracteres)').max(150).trim(),
   telefono: z.string().max(30).trim().optional().nullable(),
-  correo: z.string().email('Correo inválido').max(254).trim().optional().nullable(),
+  correo: z.preprocess(
+    (val) => (val === '' ? null : val),
+    z.string().email('Correo inválido').max(254).trim().optional().nullable()
+  ),
   notas: z.string().max(1000).trim().optional().nullable(),
 });
 
