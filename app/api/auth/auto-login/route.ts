@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
       return handleInvalidToken(token, ipAddress, userAgent, 'La cuenta de usuario no existe o está inactiva');
     }
 
+    const allowedRoles = ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'];
+    if (!allowedRoles.includes(empleado.rol)) {
+      return handleInvalidToken(token, ipAddress, userAgent, 'Rol de usuario no válido');
+    }
+
     // ─── Generar sesión normal (JWT) ─────────────────────────
     const tokenPayload = {
       id: empleado.id,

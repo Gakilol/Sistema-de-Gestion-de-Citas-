@@ -81,3 +81,49 @@ export function parseLocalDateToUTC(fechaYYYYMMDD: string): Date {
   const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day));
 }
+
+/**
+ * Retorna la fecha por defecto para reservar una cita.
+ * Si la hora actual en Costa Rica es mayor o igual a las 6:30 PM (18:30), retorna la fecha del día siguiente,
+ * de lo contrario retorna la fecha de hoy.
+ */
+export function getDefaultBookingDate(): string {
+  const d = new Date();
+  
+  // Obtener la hora actual en Costa Rica (formato 24h)
+  const formatterTime = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  });
+  
+  const timeStr = formatterTime.format(d);
+  const [hour, minute] = timeStr.split(':').map(Number);
+  
+  // Obtener la fecha de hoy en Costa Rica
+  const formatterDate = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatterDate.formatToParts(d);
+  const year = Number(parts.find(p => p.type === 'year')?.value);
+  const month = Number(parts.find(p => p.type === 'month')?.value);
+  const day = Number(parts.find(p => p.type === 'day')?.value);
+  
+  // Crear fecha base en UTC usando el año, mes y día de Costa Rica
+  const dateCR = new Date(Date.UTC(year, month - 1, day));
+  
+  // Si son las 6:30 PM o más tarde, se suma un día
+  if (hour > 18 || (hour === 18 && minute >= 30)) {
+    dateCR.setUTCDate(dateCR.getUTCDate() + 1);
+  }
+  
+  const nextYear = dateCR.getUTCFullYear();
+  const nextMonth = String(dateCR.getUTCMonth() + 1).padStart(2, '0');
+  const nextDay = String(dateCR.getUTCDate()).padStart(2, '0');
+  
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}

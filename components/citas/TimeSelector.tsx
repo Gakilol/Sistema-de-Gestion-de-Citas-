@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getBusinessTodayString, getBusinessNowTime } from '@/lib/timezone';
 
@@ -178,6 +178,17 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     const outsideJornada = selectedMinutes < jornadaInicioMin || (selectedMinutes + duracion) > jornadaFinMin;
     return isDiaInactivo || outsideJornada;
   }, [selectedTime, selectedMinutes, duracion, jornada, jornadaInicioMin, jornadaFinMin]);
+
+  const isPastTime = useMemo(() => {
+    if (!selectedTime) return false;
+    const todayStr = getBusinessTodayString();
+    if (fecha < todayStr) return true;
+    if (fecha === todayStr) {
+      const nowTime = getBusinessNowTime();
+      return selectedTime < nowTime;
+    }
+    return false;
+  }, [fecha, selectedTime, businessNow]);
 
   // ─── Time Picker Handlers ──────────────────────────────────────────────
   const adjustTime = useCallback((deltaMinutes: number) => {
@@ -358,14 +369,21 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
 
     if (validacionActual.valida) {
       return (
-        <div className="flex flex-col gap-2 w-full">
-          {isHorarioEspecial && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-semibold animate-in fade-in duration-200">
-              <span className="animate-pulse">⚡</span>
-              <span>Horario especial: fuera de la jornada laboral habitual</span>
+        <div className="flex flex-col gap-2 w-full animate-in fade-in duration-200">
+          {isPastTime ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>La hora seleccionada ya pasó, pero se permitirá registrar la cita.</span>
             </div>
+          ) : (
+            isHorarioEspecial && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-semibold">
+                <span className="animate-pulse">⚡</span>
+                <span>Horario especial: fuera de la jornada laboral habitual</span>
+              </div>
+            )
           )}
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/30 dark:border-emerald-800/30 text-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/30 dark:border-emerald-800/30 text-xs">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             <div>
               <span className="font-bold text-emerald-600 dark:text-emerald-400">

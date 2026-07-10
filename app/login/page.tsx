@@ -21,9 +21,14 @@ export default function Login() {
 
   useEffect(() => {
     const checkAutoLogin = async () => {
+      // Evitar que StrictMode o re-renders concurrentes disparen doble petición (lo cual invalidaría el token por rotación)
+      if ((window as any).__autoLoginChecked) return;
+      (window as any).__autoLoginChecked = true;
+
       try {
         const res = await fetch('/api/auth/auto-login', {
           method: 'POST',
+          credentials: 'same-origin', // Garantizar el envío de cookies en el mismo origen
         });
         if (res.ok) {
           toast.success('¡Bienvenido de nuevo!');
@@ -31,9 +36,11 @@ export default function Login() {
           const redirectPath = searchParams.get('redirect') || '/dashboard';
           window.location.href = redirectPath;
         } else {
+          (window as any).__autoLoginChecked = false; // Permitir reintento
           setIsCheckingAutoLogin(false);
         }
       } catch (err) {
+        (window as any).__autoLoginChecked = false;
         setIsCheckingAutoLogin(false);
       }
     };

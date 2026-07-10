@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn, formatTo12h } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
-import { formatDBDate, getBusinessTodayString } from '@/lib/timezone';
+import { formatDBDate, getBusinessTodayString, getDefaultBookingDate } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
 
@@ -171,7 +171,7 @@ function CitasContent() {
         const service = servicios.find(s => s.id === qServicioId);
 
         const newForm = { ...getEmptyForm() };
-        newForm.fecha = getBusinessTodayString();
+        newForm.fecha = getDefaultBookingDate();
 
         if (client) {
           newForm.cliente_id = client.id;
@@ -298,7 +298,7 @@ function CitasContent() {
       return;
     }
     const emptyForm = getEmptyForm();
-    emptyForm.fecha = getBusinessTodayString();
+    emptyForm.fecha = getDefaultBookingDate();
     
     // Seleccionar por defecto el colaborador logueado si es agendable (o si es Empleado, forzosamente él mismo), de lo contrario el primero disponible
     if (user?.rol === 'EMPLEADO') {
@@ -1464,7 +1464,6 @@ function CitasContent() {
                   value={form.fecha}
                   onChange={e => setForm({ ...form, fecha: e.target.value, hora: '' })}
                   required
-                  min={getBusinessTodayString()}
                 />
               </div>
               {form.fecha && form.empleado_id && form.servicio_ids.length > 0 && (
