@@ -319,6 +319,39 @@ function CitasContent() {
     setShowModal(true);
   };
 
+  const openCreateFromSlot = ({ date, time, empleadoId }: { date: string; time: string; empleadoId: string }) => {
+    const activeServs = servicios.filter(s => s.activo);
+    if (!activeServs.length || !empleados.length) {
+      toast.error('Crea al menos un servicio y un empleado activos primero');
+      return;
+    }
+    const emptyForm = getEmptyForm();
+    emptyForm.fecha = date;
+    emptyForm.hora = time;
+    
+    if (user?.rol === 'EMPLEADO') {
+      emptyForm.empleado_id = user.id || '';
+    } else {
+      const isAgendable = empleados.some(e => e.id === empleadoId);
+      if (isAgendable) {
+        emptyForm.empleado_id = empleadoId;
+      } else {
+        const isLogueadoAgendable = empleados.some(e => e.id === user?.id);
+        if (isLogueadoAgendable && user?.id) {
+          emptyForm.empleado_id = user.id;
+        } else {
+          emptyForm.empleado_id = empleados[0]?.id || '';
+        }
+      }
+    }
+
+    setForm(emptyForm);
+    setClienteBusqueda('');
+    setForzar(false);
+    setEditingId(null);
+    setShowModal(true);
+  };
+
   // ─── Crear cliente inline desde formulario de cita ──────────────────────
   const handleCrearCliente = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1147,6 +1180,7 @@ function CitasContent() {
                 scope={scope}
                 user={user}
                 onEditCita={openEdit}
+                onSlotClick={openCreateFromSlot}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
                 isLoading={isLoading}

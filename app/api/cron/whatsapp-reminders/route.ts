@@ -14,6 +14,15 @@ export async function POST(req: NextRequest) {
 
 async function handleCron(req: NextRequest) {
   try {
+    // Verificar si los recordatorios automáticos o las notificaciones están desactivadas
+    if (process.env.DISABLE_REMINDER_JOBS === 'true' || process.env.DISABLE_NOTIFICATIONS === 'true') {
+      console.log('[CRON] Envío de recordatorios abortado: recordatorios automáticos desactivados.');
+      return NextResponse.json({
+        mensaje: 'Recordatorios automáticos desactivados.',
+        procesados: 0
+      }, { status: 200 });
+    }
+
     // 1. Proteger el endpoint en producción usando el secreto de Vercel Cron
     const authHeader = req.headers.get('authorization');
     if (process.env.NODE_ENV === 'production') {
@@ -105,9 +114,10 @@ async function handleCron(req: NextRequest) {
       const url = process.env.WHATSAPP_API_URL;
       const token = process.env.WHATSAPP_API_TOKEN;
       let statusEnvio = 'LOGGED_TO_CONSOLE';
+      const isWhatsAppDisabled = process.env.DISABLE_WHATSAPP === 'true' || process.env.DISABLE_NOTIFICATIONS === 'true';
 
       // Si las variables están configuradas y hay teléfono, enviar de verdad
-      if (url && token && cita.cliente_telefono) {
+      if (url && token && cita.cliente_telefono && !isWhatsAppDisabled) {
         try {
           const cleanPhone = cita.cliente_telefono.replace(/\D/g, '');
           const formattedPhone = cleanPhone.startsWith('505') || cleanPhone.startsWith('506')

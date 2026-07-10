@@ -20,9 +20,12 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const { assertNotProductionScript, assertCanWriteToDatabase } = require('./env-guard');
 const prisma = new PrismaClient();
 
 async function main() {
+  assertNotProductionScript();
+  assertCanWriteToDatabase();
   console.log('=== INICIANDO BACKFILL DE PRECIOS ESTIMADOS ===');
 
   // 1. Obtener todos los servicios con sus precios actuales

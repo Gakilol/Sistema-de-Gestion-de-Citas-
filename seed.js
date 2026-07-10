@@ -1,9 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { assertNotProductionScript, assertCanWriteToDatabase } = require('./scripts/env-guard');
 
 const prisma = new PrismaClient();
 
 async function main() {
+  assertNotProductionScript();
+  assertCanWriteToDatabase();
   console.log('Sembrando base de datos con Admin por defecto...');
 
   const passwordHash = await bcrypt.hash('Admin123!', 10);

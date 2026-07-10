@@ -1,4 +1,5 @@
-const { PrismaClient } = require('c:/Users/Gaki/Documents/Sistema de Gestion de Citas/node_modules/@prisma/client');
+const { PrismaClient } = require('@prisma/client');
+const { assertNotProductionScript, assertCanWriteToDatabase } = require('./env-guard');
 const prisma = new PrismaClient();
 
 const defaultHorarios = {
@@ -12,6 +13,8 @@ const defaultHorarios = {
 };
 
 async function main() {
+  assertNotProductionScript();
+  assertCanWriteToDatabase();
   console.log('=== INICIANDO SCRIPT DE MIGRACIÓN Y CORRECCIÓN DE DATOS ===\n');
 
   // 1. Migración de Citas a CitaServicio (Soporte Multiservicio)

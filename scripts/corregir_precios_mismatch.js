@@ -1,7 +1,10 @@
 const { PrismaClient } = require('@prisma/client');
+const { assertNotProductionScript, assertCanWriteToDatabase } = require('./env-guard');
 const prisma = new PrismaClient();
 
 async function main() {
+  assertNotProductionScript();
+  assertCanWriteToDatabase();
   console.log('=== INICIANDO SCRIPT DE CORRECCIÓN DE PRECIOS EN CITAS ===\n');
 
   // 1. Obtener catálogo de servicios y sus precios actuales

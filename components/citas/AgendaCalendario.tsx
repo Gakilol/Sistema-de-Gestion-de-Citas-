@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ interface AgendaCalendarioProps {
   scope: string;
   user: any;
   onEditCita: (cita: any) => void;
+  onSlotClick: (params: { date: string; time: string; empleadoId: string }) => void;
   selectedDateStr: string;
   setSelectedDateStr: (date: string) => void;
   isLoading?: boolean;
@@ -39,11 +40,13 @@ export function AgendaCalendario({
   scope,
   user,
   onEditCita,
+  onSlotClick,
   selectedDateStr,
   setSelectedDateStr,
   isLoading = false,
 }: AgendaCalendarioProps) {
   const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('dia'); // Por defecto 'dia' para columnas claras de empleados
+  const [hoveredSlot, setHoveredSlot] = useState<{ dayStr: string; empleadoId: string; top: number; timeLabel: string } | null>(null);
 
   // Helper para convertir YYYY-MM-DD local a objeto Date de forma segura en zona horaria local
   const parseLocalDate = (dateStr: string) => {
@@ -451,11 +454,87 @@ export function AgendaCalendario({
                       const citasDiaRaw = citasDiaTodos.filter((cita) => cita.empleado_id === emp.id);
                       const citasDia = procesarCitasDia(citasDiaRaw);
 
+                      const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+                        const isOverBooking = (e.target as HTMLElement).closest('.booking-card');
+                        if (isOverBooking) {
+                          setHoveredSlot(null);
+                          return;
+                        }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const y = e.clientY - rect.top;
+                        
+                        const slotHeight = HOUR_HEIGHT / 4; // 20px
+                        const minutesFromStart = Math.floor(y / slotHeight) * 15;
+                        const totalMinutes = HORA_INICIO * 60 + minutesFromStart;
+                        const clampedMinutes = Math.min(Math.max(HORA_INICIO * 60, totalMinutes), HORA_FIN * 60);
+                        
+                        const topPx = ((clampedMinutes - HORA_INICIO * 60) / 60) * HOUR_HEIGHT;
+                        
+                        const hour = Math.floor(clampedMinutes / 60);
+                        const min = clampedMinutes % 60;
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+                        const timeLabel = `${displayHour}:${String(min).padStart(2, '0')} ${ampm}`;
+                        
+                        setHoveredSlot({
+                          dayStr: diaStr,
+                          empleadoId: emp.id,
+                          top: topPx,
+                          timeLabel
+                        });
+                      };
+
+                      const handleMouseLeave = () => {
+                        setHoveredSlot(null);
+                      };
+
+                      const handleSlotClick = (e: React.MouseEvent<HTMLDivElement>) => {
+                        const isOverBooking = (e.target as HTMLElement).closest('.booking-card');
+                        if (isOverBooking) {
+                          return;
+                        }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const y = e.clientY - rect.top;
+                        
+                        const slotHeight = HOUR_HEIGHT / 4; // 20px
+                        const minutesFromStart = Math.floor(y / slotHeight) * 15;
+                        const totalMinutes = HORA_INICIO * 60 + minutesFromStart;
+                        const clampedMinutes = Math.min(Math.max(HORA_INICIO * 60, totalMinutes), HORA_FIN * 60);
+                        
+                        const hour = Math.floor(clampedMinutes / 60);
+                        const min = clampedMinutes % 60;
+                        const timeStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+                        
+                        onSlotClick({
+                          date: diaStr,
+                          time: timeStr,
+                          empleadoId: emp.id
+                        });
+                      };
+
                       return (
                         <div
                           key={emp.id}
-                          className="flex-1 relative h-full min-w-[80px]"
+                          className="flex-1 relative h-full min-w-[80px] cursor-pointer hover:bg-primary/[0.02] transition-colors duration-150"
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={handleMouseLeave}
+                          onClick={handleSlotClick}
                         >
+                          {/* Hover slot guide placeholder */}
+                          {hoveredSlot && hoveredSlot.dayStr === diaStr && hoveredSlot.empleadoId === emp.id && (
+                            <div
+                              className="absolute left-1 right-1 rounded-lg border border-primary/30 bg-primary/5 pointer-events-none z-0 flex items-center justify-center transition-all duration-75 animate-in fade-in zoom-in-95"
+                              style={{
+                                top: `${hoveredSlot.top}px`,
+                                height: `${HOUR_HEIGHT / 2}px`, // 30 mins
+                              }}
+                            >
+                              <span className="text-[10px] font-bold text-primary opacity-80 flex items-center gap-1">
+                                <Plus className="w-3.5 h-3.5" /> Agendar {hoveredSlot.timeLabel}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Citas de este día para este estilista */}
                           {citasDia.map((cita) => {
                             const { topPx, heightPx, colIndex, totalColumns } = cita;
@@ -477,9 +556,12 @@ export function AgendaCalendario({
                             return (
                               <div
                                 key={cita.id}
-                                onClick={() => onEditCita(cita)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditCita(cita);
+                                }}
                                 title={tooltipText}
-                                className="absolute p-2 rounded-xl border text-left cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:shadow-lg hover:scale-[1.01] hover:z-30 select-none active:scale-[0.99]"
+                                className="booking-card absolute p-2 rounded-xl border text-left cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:shadow-lg hover:scale-[1.01] hover:z-30 select-none active:scale-[0.99]"
                                 style={{
                                   top: `${topPx}px`,
                                   height: `${heightPx}px`,
