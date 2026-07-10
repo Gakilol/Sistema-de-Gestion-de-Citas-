@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, Mail, ArrowRight, Scissors, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -15,7 +16,29 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPass, setShowPass]   = useState(false);
   const [shake,    setShake]      = useState(false);
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
+  const [form, setForm] = useState({ email: '', password: '', rememberDevice: false });
+
+  useEffect(() => {
+    const checkAutoLogin = async () => {
+      try {
+        const res = await fetch('/api/auth/auto-login', {
+          method: 'POST',
+        });
+        if (res.ok) {
+          toast.success('¡Bienvenido de nuevo!');
+          const searchParams = new URLSearchParams(window.location.search);
+          const redirectPath = searchParams.get('redirect') || '/dashboard';
+          window.location.href = redirectPath;
+        } else {
+          setIsCheckingAutoLogin(false);
+        }
+      } catch (err) {
+        setIsCheckingAutoLogin(false);
+      }
+    };
+    checkAutoLogin();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +52,9 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Credenciales incorrectas');
       toast.success('¡Bienvenido al sistema!');
-      window.location.href = '/dashboard';
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirectPath = searchParams.get('redirect') || '/dashboard';
+      window.location.href = redirectPath;
     } catch (err: any) {
       setShake(true);
       setTimeout(() => setShake(false), 600);
@@ -37,6 +62,18 @@ export default function Login() {
       setIsLoading(false);
     }
   };
+
+  if (isCheckingAutoLogin) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+        <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-2xl mb-6 animate-pulse">
+          <Scissors className="w-8 h-8 text-white animate-spin" style={{ animationDuration: '3s' }} />
+        </div>
+        <h2 className="text-xl font-bold text-foreground mb-2">Comprobando sesión...</h2>
+        <p className="text-sm text-muted-foreground animate-pulse">Iniciando sesión de forma segura</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -157,6 +194,20 @@ export default function Login() {
               </div>
             </div>
 
+            {/* Recordar dispositivo */}
+            <div className="flex items-center space-x-2 py-1">
+              <Checkbox
+                id="rememberDevice"
+                checked={form.rememberDevice}
+                onCheckedChange={(checked) => setForm({ ...form, rememberDevice: !!checked })}
+              />
+              <label
+                htmlFor="rememberDevice"
+                className="text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+              >
+                Recordar este dispositivo por 60 días
+              </label>
+            </div>
 
             <Button type="submit" className="w-full h-11 text-sm font-semibold glow-gold" disabled={isLoading}>
               {isLoading ? (

@@ -45,7 +45,9 @@ export async function middleware(req: NextRequest) {
     if (path.startsWith('/api/')) {
       return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
     }
-    return NextResponse.redirect(new URL('/login', req.url));
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect', path);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Rutas privadas: Si no hay token
@@ -53,7 +55,9 @@ export async function middleware(req: NextRequest) {
     if (path.startsWith('/api/')) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    return NextResponse.redirect(new URL('/login', req.url));
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect', path);
+    return NextResponse.redirect(loginUrl);
   }
 
   try {
@@ -112,7 +116,9 @@ export async function middleware(req: NextRequest) {
       return NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 });
     }
 
-    const response = NextResponse.redirect(new URL('/login', req.url));
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect', path);
+    const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('access_token');
     return response;
   }

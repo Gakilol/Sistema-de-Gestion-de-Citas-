@@ -67,6 +67,11 @@ export async function POST(req: NextRequest) {
         where: { id: resetToken.id },
         data: { used_at: new Date() },
       }),
+      // Revocar todos los dispositivos recordados del usuario
+      prisma.dispositivoRecordado.updateMany({
+        where: { userId: resetToken.user_id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     ]);
 
     console.log(`[RESET_PASSWORD] Contraseña restablecida exitosamente para el usuario: ${resetToken.empleado.correo}`);

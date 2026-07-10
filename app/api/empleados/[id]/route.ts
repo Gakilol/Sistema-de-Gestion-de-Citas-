@@ -138,6 +138,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       select: { id: true, nombre: true, correo: true, rol: true, activo: true }
     });
 
+    // Si se actualizó la contraseña o se desactivó al usuario, revocar todos sus dispositivos recordados
+    if (body.password || body.activo === false) {
+      try {
+        await prisma.dispositivoRecordado.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      } catch (dbError) {
+        console.error('[EMPLOYEE_UPDATE_DB_ERROR] Error al revocar dispositivos recordados:', dbError);
+      }
+    }
+
     // Detectar acción
     let finalAction = 'USER_UPDATED';
     let finalDesc = `Usuario ${empleado.nombre} actualizado.`;

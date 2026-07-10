@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   Store, Clock, Bell, Palette, Save, CheckCircle2,
   Phone, MapPin, MessageCircle, Globe, RefreshCcw,
+  Laptop, Smartphone, Trash2, LogOut, Settings,
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -15,10 +16,11 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const TABS = [
-  { id: 'negocio',     label: 'Negocio',      icon: Store },
-  { id: 'horarios',    label: 'Horarios',      icon: Clock },
-  { id: 'whatsapp',    label: 'WhatsApp',      icon: MessageCircle },
-  { id: 'apariencia',  label: 'Apariencia',    icon: Palette },
+  { id: 'negocio',     label: 'Negocio',      icon: Store, roles: ['ADMIN', 'TECH_SUPPORT'] },
+  { id: 'horarios',    label: 'Horarios',      icon: Clock, roles: ['ADMIN', 'TECH_SUPPORT'] },
+  { id: 'whatsapp',    label: 'WhatsApp',      icon: MessageCircle, roles: ['ADMIN', 'TECH_SUPPORT'] },
+  { id: 'apariencia',  label: 'Apariencia',    icon: Palette, roles: ['ADMIN', 'TECH_SUPPORT'] },
+  { id: 'dispositivos', label: 'Sesiones y Dispositivos', icon: Laptop, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
 ];
 
 const DIAS = [
@@ -101,6 +103,73 @@ export default function Configuracion() {
   const [divisaSaving, setDivisaSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // ── Dispositivos Recordados ─────────────────────────────────────────────
+  const [dispositivos, setDispositivos] = useState<any[]>([]);
+  const [loadingDispositivos, setLoadingDispositivos] = useState(false);
+
+  const fetchDispositivos = async () => {
+    setLoadingDispositivos(true);
+    try {
+      const res = await fetch('/api/auth/dispositivos');
+      if (res.ok) {
+        const data = await res.json();
+        setDispositivos(data);
+      }
+    } catch (err) {
+      console.error('Error al cargar dispositivos:', err);
+    } finally {
+      setLoadingDispositivos(false);
+    }
+  };
+
+  const handleRevokeDevice = async (id: string) => {
+    try {
+      const res = await fetch(`/api/auth/dispositivos?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Sesión revocada exitosamente');
+        const revoked = dispositivos.find(d => d.id === id);
+        if (revoked?.isCurrent) {
+          window.location.href = '/login';
+        } else {
+          fetchDispositivos();
+        }
+      } else {
+        toast.error('No se pudo revocar el dispositivo');
+      }
+    } catch (err) {
+      toast.error('Error al revocar el dispositivo');
+    }
+  };
+
+  const handleRevokeAllDevices = async () => {
+    if (!confirm('¿Estás seguro de que deseas cerrar sesión en todos los dispositivos?')) return;
+    try {
+      const res = await fetch('/api/auth/dispositivos?all=true', { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Todas las sesiones revocadas');
+        window.location.href = '/login';
+      } else {
+        toast.error('No se pudieron revocar los dispositivos');
+      }
+    } catch (err) {
+      toast.error('Error al revocar los dispositivos');
+    }
+  };
+
+  // Ajustar la pestaña activa según el rol del usuario
+  useEffect(() => {
+    if (user && user.rol === 'EMPLEADO') {
+      setTab('dispositivos');
+    }
+  }, [user]);
+
+  // Cargar dispositivos al cambiar a la pestaña de dispositivos
+  useEffect(() => {
+    if (tab === 'dispositivos') {
+      fetchDispositivos();
+    }
+  }, [tab]);
+
   useEffect(() => {
     // Cargar la configuración general
     fetch('/api/configuracion')
@@ -171,6 +240,40 @@ export default function Configuracion() {
     setHorarios(h => ({ ...h, [dia]: { ...h[dia], [field]: val } }));
   };
 
+  const getHeaderInfo = () => {
+    switch (tab) {
+      case 'negocio':
+        return {
+          title: 'Configuración del Negocio',
+          desc: 'Gestiona la información de contacto, ubicación y divisa de HAIR STYLE',
+        };
+      case 'whatsapp':
+        return {
+          title: 'Configuración de WhatsApp',
+          desc: 'Configura notificaciones, recordatorios y mensajes automáticos',
+        };
+      case 'apariencia':
+        return {
+          title: 'Apariencia del Sistema',
+          desc: 'Personaliza el modo de color y el tema del portal administrativo',
+        };
+      case 'dispositivos':
+        return {
+          title: 'Sesiones y Dispositivos',
+          desc: 'Administra los dispositivos que tienen acceso guardado de 60 días a tu cuenta',
+        };
+      case 'horarios':
+      default:
+        return {
+          title: 'Horarios de Apertura',
+          desc: 'Gestiona el horario de atención general de HAIR STYLE',
+        };
+    }
+  };
+
+  const headerInfo = getHeaderInfo();
+  const visibleTabs = TABS.filter(t => t.roles.includes(user?.rol ?? 'EMPLEADO'));
+
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
@@ -180,20 +283,47 @@ export default function Configuracion() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Horarios de Apertura</h1>
-              <p className="text-sm text-muted-foreground">Gestiona el horario de atención general de HAIR STYLE</p>
+              <h1 className="text-2xl font-bold text-foreground">{headerInfo.title}</h1>
+              <p className="text-sm text-muted-foreground">{headerInfo.desc}</p>
             </div>
-            {isTechSupport ? (
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                Modo Solo Lectura
-              </span>
-            ) : (
-              <Button onClick={handleSave} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
-                {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                {saved ? 'Guardado' : 'Guardar cambios'}
-              </Button>
+            {tab !== 'dispositivos' && (
+              isTechSupport ? (
+                <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                  Modo Solo Lectura
+                </span>
+              ) : (
+                <Button onClick={handleSave} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
+                  {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                  {saved ? 'Guardado' : 'Guardar cambios'}
+                </Button>
+              )
             )}
           </div>
+
+          {/* Selector de pestañas */}
+          {visibleTabs.length > 1 && (
+            <div className="flex border-b border-border/50 overflow-x-auto gap-2 pb-1 scrollbar-none mb-2">
+              {visibleTabs.map((t) => {
+                const Icon = t.icon;
+                const isActive = tab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer',
+                      isActive
+                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 dark:bg-amber-500/20'
+                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* ── Tab: Negocio ─────────────────────────────────── */}
           {tab === 'negocio' && (
@@ -411,6 +541,101 @@ export default function Configuracion() {
                 </div>
               </div>
               </fieldset>
+            </Card>
+          )}
+
+          {/* ── Tab: Dispositivos Recordados ─────────────────── */}
+          {tab === 'dispositivos' && (
+            <Card className="p-6 border-border/50">
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <Laptop className="w-4 h-4 text-primary"/>
+                    <h2 className="font-semibold text-foreground">Dispositivos y Sesiones Guardadas</h2>
+                  </div>
+                  {dispositivos.length > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleRevokeAllDevices}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Cerrar sesión en todos los dispositivos
+                    </Button>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Estas son las sesiones que tienen la opción "Recordar este dispositivo" activa. Tienen una duración máxima de 60 días desde su último uso y te permiten acceder al sistema automáticamente sin ingresar contraseña.
+                </p>
+
+                {loadingDispositivos ? (
+                  <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                    <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin"/>
+                    <p className="text-xs text-muted-foreground">Cargando dispositivos...</p>
+                  </div>
+                ) : dispositivos.length === 0 ? (
+                  <div className="text-center py-10 border border-dashed border-border/50 rounded-xl">
+                    <Laptop className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">No tienes otros dispositivos recordados</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">Activa "Recordar este dispositivo" al iniciar sesión</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {dispositivos.map((device) => {
+                      const isMobile = device.deviceName.toLowerCase().includes('iphone') || device.deviceName.toLowerCase().includes('android') || device.deviceName.toLowerCase().includes('ipad');
+                      const DeviceIcon = isMobile ? Smartphone : Laptop;
+                      
+                      return (
+                        <div key={device.id} className={cn(
+                          "flex items-center justify-between p-4 rounded-xl border transition-all",
+                          device.isCurrent 
+                            ? "border-primary/45 bg-primary/3" 
+                            : "border-border/50 bg-secondary/10"
+                        )}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-10 h-10 rounded-lg flex items-center justify-center border",
+                              device.isCurrent 
+                                ? "bg-primary/10 border-primary/20 text-primary" 
+                                : "bg-card border-border/50 text-muted-foreground"
+                            )}>
+                              <DeviceIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm text-foreground">{device.deviceName}</span>
+                                {device.isCurrent && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                    Este dispositivo
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground/75 mt-0.5">
+                                <span>IP: {device.ipAddress}</span>
+                                <span className="hidden sm:inline">•</span>
+                                <span>Primer login: {new Date(device.createdAt).toLocaleDateString()}</span>
+                                <span className="hidden sm:inline">•</span>
+                                <span>Último uso: {new Date(device.lastUsedAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRevokeDevice(device.id)}
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            title={device.isCurrent ? "Cerrar sesión actual" : "Cerrar sesión en este dispositivo"}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </Card>
           )}
 

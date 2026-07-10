@@ -191,10 +191,10 @@ const menuGroups: MenuGroup[] = [
         roles: ['ADMIN', 'TECH_SUPPORT'],
       },
       {
-        title: 'Horarios',
+        title: 'Configuración',
         href: '/configuracion',
-        icon: Clock,
-        roles: ['ADMIN', 'TECH_SUPPORT'],
+        icon: Settings,
+        roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
       },
       {
         title: 'Auditoría',
@@ -347,7 +347,7 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
     '/categorias':         'Categorías',
     '/empleados':          'Personal',
     '/reportes':           'Reportes',
-    '/configuracion':      'Horarios',
+    '/configuracion':      'Configuración',
     '/auditoria':          'Auditoría',
   };
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';

@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { AuthServicio } from '@/src/servicios/auth.servicio';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { checkLoginRateLimit } from '@/lib/audit/rate-limiter';
+import { prisma } from '@/lib/db';
+import { generateRememberToken, hashRememberToken, parseUserAgent } from '@/lib/remember-device';
 
 // ─── Schema de validación Zod ────────────────────────────────────────────────
 const LoginInputSchema = z.object({
   email: z.string().email('Correo electrónico no válido').max(254),
   password: z.string().min(1, 'La contraseña es obligatoria').max(128),
+  rememberDevice: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -56,6 +59,7 @@ export async function POST(req: NextRequest) {
     const parseResult = LoginInputSchema.safeParse({
       email: body.correo || body.email,
       password: body.password,
+      rememberDevice: !!(body.rememberDevice || body.recordarDispositivo),
     });
 
     if (!parseResult.success) {
@@ -77,11 +81,12 @@ export async function POST(req: NextRequest) {
     );
 
     // Configurar cookies httpOnly seguras
+    // Sesión normal dura 24 horas por requisito del usuario
     response.cookies.set('access_token', result.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60, // 1 hora
+      maxAge: 60 * 60 * 24, // 24 horas
       path: '/',
     });
 
@@ -92,6 +97,37 @@ export async function POST(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 7, // 7 días
       path: '/api/auth/refresh',
     });
+
+    // Manejar el token persistente de 60 días si el usuario lo seleccionó
+    if (parseResult.data.rememberDevice) {
+      const token = generateRememberToken();
+      const tokenHash = hashRememberToken(token);
+      const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 días
+      const deviceName = parseUserAgent(userAgent);
+
+      await prisma.dispositivoRecordado.create({
+        data: {
+          userId: result.usuario.id,
+          tokenHash,
+          userAgent,
+          ipAddress,
+          deviceName,
+          expiresAt,
+          lastUsedAt: new Date(),
+        },
+      });
+
+      response.cookies.set('remember_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 24 * 60 * 60, // 60 días
+        path: '/',
+      });
+    } else {
+      // Si no lo seleccionó, por seguridad nos aseguramos de borrar cualquier cookie previa
+      response.cookies.set('remember_token', '', { path: '/', maxAge: 0 });
+    }
 
     // Log LOGIN_SUCCESS
     await logAudit({

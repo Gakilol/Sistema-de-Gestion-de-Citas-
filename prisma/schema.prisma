@@ -27,6 +27,7 @@ model Empleado {
   bloqueos     BloqueoHorario[]
   vacaciones   VacacionesEmpleado[]
   resetTokens  PasswordResetToken[]
+  dispositivosRecordados DispositivoRecordado[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -250,5 +251,25 @@ model PasswordResetToken {
   @@index([user_id])
   @@index([token_hash])
 }
+
+model DispositivoRecordado {
+  id          String    @id @default(dbgenerated("gen_random_uuid()"))
+  userId      String
+  tokenHash   String    @unique
+  userAgent   String?
+  ipAddress   String?
+  deviceName  String?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+
+  empleado    Empleado  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
 
 
