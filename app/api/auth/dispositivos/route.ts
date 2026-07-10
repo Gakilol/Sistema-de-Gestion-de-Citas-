@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const output = dispositivos.map((d) => ({
+    const output = dispositivos.map((d: any) => ({
       id: d.id,
       deviceName: d.deviceName || 'Dispositivo desconocido',
       ipAddress: d.ipAddress || 'IP desconocida',
