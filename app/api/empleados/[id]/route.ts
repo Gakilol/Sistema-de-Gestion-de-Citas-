@@ -6,10 +6,10 @@ import { getUserContext } from '@/lib/auth-helpers';
 
 // ─── Schemas Zod ─────────────────────────────────────────────────────────────
 const PatchEmpleadoSchema = z.object({
-  nombre: z.string().min(2).max(100).optional(),
-  correo: z.string().email().max(254).optional(),
+  nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).optional(),
+  correo: z.string().email('Correo electrónico no válido').max(254).optional(),
   telefono: z.string().max(30).optional().nullable(),
-  password: z.string().min(6).max(128).optional(),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').max(128).optional(),
   especialidad: z.string().max(100).optional().nullable(),
   tituloCliente: z.string().max(100).optional().nullable(),
   horario: z.record(z.any()).optional(),

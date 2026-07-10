@@ -81,7 +81,9 @@ export default function Empleados() {
   };
 
   const handleSubmit = async (e:React.FormEvent) => {
-    e.preventDefault(); setSaving(true);
+    e.preventDefault();
+    if (saving) return; // Evitar clics concurrentes antes del re-render de desactivación
+    setSaving(true);
     try {
       const body:any = {...form};
       if (editingId && !body.password) delete body.password;
@@ -90,7 +92,14 @@ export default function Empleados() {
       const url  = editingId ? `/api/empleados/${editingId}` : '/api/empleados';
       const meth = editingId ? 'PATCH' : 'POST';
       const res  = await fetch(url,{method:meth,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      if (!res.ok) { const d=await res.json(); throw new Error(d.error); }
+      if (!res.ok) {
+        const d = await res.json();
+        if (d.detalles) {
+          const errorMsg = Object.values(d.detalles).flat().join(', ');
+          throw new Error(errorMsg || d.error);
+        }
+        throw new Error(d.error);
+      }
       toast.success(editingId?'Empleado actualizado':'Empleado creado exitosamente');
       setShowModal(false); fetchEmpleados();
     } catch(err:any) { toast.error(err.message||'Error al guardar'); }
