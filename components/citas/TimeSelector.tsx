@@ -421,19 +421,8 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     const isPM     = currentH >= 12;
 
     const handleHourChange = (val: string) => {
-      const h12New  = parseInt(val, 10);
-      let isPMNew = isPM;
-      
-      // Regla de AM/PM automática del negocio (8:00 AM - 6:00 PM)
-      if (h12New >= 8 && h12New <= 11) {
-        isPMNew = false; // AM
-      } else if (h12New === 12) {
-        isPMNew = true;  // PM
-      } else if (h12New >= 1 && h12New <= 6) {
-        isPMNew = true;  // PM
-      }
-
-      const h24New  = isPMNew
+      const h12New = parseInt(val, 10);
+      const h24New = isPM
         ? (h12New === 12 ? 12 : h12New + 12)
         : (h12New === 12 ? 0 : h12New);
       setHour(h24New);
@@ -443,13 +432,12 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
       setMinute(parseInt(val, 10));
     };
 
-    const handlePeriodChange = (val: string) => {
-      const wantPM = val === 'PM';
-      if (wantPM && !isPM) {
-        const newH = currentH + 12;
+    const togglePeriod = (targetPM: boolean) => {
+      if (targetPM && !isPM) {
+        const newH = currentH === 0 ? 12 : currentH + 12;
         if (newH <= 23) setHour(newH);
-      } else if (!wantPM && isPM) {
-        const newH = currentH - 12;
+      } else if (!targetPM && isPM) {
+        const newH = currentH === 12 ? 0 : currentH - 12;
         if (newH >= 0) setHour(newH);
       }
     };
@@ -483,70 +471,96 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
           </div>
         )}
 
-        {/* ─── Selectores de Hora / Minuto / Período ──────────────────────── */}
-        <div className="flex items-center justify-center gap-2">
-          {/* Selector de Hora (1–12) */}
-          <div className="flex flex-col items-center gap-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Hora</label>
-            <select
-              value={String(h12).padStart(2, '0')}
-              onChange={e => handleHourChange(e.target.value)}
-              className="w-16 h-11 text-center text-xl font-bold rounded-xl bg-card border border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                <option key={h} value={String(h).padStart(2, '0')}>
-                  {String(h).padStart(2, '0')}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* ─── Selectores de Hora / Minuto (00-59) / Período Botones AM/PM ──── */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center justify-center gap-2">
+            {/* Selector de Hora (1–12) */}
+            <div className="flex flex-col items-center gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Hora</label>
+              <select
+                value={String(h12).padStart(2, '0')}
+                onChange={e => handleHourChange(e.target.value)}
+                className="w-20 h-12 text-center text-xl font-extrabold rounded-xl bg-card border-2 border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary appearance-none"
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                  <option key={h} value={String(h).padStart(2, '0')}>
+                    {String(h).padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <span className="text-2xl font-bold text-muted-foreground self-end mb-2">:</span>
+            <span className="text-2xl font-black text-muted-foreground self-end mb-2.5">:</span>
 
-          {/* Selector de Minuto (00–59) */}
-          <div className="flex flex-col items-center gap-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Min</label>
-            <select
-              value={String(currentM).padStart(2, '0')}
-              onChange={e => handleMinuteChange(e.target.value)}
-              className="w-16 h-11 text-center text-xl font-bold rounded-xl bg-card border border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
-            >
-              {(() => {
-                const options = [0, 15, 30, 45];
-                if (!options.includes(currentM)) {
-                  options.push(currentM);
-                  options.sort((a, b) => a - b);
-                }
-                return options.map(m => (
+            {/* Selector de Minuto Completo (00–59) */}
+            <div className="flex flex-col items-center gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Minuto (00-59)</label>
+              <select
+                value={String(currentM).padStart(2, '0')}
+                onChange={e => handleMinuteChange(e.target.value)}
+                className="w-20 h-12 text-center text-xl font-extrabold rounded-xl bg-card border-2 border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary appearance-none"
+              >
+                {Array.from({ length: 60 }, (_, i) => i).map(m => (
                   <option key={m} value={String(m).padStart(2, '0')}>
                     {String(m).padStart(2, '0')}
                   </option>
-                ));
-              })()}
-            </select>
+                ))}
+              </select>
+            </div>
+
+            {/* Botones Grandes Táctiles AM / PM */}
+            <div className="flex flex-col items-center gap-1 ml-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Período</label>
+              <div className="flex bg-secondary/60 p-1 rounded-xl border border-border/60">
+                <button
+                  type="button"
+                  onClick={() => togglePeriod(false)}
+                  className={cn(
+                    "px-3 py-2 text-xs font-black rounded-lg transition-all min-w-[42px] min-h-[38px] flex items-center justify-center cursor-pointer",
+                    !isPM
+                      ? "bg-amber-500 text-white shadow-md scale-105"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="Ante meridiem (Mañana)"
+                >
+                  AM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => togglePeriod(true)}
+                  className={cn(
+                    "px-3 py-2 text-xs font-black rounded-lg transition-all min-w-[42px] min-h-[38px] flex items-center justify-center cursor-pointer",
+                    isPM
+                      ? "bg-indigo-600 text-white shadow-md scale-105"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="Post meridiem (Tarde/Noche)"
+                >
+                  PM
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Selector de Período AM/PM */}
-          <div className="flex flex-col items-center gap-1 ml-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Período</label>
-            <select
-              value={isPM ? 'PM' : 'AM'}
-              onChange={e => handlePeriodChange(e.target.value)}
-              className={cn(
-                "w-16 h-11 text-center text-sm font-bold rounded-xl border shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none transition-colors",
-                isPM
-                  ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-500"
-              )}
-            >
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
+            {/* Ajuste Fino Táctil Rápido (+1m, +5m, +15m, -1m, -5m, -15m) */}
+          <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
+            <span className="text-[10px] text-muted-foreground font-semibold mr-1 shrink-0">Ajuste rápido:</span>
+            {[-15, -5, -1, 1, 5, 15].map(delta => (
+              <button
+                key={delta}
+                type="button"
+                onClick={() => adjustTime(delta)}
+                className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground text-xs font-bold hover:bg-primary/10 hover:border-primary/40 active:scale-95 transition-all min-h-[38px] min-w-[42px] cursor-pointer flex items-center justify-center shadow-xs"
+              >
+                {delta > 0 ? `+${delta}m` : `${delta}m`}
+              </button>
+            ))}
           </div>
         </div>
       </div>
     );
   };
+
 
   // ─── Render ─────────────────────────────────────────────────────────────
   return (

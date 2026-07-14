@@ -251,11 +251,20 @@ export default function Servicios() {
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <Card className="w-full max-w-md p-6 relative border-border/50 shadow-2xl">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
-            <h2 className="text-lg font-bold mb-5">{editingId ? 'Editar Servicio' : 'Nuevo Servicio'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <Card className="w-full max-w-md p-4 sm:p-6 relative max-h-[92vh] sm:max-h-[90vh] flex flex-col border-border/50 shadow-2xl rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl pb-safe">
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-border/40 shrink-0">
+              <h2 className="text-lg font-bold text-foreground">{editingId ? 'Editar Servicio' : 'Nuevo Servicio'}</h2>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                aria-label="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 custom-scrollbar pr-1">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre *</label>
                 <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Ej: Corte Clásico" />
@@ -279,7 +288,7 @@ export default function Servicios() {
                   {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
                 <Button type="submit" disabled={saving} className="glow-gold">
                   {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Servicio')}
@@ -289,6 +298,7 @@ export default function Servicios() {
           </Card>
         </div>
       )}
+
     </div>
   );
 }

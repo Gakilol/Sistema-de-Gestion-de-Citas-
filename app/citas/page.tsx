@@ -12,9 +12,10 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn, formatTo12h } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
-import { formatDBDate, getBusinessTodayString, getDefaultBookingDate } from '@/lib/timezone';
+import { formatDBDate, getBusinessTodayString, getDefaultBookingDate, getDefaultAgendaDate } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
+import { CitaResumenModal } from '@/components/citas/CitaResumenModal';
 
 const getEmptyForm = () => ({
   cliente_id: '',
@@ -150,13 +151,19 @@ function CitasContent() {
   // Modos de Vista y Scopes
   const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('agenda');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
-  const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
+  // Fecha predeterminada: hoy antes de las 18:30 CR, mañana desde las 18:30.
+  // getDefaultAgendaDate() usa America/Costa_Rica vía Intl — funciona igual
+  // en localhost, Vercel (UTC), iOS, Android y usuarios de otro país.
+  const [selectedDateStr, setSelectedDateStr] = useState(getDefaultAgendaDate());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [citaToDelete, setCitaToDelete] = useState<any>(null);
   const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [citaResumen, setCitaResumen] = useState<any>(null);
 
   const { user }                  = useAuth();
+
+
   const isAdmin                   = user?.rol === 'ADMIN';
   const isTechSupport             = user?.rol === 'TECH_SUPPORT';
   const canSeeAll                 = isAdmin || isTechSupport;
@@ -231,7 +238,19 @@ function CitasContent() {
   const [selectedOverlapReason, setSelectedOverlapReason] = useState('Cliente en tiempo de espera');
   const [customOverlapReason, setCustomOverlapReason] = useState('');
 
+  useEffect(() => {
+    if (showModal || showCrearCliente || showOverlapModal || showDeleteModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showModal, showCrearCliente, showOverlapModal, showDeleteModal]);
+
   // Ref para cerrar el buscador de clientes al hacer click fuera
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Escuchar clicks fuera para cerrar el dropdown de clientes
@@ -333,16 +352,8 @@ function CitasContent() {
     emptyForm.fecha = date;
     emptyForm.hora = time;
 
-    // Pre-cargar el primer servicio activo con la duración seleccionada por drag
-    // Esto permite que el TimeSelector muestre la hora pre-seleccionada.
-    // El usuario puede cambiar el servicio o ajustar la duración libremente.
-    if (durationMinutes > 0 && activeServs.length > 0) {
-      const primerServicio = activeServs[0];
-      emptyForm.servicio_id = primerServicio.id;
-      emptyForm.servicio_ids = [primerServicio.id];
-      // Usar la duración del drag, no la default del servicio
-      emptyForm.servicio_duraciones = [durationMinutes];
-    }
+    // Al abrir desde un slot del calendario, la selección de servicios debe iniciar vacía.
+    // El horario seleccionado se preserva en emptyForm.hora.
     
     if (user?.rol === 'EMPLEADO') {
       emptyForm.empleado_id = user.id || '';
@@ -1250,6 +1261,7 @@ function CitasContent() {
                 scope={scope}
                 user={user}
                 onEditCita={openEdit}
+                onViewCita={(cita) => setCitaResumen(cita)}
                 onSlotClick={openCreateFromSlot}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
@@ -1263,16 +1275,36 @@ function CitasContent() {
         </div>
       </main>
 
-      {/* Modal */}
+      {/* Modal Principal de Cita */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <Card className="w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto border-border/50 shadow-2xl">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold mb-5">{editingId ? 'Editar Cita' : 'Nueva Cita'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+        <div
+          className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
+          <Card className="w-full max-w-lg p-0 relative max-h-[92vh] sm:max-h-[90vh] flex flex-col border-border/50 shadow-2xl rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl overflow-hidden bg-card">
+            
+            {/* Tirador táctil superior para móvil */}
+            <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-0 sm:hidden shrink-0" />
+
+            {/* Header del modal */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border/40 shrink-0 bg-secondary/10">
+              <h2 className="text-base sm:text-lg font-bold text-foreground">{editingId ? 'Editar Cita' : 'Nueva Cita'}</h2>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                aria-label="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
+              <div className="grid grid-cols-1 gap-3.5">
+
                 {/* ─── Selector Inteligente de Cliente ──────────────────── */}
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Cliente *</label>
@@ -1372,6 +1404,7 @@ function CitasContent() {
                 )}
               </div>
               </div>
+
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Servicio(s) *</label>
                 <div className="space-y-2">
@@ -1385,7 +1418,6 @@ function CitasContent() {
                         ...prev,
                         servicio_ids: [...prev.servicio_ids, val],
                         servicio_duraciones: [...prev.servicio_duraciones, s ? s.duracion : 30],
-                        hora: '' // Reset selected time
                       }));
                     }}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -1398,7 +1430,7 @@ function CitasContent() {
                       ))}
                   </select>
 
-                  {form.servicio_ids.length > 0 && (
+                  {form.servicio_ids.length > 0 ? (
                     <div className="border border-border/60 rounded-lg p-2.5 space-y-2 bg-secondary/15">
                       {form.servicio_ids.map((id: string, index: number) => {
                         const s = servicios.find(srv => srv.id === id);
@@ -1428,7 +1460,6 @@ function CitasContent() {
                                       ...prev,
                                       servicio_ids: newIds,
                                       servicio_duraciones: newDurs,
-                                      hora: '' // Reset selected time
                                     };
                                   });
                                 }}
@@ -1453,7 +1484,6 @@ function CitasContent() {
                                       return {
                                         ...prev,
                                         servicio_duraciones: newDurs,
-                                        hora: ''
                                       };
                                     });
                                   }}
@@ -1474,7 +1504,6 @@ function CitasContent() {
                                       return {
                                         ...prev,
                                         servicio_duraciones: newDurs,
-                                        hora: ''
                                       };
                                     });
                                   }}
@@ -1490,7 +1519,6 @@ function CitasContent() {
                                       return {
                                         ...prev,
                                         servicio_duraciones: newDurs,
-                                        hora: ''
                                       };
                                     });
                                   }}
@@ -1515,7 +1543,6 @@ function CitasContent() {
                                         return {
                                           ...prev,
                                           servicio_duraciones: newDurs,
-                                          hora: ''
                                         };
                                       });
                                     }}
@@ -1539,6 +1566,10 @@ function CitasContent() {
                           </div>
                         );
                       })()}
+                    </div>
+                  ) : (
+                    <div className="p-3 border border-dashed border-border/60 rounded-lg text-xs text-muted-foreground italic text-center bg-secondary/10">
+                      No se ha seleccionado ningún servicio. Selecciona al menos uno.
                     </div>
                   )}
                 </div>
@@ -1570,7 +1601,7 @@ function CitasContent() {
                   required
                 />
               </div>
-              {form.fecha && form.empleado_id && form.servicio_ids.length > 0 && (
+              {form.fecha && form.empleado_id && (
                 <div className="bg-secondary/30 border border-border/50 rounded-xl p-4">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-3">Selecciona la Hora *</label>
                   <TimeSelector
@@ -1599,35 +1630,43 @@ function CitasContent() {
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas / Comentarios</label>
                 <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones o peticiones especiales..." />
               </div>
-              <div className="flex justify-between items-center pt-2 border-t border-border/30">
-                <div>
-                  {editingId && (() => {
-                    const currentCita = citas.find(c => c.id === editingId);
-                    const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && currentCita?.created_by === user.id);
-                    if (canDelete) {
-                      return (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          onClick={() => confirmDelete(currentCita, 'agenda')}
-                          className="cursor-pointer font-bold gap-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Eliminar Cita
-                        </Button>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={saving} className="glow-gold">
-                    {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
-                  </Button>
-                </div>
-              </div>
             </form>
+
+            {/* Sticky Bottom Actions Bar */}
+            <div className="shrink-0 border-t border-border/40 p-4 sm:p-5 bg-card pb-safe flex items-center justify-between gap-3 z-30">
+              <div>
+                {editingId && (() => {
+                  const currentCita = citas.find(c => c.id === editingId);
+                  const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && currentCita?.created_by === user.id);
+                  if (canDelete) {
+                    return (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => confirmDelete(currentCita, 'agenda')}
+                        className="cursor-pointer font-bold gap-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground h-11 text-xs sm:text-sm px-3"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Eliminar Cita</span>
+                        <span className="sm:hidden">Eliminar</span>
+                      </Button>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+              <div className="flex items-center gap-2.5 ml-auto">
+                <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="h-11 px-4 text-sm font-semibold cursor-pointer">
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={(e) => {
+                  const formEl = (e.currentTarget.closest('form') || document.querySelector('form')) as HTMLFormElement;
+                  if (formEl) formEl.requestSubmit();
+                }} disabled={saving} className="glow-gold h-11 px-5 text-sm font-bold cursor-pointer">
+                  {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
       )}
@@ -1640,10 +1679,14 @@ function CitasContent() {
 
       {/* ─── Modal inline: Crear Nuevo Cliente ──────────────────────────────── */}
       {showCrearCliente && (
-        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl">
+        <div className="fixed inset-0 bg-black/75 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl flex flex-col max-h-[92vh] pb-safe overflow-hidden">
+            
+            {/* Tirador táctil superior para móvil */}
+            <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-0 sm:hidden shrink-0" />
+
             {/* Header */}
-            <div className="flex items-center gap-3 p-5 border-b border-border/50">
+            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 shrink-0">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <UserPlus className="w-5 h-5 text-primary" />
               </div>
@@ -1661,7 +1704,7 @@ function CitasContent() {
             </div>
 
             {/* Formulario */}
-            <form onSubmit={handleCrearCliente} className="p-5 space-y-4">
+            <form onSubmit={handleCrearCliente} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
                   Nombre completo *
@@ -1714,7 +1757,7 @@ function CitasContent() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-1 border-t border-border/30">
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
                 <Button
                   type="button"
                   variant="outline"
@@ -1735,10 +1778,10 @@ function CitasContent() {
 
       {/* ─── Modal: Confirmación de Traslape Controlado ────────────────────────── */}
       {showOverlapModal && (
-        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/75 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] pb-safe">
             {/* Header */}
-            <div className="flex items-center gap-3 p-5 border-b border-border/50 bg-amber-500/5">
+            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 bg-amber-500/5 shrink-0">
               <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 border border-amber-500/20">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
               </div>
@@ -1756,7 +1799,7 @@ function CitasContent() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 p-5 space-y-4 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-y-auto custom-scrollbar">
               <div className="text-sm space-y-2.5">
                 <p className="text-muted-foreground leading-relaxed">
                   Este horario se cruza con la siguiente cita del mismo profesional:
@@ -1765,15 +1808,11 @@ function CitasContent() {
                 {overlapConflicts.map((c, idx) => (
                   <div key={c.appointmentId || idx} className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-1.5 shadow-inner">
                     <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Cita en Conflicto</p>
-                    <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-xs">
-                      <span className="text-muted-foreground font-semibold">Cliente:</span>
-                      <span className="font-bold text-foreground">{c.clientName}</span>
-                      <span className="text-muted-foreground font-semibold">Servicio:</span>
-                      <span className="font-semibold text-foreground">{c.serviceName}</span>
-                      <span className="text-muted-foreground font-semibold">Horario:</span>
-                      <span className="font-semibold text-foreground tabular-nums">{to12h(c.startTime)} - {to12h(c.endTime)}</span>
-                      <span className="text-muted-foreground font-semibold">Profesional:</span>
-                      <span className="font-semibold text-foreground">{c.professionalName}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-2 text-xs">
+                      <span className="text-muted-foreground font-semibold">Cliente: <span className="font-bold text-foreground">{c.clientName}</span></span>
+                      <span className="text-muted-foreground font-semibold">Servicio: <span className="font-semibold text-foreground">{c.serviceName}</span></span>
+                      <span className="text-muted-foreground font-semibold">Horario: <span className="font-semibold text-foreground tabular-nums">{to12h(c.startTime)} - {to12h(c.endTime)}</span></span>
+                      <span className="text-muted-foreground font-semibold">Profesional: <span className="font-semibold text-foreground">{c.professionalName}</span></span>
                     </div>
                   </div>
                 ))}
@@ -1817,7 +1856,7 @@ function CitasContent() {
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex flex-col sm:flex-row justify-end gap-2 p-5 border-t border-border/30 bg-secondary/10">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 p-4 sm:p-5 border-t border-border/30 bg-secondary/10 shrink-0">
               <Button
                 type="button"
                 variant="outline"
@@ -1851,10 +1890,10 @@ function CitasContent() {
 
       {/* ─── Modal: Confirmación de Eliminación de Cita ────────────────────────── */}
       {showDeleteModal && citaToDelete && (
-        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/75 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] pb-safe">
             {/* Header */}
-            <div className="flex items-center gap-3 p-5 border-b border-border/50 bg-destructive/5">
+            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 bg-destructive/5 shrink-0">
               <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center text-destructive shrink-0">
                 <AlertTriangle className="w-5 h-5" />
               </div>
@@ -1865,7 +1904,7 @@ function CitasContent() {
             </div>
 
             {/* Content */}
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               <p className="text-sm text-foreground font-medium">
                 ¿Seguro que deseas eliminar esta cita?
               </p>
@@ -1898,7 +1937,7 @@ function CitasContent() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-2 p-4 bg-secondary/10 border-t border-border/50">
+            <div className="flex items-center justify-end gap-2 p-4 bg-secondary/10 border-t border-border/50 shrink-0">
               <Button
                 type="button"
                 variant="outline"
@@ -1907,7 +1946,7 @@ function CitasContent() {
                   setCitaToDelete(null);
                 }}
                 disabled={isDeleting}
-                className="cursor-pointer"
+                className="cursor-pointer flex-1 sm:flex-none"
               >
                 Cancelar
               </Button>
@@ -1916,7 +1955,7 @@ function CitasContent() {
                 variant="destructive"
                 onClick={executeDelete}
                 disabled={isDeleting}
-                className="cursor-pointer font-bold gap-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm"
+                className="cursor-pointer font-bold gap-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm flex-1 sm:flex-none"
               >
                 {isDeleting ? 'Eliminando...' : 'Eliminar Cita'}
               </Button>
@@ -1924,6 +1963,20 @@ function CitasContent() {
           </div>
         </div>
       )}
+
+      {/* Modal de Resumen de Cita */}
+      {citaResumen && (
+        <CitaResumenModal
+          cita={citaResumen}
+          user={user}
+          onClose={() => setCitaResumen(null)}
+          onEdit={(cita) => {
+            setCitaResumen(null);
+            openEdit(cita);
+          }}
+        />
+      )}
+
     </>
   );
 }

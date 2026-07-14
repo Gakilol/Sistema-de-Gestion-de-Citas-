@@ -95,10 +95,10 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
   const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-card border border-border/50 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col pb-safe">
         {/* Header */}
-        <div className="flex items-center gap-3 p-5 border-b border-border/50">
+        <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 shrink-0">
           <Avatar nombre={cliente.nombre} size="lg" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -125,7 +125,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 gap-3 p-4 border-b border-border/50">
+        <div className="grid grid-cols-2 gap-3 p-3 sm:p-4 border-b border-border/50 shrink-0">
           <div className="text-center border-r border-border/50">
             <p className="text-lg font-bold text-foreground">{cliente.totalCitas}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Visitas</p>
@@ -137,7 +137,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
         </div>
 
         {/* Historial */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Historial de citas</p>
           {cliente.historial && cliente.historial.length > 0 ? (
             cliente.historial.map((cita: any) => (
@@ -162,16 +162,16 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
           )}
         </div>
 
-        {/* Notas Privadas si no son privadas en backend */}
+        {/* Notas Privadas */}
         {cliente.notas && (
-          <div className="px-5 py-3 border-t border-border/30 bg-secondary/10">
+          <div className="px-5 py-3 border-t border-border/30 bg-secondary/10 shrink-0">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Notas / Observaciones</p>
             <p className="text-xs text-foreground mt-1 whitespace-pre-wrap leading-relaxed">{cliente.notas}</p>
           </div>
         )}
 
-        {/* Footer con WhatsApp, Edición y Eliminación */}
-        <div className="p-4 border-t border-border/50 flex flex-col gap-2 bg-secondary/5">
+        {/* Footer */}
+        <div className="p-4 border-t border-border/50 flex flex-col gap-2 bg-secondary/5 shrink-0">
           <div className="flex gap-2">
             {cliente.telefono && cliente.telefono !== '••••••••' ? (
               <a
@@ -315,15 +315,15 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-5">
+    <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl p-4 sm:p-6 pb-safe max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40 shrink-0">
           <h2 className="text-lg font-bold text-foreground">Agregar Cliente</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 custom-scrollbar">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
             <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
@@ -356,7 +356,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
           <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
             El cliente quedará registrado y podrá programarle una cita desde el panel correspondiente.
           </p>
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
             <Button type="submit" disabled={saving} className="glow-gold">
               {saving ? 'Guardando...' : 'Registrar Cliente'}
@@ -405,15 +405,15 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-card border border-border/50 rounded-2xl shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-5">
+    <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl p-4 sm:p-6 pb-safe max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40 shrink-0">
           <h2 className="text-lg font-bold text-foreground">Editar Cliente</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 custom-scrollbar">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
             <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
@@ -443,7 +443,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
             <Button type="submit" disabled={saving} className="glow-gold">
               {saving ? 'Guardando...' : 'Guardar Cambios'}
@@ -454,6 +454,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
     </div>
   );
 }
+
 
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function Clientes() {

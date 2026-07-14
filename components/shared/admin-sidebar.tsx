@@ -353,18 +353,19 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';
 
   return (
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar))] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-4">
+    <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar))] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-4 pt-safe">
       <button
         onClick={onOpen}
-        className="w-8 h-8 flex items-center justify-center rounded-lg text-[hsl(var(--sidebar-foreground)/0.65)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition-all"
+        aria-label="Abrir menú de navegación"
+        className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-[hsl(var(--sidebar-foreground)/0.75)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] active:bg-[hsl(var(--sidebar-accent))] transition-all"
       >
         <Menu className="w-5 h-5" />
       </button>
       <div className="flex items-center gap-2">
-        <div className="w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md flex items-center justify-center">
-          <Scissors className="w-3 h-3 text-white" />
+        <div className="w-5.5 h-5.5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md flex items-center justify-center shadow-sm">
+          <Scissors className="w-3.5 h-3.5 text-white" />
         </div>
-        <span className="text-[hsl(var(--sidebar-foreground))] font-bold text-sm">{currentPage}</span>
+        <span className="text-[hsl(var(--sidebar-foreground))] font-bold text-sm tracking-tight">{currentPage}</span>
       </div>
     </div>
   );
@@ -373,6 +374,17 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
 // ─── Export Principal ──────────────────────────────────────────────────────
 export function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
 
   return (
     <>
@@ -388,10 +400,10 @@ export function AdminSidebar() {
       {mobileOpen && (
         <>
           <div
-            className="lg:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+            className="lg:hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="lg:hidden fixed inset-y-0 left-0 z-50 w-60 shadow-2xl animate-in slide-in-from-left duration-250">
+          <div className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 shadow-2xl animate-in slide-in-from-left duration-250 pb-safe pt-safe">
             <SidebarContent onClose={() => setMobileOpen(false)} />
           </div>
         </>
@@ -399,3 +411,4 @@ export function AdminSidebar() {
     </>
   );
 }
+

@@ -5,6 +5,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors, Plus, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getBusinessTodayString } from '@/lib/timezone';
 
 interface AgendaCalendarioProps {
   citas: any[];
@@ -13,6 +14,8 @@ interface AgendaCalendarioProps {
   scope: string;
   user: any;
   onEditCita: (cita: any) => void;
+  /** Llamado al hacer click en una cita para ver el resumen */
+  onViewCita?: (cita: any) => void;
   /** Llamado cuando el usuario termina de seleccionar un slot (click o drag) */
   onSlotClick: (params: { date: string; time: string; empleadoId: string; durationMinutes: number }) => void;
   selectedDateStr: string;
@@ -112,6 +115,7 @@ export function AgendaCalendario({
   scope,
   user,
   onEditCita,
+  onViewCita,
   onSlotClick,
   selectedDateStr,
   setSelectedDateStr,
@@ -149,8 +153,10 @@ export function AgendaCalendario({
 
   const fechaBase = useMemo(() => parseLocalDate(selectedDateStr), [selectedDateStr]);
 
+  const [activeMobileEmpId, setActiveMobileEmpId] = useState<string>('all');
+
   // Filtrar empleados según el rol y filtros del admin/scope
-  const empleadosColumnas = useMemo(() => {
+  const empleadosBase = useMemo(() => {
     if (user?.rol === 'EMPLEADO' || scope === 'mine') {
       return empleados.filter((e) => e.id === user?.id);
     }
@@ -159,6 +165,13 @@ export function AgendaCalendario({
     }
     return empleados.filter((e) => e.activo);
   }, [empleados, filtroEmpleado, user, scope]);
+
+  const empleadosColumnas = useMemo(() => {
+    if (activeMobileEmpId !== 'all' && empleadosBase.some(e => e.id === activeMobileEmpId)) {
+      return empleadosBase.filter(e => e.id === activeMobileEmpId);
+    }
+    return empleadosBase;
+  }, [empleadosBase, activeMobileEmpId]);
 
   // Obtener rango de días según la vista seleccionada
   const diasAMostrar = useMemo(() => {
@@ -207,8 +220,10 @@ export function AgendaCalendario({
     setSelectedDateStr(formatLocalDate(nuevaFecha));
   };
 
+  // El botón "Hoy" siempre navega a la fecha real actual en Costa Rica,
+  // sin importar qué fecha predeterminada se mostró al abrir el módulo.
   const irAHoy = () => {
-    setSelectedDateStr(formatLocalDate(new Date()));
+    setSelectedDateStr(getBusinessTodayString());
   };
 
   const timeToMinutes = (timeStr: string) => {
@@ -327,9 +342,9 @@ export function AgendaCalendario({
 
   const minGridWidth = useMemo(() => {
     if (vista === 'dia') {
-      return totalSubColumnas > 3 ? `${totalSubColumnas * 160}px` : '100%';
+      return totalSubColumnas > 1 ? `${Math.max(340, totalSubColumnas * 120)}px` : '100%';
     }
-    return `${Math.max(650, totalSubColumnas * 120)}px`;
+    return `${Math.max(680, totalSubColumnas * 110)}px`;
   }, [vista, totalSubColumnas]);
 
   // ─── Lógica de Drag-to-Select ─────────────────────────────────────────────
@@ -404,21 +419,12 @@ export function AgendaCalendario({
     dayStr: string,
     empleadoId: string,
   ) => {
-    // Ignorar si el click es sobre una cita existente
     const isOverBooking = (e.target as HTMLElement).closest('.booking-card');
     if (isOverBooking) return;
-
-    // Solo botón primario (izquierdo / dedo)
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const startMin = yToMinutes(y);
-
-    // Capturar el pointer para recibir move/up aunque el cursor salga del elemento
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
 
     dragRef.current = {
       active: true,
@@ -428,23 +434,13 @@ export function AgendaCalendario({
       currentMinutes: startMin,
       pointerId: e.pointerId,
       startY: e.clientY,
-      thresholdMet: e.pointerType !== 'touch', // mouse y stylus activan inmediatamente
+      thresholdMet: false,
     };
 
-    // Para mouse: activar ghost inmediatamente (sin esperar umbral)
-    if (e.pointerType !== 'touch') {
-      setGhostBlock({
-        dayStr,
-        empleadoId,
-        topPx: minutesToY(startMin),
-        heightPx: SLOT_HEIGHT,
-        startLabel: minutesToLabel(startMin),
-        endLabel: minutesToLabel(startMin + MIN_DRAG_MINUTES),
-        durationMin: MIN_DRAG_MINUTES,
-      });
-    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
 
-    // Ocultar hover guide durante drag
     setHoveredSlot(null);
   }, []);
 
@@ -525,7 +521,6 @@ export function AgendaCalendario({
     if (duration < MIN_DRAG_MINUTES) duration = MIN_DRAG_MINUTES;
 
     // Limpiar estado de drag
-    const wasDragging = drag.thresholdMet && (finalEnd - finalStart) >= MIN_DRAG_MINUTES;
     cancelDrag();
 
     // Solo abrir modal si hubo al menos un drag real o click
@@ -550,61 +545,91 @@ export function AgendaCalendario({
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[750px] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative">
+    <div className="flex flex-col h-[750px] max-h-[85vh] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative">
       
-      {/* CABECERA DEL CALENDARIO (CONTROLES) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b border-border/50 bg-secondary/15 z-30">
-        
-        {/* Controles de Navegación */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={irAHoy} className="font-semibold gap-1 text-xs hover-lift cursor-pointer h-9">
-            <CalendarIcon className="w-3.5 h-3.5" /> Hoy
-          </Button>
-          <div className="flex items-center border border-border rounded-lg bg-background shadow-sm h-9">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)}>
-              <ChevronLeft className="w-4 h-4" />
+      {/* CABECERA DEL CALENDARIO (CONTROLES RESPONSIVE) */}
+      <div className="flex flex-col gap-2 p-2.5 sm:p-4 border-b border-border/50 bg-secondary/15 z-30 shrink-0">
+        <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+          {/* Controles de Navegación de Fecha */}
+          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
+            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1 text-xs hover-lift cursor-pointer h-9 px-3">
+              <CalendarIcon className="w-3.5 h-3.5" /> Hoy
             </Button>
-            <span className="text-xs font-bold px-3 border-x border-border py-1 text-foreground min-w-[130px] text-center">
-              {tituloCabecera}
-            </span>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center border border-border rounded-lg bg-background shadow-sm h-9">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-xs font-bold px-2 sm:px-3 border-x border-border py-1 text-foreground min-w-[100px] sm:min-w-[130px] text-center truncate">
+                {tituloCabecera}
+              </span>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+            {scope === 'all' && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
+                <Users className="w-3 h-3 shrink-0" /> Global
+              </span>
+            )}
           </div>
-          {scope === 'all' && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 animate-pulse uppercase tracking-wider">
-              <Users className="w-3 h-3 shrink-0" /> Agenda Global
-            </span>
-          )}
+
+          {/* Toggles de Vista (Día, 3 Días, Semana) */}
+          <div className="flex bg-secondary/40 p-1 rounded-xl border border-border/50 shadow-inner h-9 items-center ml-auto sm:ml-0">
+            {[
+              { id: 'dia', label: 'Día' },
+              { id: '3dias', label: '3 Días' },
+              { id: 'semana', label: 'Semana' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setVista(tab.id as any)}
+                className={cn(
+                  "px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-7 flex items-center justify-center",
+                  vista === tab.id
+                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Hint de drag */}
-        <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground/60 font-medium">
-          <GripVertical className="w-3 h-3" />
-          <span>Arrastra para seleccionar horario</span>
-        </div>
-
-        {/* Toggles de Vista */}
-        <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/40 self-start sm:self-auto shadow-inner h-10 items-center">
-          {[
-            { id: 'dia', label: 'Día' },
-            { id: '3dias', label: '3 Días' },
-            { id: 'semana', label: 'Semana' },
-          ].map((tab) => (
+        {/* SELECTOR MÓVIL DE PROFESIONAL (Pill-tabs si hay 2+ estilistas) */}
+        {empleadosBase.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-border/20">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">Estilista:</span>
             <button
-              key={tab.id}
-              onClick={() => setVista(tab.id as any)}
+              onClick={() => setActiveMobileEmpId('all')}
               className={cn(
-                "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
-                vista === tab.id
-                  ? "bg-primary text-primary-foreground shadow-sm font-bold scale-[1.02]"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                "px-2.5 py-1 text-xs font-bold rounded-full transition-all shrink-0 cursor-pointer h-7 flex items-center gap-1 border",
+                activeMobileEmpId === 'all'
+                  ? "bg-primary/15 text-primary border-primary/40 font-black"
+                  : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground"
               )}
             >
-              {tab.label}
+              <Users className="w-3 h-3" /> Todos ({empleadosBase.length})
             </button>
-          ))}
-        </div>
+            {empleadosBase.map((emp) => {
+              const isActive = activeMobileEmpId === emp.id;
+              return (
+                <button
+                  key={emp.id}
+                  onClick={() => setActiveMobileEmpId(emp.id)}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-bold rounded-full transition-all shrink-0 cursor-pointer h-7 flex items-center gap-1 border",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary font-black shadow-sm"
+                      : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
+                  )}
+                >
+                  <User className="w-3 h-3" /> {emp.nombre.split(' ')[0]}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* CONTENEDOR DE GRID Y HORAS (SCROLL) */}
@@ -618,12 +643,13 @@ export function AgendaCalendario({
           {/* CABECERA DE DÍAS Y EMPLEADOS (Sticky top) */}
           <div className="flex sticky top-0 bg-card border-b border-border/40 z-30 shadow-sm">
             {/* Esquina superior izquierda */}
-            <div className="w-16 md:w-20 shrink-0 sticky left-0 bg-card border-r border-border/40 z-40 flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" />
+            <div className="w-12 md:w-20 shrink-0 sticky left-0 bg-card border-r border-border/40 z-40 flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" />
             
             {/* Columnas de nombres de días y empleados */}
             <div className="flex-1 flex">
               {diasAMostrar.map((dia, dIdx) => {
-                const esHoy = formatLocalDate(dia) === formatLocalDate(new Date());
+                const todayCR = getBusinessTodayString();
+                const esHoy = formatLocalDate(dia) === todayCR;
                 return (
                   <div
                     key={dIdx}
@@ -668,14 +694,14 @@ export function AgendaCalendario({
           <div className="flex relative flex-1" style={{ height: `${TOTAL_HORAS * HOUR_HEIGHT}px` }}>
             
             {/* Columna lateral de Horas (sticky left) */}
-            <div className="w-16 md:w-20 shrink-0 border-r border-border/40 bg-card/90 select-none relative z-20">
+            <div className="w-12 md:w-20 shrink-0 border-r border-border/40 bg-card/90 select-none relative z-20">
               {horasRegla.map((hora, idx) => (
                 <div
                   key={idx}
-                  className="relative text-right pr-2 text-[10px] font-bold text-muted-foreground"
+                  className="relative text-right pr-1 md:pr-2 text-[10px] font-bold text-muted-foreground"
                   style={{ height: `${HOUR_HEIGHT}px` }}
                 >
-                  <span className="absolute -top-2.5 right-2 bg-background px-1 rounded shadow-sm border border-border/10 text-[9px] font-bold">
+                  <span className="absolute -top-2.5 right-1 md:right-2 bg-background px-0.5 md:px-1 rounded shadow-sm border border-border/10 text-[9px] font-bold">
                     {hora.label.replace(':00', '').replace(' p. m.', ' PM').replace(' a. m.', ' AM')}
                   </span>
                 </div>
@@ -714,7 +740,7 @@ export function AgendaCalendario({
               {diasAMostrar.map((dia, dIdx) => {
                 const diaStr = formatLocalDate(dia);
                 const citasDiaTodos = citasPorDia[diaStr] || [];
-                const esHoy = diaStr === formatLocalDate(new Date());
+                const esHoy = diaStr === getBusinessTodayString();
 
                 return (
                   <div
@@ -828,7 +854,7 @@ export function AgendaCalendario({
                                 key={cita.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onEditCita(cita);
+                                  (onViewCita || onEditCita)(cita);
                                 }}
                                 title={tooltipText}
                                 className="booking-card absolute p-2 rounded-xl border text-left cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:shadow-lg hover:scale-[1.01] hover:z-30 select-none active:scale-[0.99]"

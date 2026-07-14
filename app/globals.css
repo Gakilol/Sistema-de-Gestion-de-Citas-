@@ -352,4 +352,25 @@
   .empty-state-icon {
     color: hsl(var(--muted-foreground) / 0.35);
   }
+
+  /* Safe Area Utilities para iPhone */
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pl-safe { padding-left: env(safe-area-inset-left, 0px); }
+  .pr-safe { padding-right: env(safe-area-inset-right, 0px); }
+
+  /* Desactivación de auto-zoom forzado en Safari iOS (font-size 16px en mobile) */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Toque optimizado */
+  button, input, select, textarea, a {
+    touch-action: manipulation;
+  }
 }
+
