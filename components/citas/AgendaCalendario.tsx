@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors, Plus, AlertTriangle, GripVertical, Undo2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors, Plus, AlertTriangle, GripVertical, Undo2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getBusinessTodayString } from '@/lib/timezone';
@@ -10,6 +10,9 @@ import {
   HOUR_HEIGHT,
   SLOT_HEIGHT,
   MIN_HEIGHT,
+  MIN_HOUR_HEIGHT,
+  DEFAULT_HOUR_HEIGHT,
+  MAX_HOUR_HEIGHT,
   TOUCH_LONG_PRESS_MS,
   TOUCH_MOVE_THRESHOLD,
   MOUSE_MOVE_THRESHOLD,
@@ -213,6 +216,51 @@ export function AgendaCalendario({
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressPendingRef = useRef<boolean>(false);
   const mousePendingRef = useRef<boolean>(false);
+
+  // ─── Máquina de Estados de Interacción Explosiva (PROMPT 5) ─────────────────
+  type CalendarInteractionState =
+    | 'idle'
+    | 'scrolling'
+    | 'selecting'
+    | 'moving-selection'
+    | 'moving-appointment'
+    | 'resizing-start'
+    | 'resizing-end'
+    | 'pinch-zooming';
+
+  const interactionStateRef = useRef<CalendarInteractionState>('idle');
+
+  const isStateIdleOr = useCallback((...allowedStates: CalendarInteractionState[]) => {
+    return (
+      interactionStateRef.current === 'idle' ||
+      allowedStates.includes(interactionStateRef.current)
+    );
+  }, []);
+
+  // ─── Estado de Zoom Vertical Interno y Persistencia ────────────────────────
+  const [hourHeight, setHourHeight] = useState<number>(DEFAULT_HOUR_HEIGHT);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('novacita_calendar_hour_height');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= MIN_HOUR_HEIGHT && parsed <= MAX_HOUR_HEIGHT) {
+          setHourHeight(parsed);
+        }
+      }
+    }
+  }, []);
+
+  const updateHourHeight = useCallback((newHeight: number) => {
+    const clamped = Math.min(MAX_HOUR_HEIGHT, Math.max(MIN_HOUR_HEIGHT, Math.round(newHeight)));
+    setHourHeight(clamped);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('novacita_calendar_hour_height', String(clamped));
+      } catch {}
+    }
+  }, []);
 
   // Ref de estado de interacción del bloque PROVISIONAL (creación / movimiento / resize)
   const provisionalDragRef = useRef<ProvisionalDragRef>({
@@ -454,7 +502,7 @@ export function AgendaCalendario({
   }, [citasPorDia]);
 
   // Algoritmo de posicionamiento de bloques superpuestos (Google Calendar)
-  const procesarCitasDia = (citasDia: any[]) => {
+  const procesarCitasDia = useCallback((citasDia: any[]) => {
     if (!citasDia || citasDia.length === 0) return [];
 
     const parsed = citasDia.map(cita => {
@@ -508,14 +556,14 @@ export function AgendaCalendario({
       cluster.forEach((cita) => {
         cita.totalColumns = totalColumns;
         const minCero = HORA_INICIO * 60;
-        const topPx = Math.max(0, (cita.minInicio - minCero) * (HOUR_HEIGHT / 60));
-        const heightPx = Math.max(MIN_HEIGHT, (cita.duracion || 30) * (HOUR_HEIGHT / 60));
+        const topPx = Math.max(0, (cita.minInicio - minCero) * (hourHeight / 60));
+        const heightPx = Math.max(MIN_HEIGHT, (cita.duracion || 30) * (hourHeight / 60));
         result.push({ ...cita, topPx, heightPx });
       });
     });
 
     return result;
-  };
+  }, [hourHeight]);
 
   const totalSubColumnas = useMemo(() => {
     return diasAMostrar.length * empleadosColumnas.length;
@@ -523,9 +571,9 @@ export function AgendaCalendario({
 
   const minGridWidth = useMemo(() => {
     if (vista === 'dia') {
-      return totalSubColumnas > 1 ? `${Math.max(340, totalSubColumnas * 135)}px` : '100%';
+      return totalSubColumnas > 1 ? `${Math.max(340, totalSubColumnas * 140)}px` : '100%';
     }
-    return `${Math.max(680, totalSubColumnas * 125)}px`;
+    return `${Math.max(680, totalSubColumnas * 135)}px`;
   }, [vista, totalSubColumnas]);
 
   // Si la pantalla es móvil (< 768px), ajustar por defecto la vista a 'dia'
@@ -603,6 +651,13 @@ export function AgendaCalendario({
       wasDragged: false,
     };
     setHoveredSlot(null);
+    if (
+      interactionStateRef.current === 'selecting' ||
+      interactionStateRef.current === 'moving-selection' ||
+      interactionStateRef.current === 'scrolling'
+    ) {
+      interactionStateRef.current = 'idle';
+    }
   }, [stopAutoScroll]);
 
   /** Cancela y elimina por completo el bloque provisional */
@@ -645,6 +700,9 @@ export function AgendaCalendario({
       grabOffsetY: 0, targetEl: null, pending: false,
     };
     setMoveGhost(null);
+    if (interactionStateRef.current === 'moving-appointment' || interactionStateRef.current === 'scrolling') {
+      interactionStateRef.current = 'idle';
+    }
   }, [stopAutoScroll]);
 
   /** Cancela el resize de una cita existente */
@@ -661,29 +719,144 @@ export function AgendaCalendario({
       dayStr: '', empleadoId: '', pointerId: -1, targetEl: null,
     };
     setResizeGhost(null);
+    if (interactionStateRef.current === 'resizing-start' || interactionStateRef.current === 'resizing-end') {
+      interactionStateRef.current = 'idle';
+    }
   }, [stopAutoScroll]);
 
-  /** Cancelar todos los gestos con Escape o confirmar con Enter */
+  /** Limpia todas las interacciones activas */
+  const cancelAllInteractions = useCallback(() => {
+    cancelDrag();
+    cancelMove();
+    cancelResize();
+    interactionStateRef.current = 'idle';
+  }, [cancelDrag, cancelMove, cancelResize]);
+
+  /** Cancelar gestos con Escape, Enter, perdida de foco o cambio de orientación */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        cancelDrag();
-        cancelMove();
-        cancelResize();
+        cancelAllInteractions();
         clearProvisionalSlot();
         setSelectedCitaId(null);
       } else if (e.key === 'Enter' && provisionalSlot) {
         handleConfirmProvisional();
       }
     };
+
+    const onWindowInterruption = () => {
+      cancelAllInteractions();
+    };
+
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('blur', onWindowInterruption);
+    window.addEventListener('resize', onWindowInterruption);
+    window.addEventListener('orientationchange', onWindowInterruption);
+    window.addEventListener('pointercancel', onWindowInterruption);
+
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      cancelDrag();
-      cancelMove();
-      cancelResize();
+      window.removeEventListener('blur', onWindowInterruption);
+      window.removeEventListener('resize', onWindowInterruption);
+      window.removeEventListener('orientationchange', onWindowInterruption);
+      window.removeEventListener('pointercancel', onWindowInterruption);
+      cancelAllInteractions();
     };
-  }, [cancelDrag, cancelMove, cancelResize, clearProvisionalSlot, provisionalSlot, handleConfirmProvisional]);
+  }, [cancelAllInteractions, clearProvisionalSlot, provisionalSlot, handleConfirmProvisional]);
+
+  // ─── Gestor de Zoom Táctil (Pinch-to-Zoom) con Anclaje Focal ───────────────
+  const pinchRef = useRef<{
+    active: boolean;
+    initialDist: number;
+    initialHourHeight: number;
+    midYInGrid: number;
+    midYInContainer: number;
+  }>({
+    active: false,
+    initialDist: 0,
+    initialHourHeight: DEFAULT_HOUR_HEIGHT,
+    midYInGrid: 0,
+    midYInContainer: 0,
+  });
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        // Al iniciar pellizco con 2 dedos, cancelar selecciones/movimientos incompletos
+        cancelDrag();
+        cancelMove();
+        cancelResize();
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const initialDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const containerRect = container.getBoundingClientRect();
+        const midYClient = (t1.clientY + t2.clientY) / 2;
+        const midYInContainer = midYClient - containerRect.top;
+        const midYInGrid = container.scrollTop + midYInContainer;
+
+        pinchRef.current = {
+          active: true,
+          initialDist,
+          initialHourHeight: hourHeight,
+          midYInGrid,
+          midYInContainer,
+        };
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2 && pinchRef.current.active) {
+        // Prevenir el zoom completo del navegador a nivel de viewport
+        if (e.cancelable) e.preventDefault();
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        if (pinchRef.current.initialDist <= 0) return;
+
+        const scale = currentDist / pinchRef.current.initialDist;
+        const targetHeight = Math.min(
+          MAX_HOUR_HEIGHT,
+          Math.max(MIN_HOUR_HEIGHT, Math.round(pinchRef.current.initialHourHeight * scale))
+        );
+
+        if (targetHeight !== hourHeight) {
+          requestAnimationFrame(() => {
+            const ratio = targetHeight / pinchRef.current.initialHourHeight;
+            const newMidYInGrid = pinchRef.current.midYInGrid * ratio;
+            const newScrollTop = Math.max(0, newMidYInGrid - pinchRef.current.midYInContainer);
+
+            updateHourHeight(targetHeight);
+            if (container) {
+              container.scrollTop = newScrollTop;
+            }
+          });
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2 && pinchRef.current.active) {
+        pinchRef.current.active = false;
+      }
+    };
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+      container.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [hourHeight, updateHourHeight, cancelDrag, cancelMove, cancelResize]);
 
   // Desseleccionar cita al hacer click fuera del calendario
   useEffect(() => {
@@ -746,19 +919,20 @@ export function AgendaCalendario({
     dayStr: string,
     empleadoId: string,
   ) => {
-    // Si se hace click en una cita existente o en el bloque provisional actual, no interferir
+    // Validar estado de la máquina de interacción
+    if (!isStateIdleOr('selecting')) return;
     if ((e.target as HTMLElement).closest('.booking-card')) return;
     if ((e.target as HTMLElement).closest('.provisional-card')) return;
 
-    // Si hay un gesto de movimiento o resize activo, no interferir
     if (moveRef.current.active || moveRef.current.pending || resizeRef.current.active) return;
 
     cancelDrag();
+    interactionStateRef.current = 'selecting';
 
     const colEl = e.currentTarget;
     const rect = colEl.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const startMin = yToMinutes(y, 15);
+    const startMin = yToMinutes(y, 15, hourHeight);
 
     provisionalDragRef.current = {
       active: false,
@@ -836,8 +1010,8 @@ export function AgendaCalendario({
       }
       const rect = e.currentTarget.getBoundingClientRect();
       const y = e.clientY - rect.top;
-      const slotMin = yToMinutes(y, 15);
-      const topPx = minutesToY(slotMin);
+      const slotMin = yToMinutes(y, 15, hourHeight);
+      const topPx = minutesToY(slotMin, hourHeight);
       setHoveredSlot({
         dayStr,
         empleadoId,
@@ -853,7 +1027,10 @@ export function AgendaCalendario({
     const dist = Math.hypot(e.clientX - pDrag.startX, e.clientY - pDrag.startY);
 
     if (longPressPendingRef.current) {
-      if (dist > TOUCH_MOVE_THRESHOLD) cancelDrag();
+      if (dist > TOUCH_MOVE_THRESHOLD) {
+        interactionStateRef.current = 'scrolling';
+        cancelDrag();
+      }
       return;
     }
 
@@ -871,7 +1048,7 @@ export function AgendaCalendario({
       e.preventDefault();
       const colRect = e.currentTarget.getBoundingClientRect();
       const y = e.clientY - colRect.top;
-      const currentMin = yToMinutes(Math.max(0, Math.min(y, colRect.height)), 15);
+      const currentMin = yToMinutes(Math.max(0, Math.min(y, colRect.height)), 15, hourHeight);
 
       const minStart = Math.min(pDrag.startMinutes, currentMin);
       let minEnd = Math.max(pDrag.startMinutes, currentMin);
@@ -929,7 +1106,7 @@ export function AgendaCalendario({
     if (wasActive || wasDragged) {
       const rect = e.currentTarget.getBoundingClientRect();
       const y = e.clientY - rect.top;
-      const endMinRaw = yToMinutes(Math.max(0, Math.min(y, rect.height)), 15);
+      const endMinRaw = yToMinutes(Math.max(0, Math.min(y, rect.height)), 15, hourHeight);
 
       const minStart = Math.min(startMin, endMinRaw);
       let minEnd = Math.max(startMin, endMinRaw);
@@ -977,8 +1154,10 @@ export function AgendaCalendario({
   ) => {
     if ((e.target as HTMLElement).closest('.resize-handle')) return;
     if (!provisionalSlot) return;
+    if (!isStateIdleOr('moving-selection')) return;
 
     e.stopPropagation();
+    interactionStateRef.current = 'moving-selection';
 
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
@@ -1013,7 +1192,9 @@ export function AgendaCalendario({
     const pDrag = provisionalDragRef.current;
     if (pDrag.mode !== 'move') return;
 
-    const dist = Math.hypot(e.clientX - pDrag.startX, e.clientY - pDrag.startY);
+    const distX = Math.abs(e.clientX - pDrag.startX);
+    const distY = Math.abs(e.clientY - pDrag.startY);
+    const dist = Math.hypot(distX, distY);
 
     if (dist > 5) {
       pDrag.active = true;
@@ -1026,21 +1207,24 @@ export function AgendaCalendario({
     e.preventDefault();
     e.stopPropagation();
 
-    const colInfo = findColumnAt(e.clientX, e.clientY);
     let targetDayStr = pDrag.originalDayStr;
     let targetEmpleadoId = pDrag.originalEmpleadoId;
     let colEl: HTMLElement | null = null;
 
-    if (colInfo) {
-      if (colInfo.empleadoId !== pDrag.originalEmpleadoId) {
-        if (canMoveToOtherEmployee(null)) {
+    // Solo evaluar cambio de columna/empleado si la distancia horizontal supera los 40px (acción explícita)
+    if (distX > 40) {
+      const colInfo = findColumnAt(e.clientX, e.clientY);
+      if (colInfo) {
+        if (colInfo.empleadoId !== pDrag.originalEmpleadoId) {
+          if (canMoveToOtherEmployee(null)) {
+            targetEmpleadoId = colInfo.empleadoId;
+          }
+        } else {
           targetEmpleadoId = colInfo.empleadoId;
         }
-      } else {
-        targetEmpleadoId = colInfo.empleadoId;
+        targetDayStr = colInfo.dayStr || pDrag.originalDayStr;
+        colEl = colInfo.colEl;
       }
-      targetDayStr = colInfo.dayStr || pDrag.originalDayStr;
-      colEl = colInfo.colEl;
     }
 
     let colRect: DOMRect | null = null;
@@ -1054,7 +1238,8 @@ export function AgendaCalendario({
     if (colRect) {
       const y = e.clientY - colRect.top - pDrag.grabOffsetY;
       const dur = pDrag.originalEndMin - pDrag.originalStartMin;
-      const newStartMin = yToMinutes(Math.max(0, y), 15);
+      // Ajuste estricto a incrementos de 15 minutos
+      const newStartMin = yToMinutes(Math.max(0, y), 15, hourHeight);
       const clampedStart = Math.min(Math.max(HORA_INICIO * 60, newStartMin), HORA_FIN * 60 - dur);
       const newEndMin = clampedStart + dur;
 
@@ -1070,7 +1255,7 @@ export function AgendaCalendario({
     }
 
     handleAutoScrollAndPosition(e.clientY);
-  }, [findColumnAt, canMoveToOtherEmployee, citasPorDia, handleAutoScrollAndPosition]);
+  }, [findColumnAt, canMoveToOtherEmployee, citasPorDia, handleAutoScrollAndPosition, hourHeight]);
 
   const handleProvisionalBodyPointerUp = useCallback((
     e: React.PointerEvent<HTMLDivElement>
@@ -1101,6 +1286,10 @@ export function AgendaCalendario({
     e.preventDefault();
 
     if (!provisionalSlot) return;
+    const nextState = handle === 'top' ? 'resizing-start' : 'resizing-end';
+    if (!isStateIdleOr(nextState)) return;
+
+    interactionStateRef.current = nextState;
 
     const handleEl = e.currentTarget;
     provisionalDragRef.current = {
@@ -1141,7 +1330,7 @@ export function AgendaCalendario({
 
     const colRect = colEl.getBoundingClientRect();
     const y = e.clientY - colRect.top;
-    const snapMin = yToMinutes(Math.max(0, y), 15);
+    const snapMin = yToMinutes(Math.max(0, y), 15, hourHeight);
 
     let newStartMin = provisionalSlot.startMin;
     let newEndMin = provisionalSlot.endMin;
@@ -1195,12 +1384,12 @@ export function AgendaCalendario({
     citaDayStr: string,
     citaEmpleadoId: string,
   ) => {
-    // No iniciar movimiento si el click fue en el handle de resize
     if ((e.target as HTMLElement).closest('.resize-handle')) return;
-
     if (!canMoveCita(cita)) return;
+    if (!isStateIdleOr('moving-appointment')) return;
 
     e.stopPropagation();
+    interactionStateRef.current = 'moving-appointment';
 
     // Guardar offset de agarre dentro de la cita
     const card = e.currentTarget;
@@ -1247,8 +1436,8 @@ export function AgendaCalendario({
         // Mostrar ghost inmediatamente
         const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
         const duration = cita.duracion || 30;
-        const topPx = minutesToY(startMin);
-        const heightPx = Math.max(MIN_HEIGHT, duration * (HOUR_HEIGHT / 60));
+        const topPx = minutesToY(startMin, hourHeight);
+        const heightPx = Math.max(MIN_HEIGHT, duration * (hourHeight / 60));
         setMoveGhost({
           topPx, heightPx,
           dayStr: citaDayStr,
@@ -1275,9 +1464,10 @@ export function AgendaCalendario({
     const distY = e.clientY - mv.startClientY;
     const dist = Math.hypot(distX, distY);
 
-    // Touch pending: si el movimiento es muy grande antes del long-press, cancelar
+    // Touch pending: si el movimiento es muy grande antes del long-press, cancelar e ir a scrolling
     if (mv.pending && mv.pointerType !== 'mouse') {
       if (dist > TOUCH_MOVE_THRESHOLD) {
+        interactionStateRef.current = 'scrolling';
         cancelMove();
       }
       return;
@@ -1331,7 +1521,7 @@ export function AgendaCalendario({
 
     if (colRect) {
       const y = e.clientY - colRect.top - mv.grabOffsetY;
-      const newStartMin = yToMinutes(Math.max(0, y), 5);
+      const newStartMin = yToMinutes(Math.max(0, y), 5, hourHeight);
       const duration = mv.cita.duracion || 30;
       const clampedStart = Math.min(newStartMin, HORA_FIN * 60 - duration);
 
@@ -1339,8 +1529,8 @@ export function AgendaCalendario({
       moveRef.current.currentDayStr = targetDayStr;
       moveRef.current.currentEmpleadoId = targetEmpleadoId;
 
-      const topPx = minutesToY(clampedStart);
-      const heightPx = Math.max(MIN_HEIGHT, duration * (HOUR_HEIGHT / 60));
+      const topPx = minutesToY(clampedStart, hourHeight);
+      const heightPx = Math.max(MIN_HEIGHT, duration * (hourHeight / 60));
       const catColor = mv.cita.servicio?.categoriaRel?.color || '#3b82f6';
 
       const citasDiaTarget = citasPorDia[targetDayStr] || [];
@@ -1443,6 +1633,10 @@ export function AgendaCalendario({
     e.preventDefault();
 
     if (!canMoveCita(cita)) return;
+    const nextState = handle === 'top' ? 'resizing-start' : 'resizing-end';
+    if (!isStateIdleOr(nextState)) return;
+
+    interactionStateRef.current = nextState;
 
     const handleEl = e.currentTarget;
     const startMin = timeToMinutes(cita.hora);
@@ -1482,7 +1676,7 @@ export function AgendaCalendario({
 
     const colRect = colEl.getBoundingClientRect();
     const y = e.clientY - colRect.top;
-    const snapMin = yToMinutes(Math.max(0, y), 5);
+    const snapMin = yToMinutes(Math.max(0, y), 5, hourHeight);
 
     let newStartMin = rs.currentStartMin;
     let newEndMin = rs.currentEndMin;
@@ -1500,8 +1694,8 @@ export function AgendaCalendario({
     resizeRef.current.currentStartMin = newStartMin;
     resizeRef.current.currentEndMin = newEndMin;
 
-    const topPx = minutesToY(newStartMin);
-    const heightPx = Math.max(MIN_HEIGHT, (newEndMin - newStartMin) * (HOUR_HEIGHT / 60));
+    const topPx = minutesToY(newStartMin, hourHeight);
+    const heightPx = Math.max(MIN_HEIGHT, (newEndMin - newStartMin) * (hourHeight / 60));
 
     setResizeGhost({
       topPx, heightPx,
@@ -1584,27 +1778,60 @@ export function AgendaCalendario({
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-175px)] sm:h-[750px] min-h-[500px] sm:max-h-[85vh] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative pb-safe">
+    <div className="flex flex-col h-[calc(100dvh-130px)] sm:h-[750px] min-h-[520px] sm:max-h-[85vh] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative pb-safe">
       
       {/* CABECERA DEL CALENDARIO */}
-      <div className="flex flex-col gap-2 p-2 sm:p-4 border-b border-border/50 bg-secondary/15 z-30 shrink-0 sticky top-0 backdrop-blur-md">
+      <div className="flex flex-col gap-1.5 p-2 sm:p-4 border-b border-border/50 bg-secondary/15 z-30 shrink-0 sticky top-0 backdrop-blur-md">
         <div className="flex items-center justify-between gap-1.5 flex-wrap sm:flex-nowrap">
-          {/* Controles de Navegación de Fecha */}
-          <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
-            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1 text-xs hover-lift cursor-pointer h-9 px-2.5 shrink-0">
+          {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
+          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
+            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1 text-xs hover-lift cursor-pointer h-9 px-3 shrink-0">
               <CalendarIcon className="w-3.5 h-3.5" /> Hoy
             </Button>
-            <div className="flex items-center border border-border rounded-lg bg-background shadow-sm h-9">
+            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-9">
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-xs font-bold px-1.5 sm:px-3 border-x border-border py-1 text-foreground min-w-[90px] sm:min-w-[130px] text-center truncate">
+              <span className="text-xs sm:text-sm font-extrabold px-2 sm:px-3 border-x border-border py-1 text-foreground min-w-[95px] sm:min-w-[130px] text-center truncate">
                 {tituloCabecera}
               </span>
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Control Discreto de Zoom Vertical (- 100% +) */}
+            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-9 p-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-7 cursor-pointer text-muted-foreground hover:text-foreground"
+                onClick={() => updateHourHeight(hourHeight - 15)}
+                disabled={hourHeight <= MIN_HOUR_HEIGHT}
+                title="Reducir escala vertical (-)"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </Button>
+              <button
+                type="button"
+                onClick={() => updateHourHeight(DEFAULT_HOUR_HEIGHT)}
+                className="text-xs font-black px-1.5 min-w-[44px] text-center text-foreground hover:text-primary transition-colors cursor-pointer select-none"
+                title="Restablecer escala al 100%"
+              >
+                {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-7 cursor-pointer text-muted-foreground hover:text-foreground"
+                onClick={() => updateHourHeight(hourHeight + 15)}
+                disabled={hourHeight >= MAX_HOUR_HEIGHT}
+                title="Aumentar escala vertical (+)"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+
             {scope === 'all' && (
               <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
                 <Users className="w-3 h-3 shrink-0" /> Global
@@ -1623,9 +1850,9 @@ export function AgendaCalendario({
                 key={tab.id}
                 onClick={() => setVista(tab.id as any)}
                 className={cn(
-                  "px-2 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-7 flex items-center justify-center min-w-[40px]",
+                  "px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-7 flex items-center justify-center min-w-[42px]",
                   vista === tab.id
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                    ? "bg-primary text-primary-foreground shadow-xs scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
@@ -1635,20 +1862,20 @@ export function AgendaCalendario({
           </div>
         </div>
 
-        {/* SELECTOR MÓVIL DE PROFESIONAL */}
+        {/* SELECTOR MÓVIL DE PROFESIONAL (Pestañas horizontales amplias) */}
         {empleadosBase.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-border/20">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-border/20 touch-pan-x">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">Estilista:</span>
             <button
               onClick={() => setActiveMobileEmpId('all')}
               className={cn(
-                "px-2.5 py-1 text-xs font-bold rounded-full transition-all shrink-0 cursor-pointer h-7 flex items-center gap-1 border min-h-[32px]",
+                "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-8 flex items-center gap-1.5 border min-h-[34px]",
                 activeMobileEmpId === 'all'
-                  ? "bg-primary/15 text-primary border-primary/40 font-black"
-                  : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground"
+                  ? "bg-primary/15 text-primary border-primary/50 font-black shadow-xs"
+                  : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
               )}
             >
-              <Users className="w-3 h-3" /> Todos ({empleadosBase.length})
+              <Users className="w-3.5 h-3.5" /> Todos ({empleadosBase.length})
             </button>
             {empleadosBase.map((emp) => {
               const isActive = activeMobileEmpId === emp.id;
@@ -1657,13 +1884,13 @@ export function AgendaCalendario({
                   key={emp.id}
                   onClick={() => setActiveMobileEmpId(emp.id)}
                   className={cn(
-                    "px-2.5 py-1 text-xs font-bold rounded-full transition-all shrink-0 cursor-pointer h-7 flex items-center gap-1 border min-h-[32px]",
+                    "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-8 flex items-center gap-1.5 border min-h-[34px]",
                     isActive
-                      ? "bg-primary text-primary-foreground border-primary font-black shadow-sm"
+                      ? "bg-primary text-primary-foreground border-primary font-black shadow-xs"
                       : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
                   )}
                 >
-                  <User className="w-3 h-3" /> {emp.nombre.split(' ')[0]}
+                  <User className="w-3.5 h-3.5" /> {emp.nombre.split(' ')[0]}
                 </button>
               );
             })}
@@ -1680,9 +1907,9 @@ export function AgendaCalendario({
           style={{ minWidth: minGridWidth }}
         >
           {/* CABECERA DE DÍAS Y EMPLEADOS (Sticky top) */}
-          <div className="flex sticky top-0 bg-card border-b border-border/40 z-30 shadow-sm">
+          <div className="flex sticky top-0 bg-card border-b border-border/40 z-30 shadow-xs">
             {/* Esquina superior izquierda */}
-            <div className="w-12 md:w-20 shrink-0 sticky left-0 bg-card border-r border-border/40 z-40 flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" />
+            <div className="w-14 sm:w-20 shrink-0 sticky left-0 bg-card border-r border-border/40 z-40 flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" />
             
             {/* Columnas de nombres de días y empleados */}
             <div className="flex-1 flex">
@@ -1698,13 +1925,13 @@ export function AgendaCalendario({
                     )}
                   >
                     {/* Header del Día */}
-                    <div className="py-2 text-center border-b border-border/20 bg-secondary/10 flex flex-col items-center justify-center min-w-[90px]">
-                      <span className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                    <div className="py-1.5 sm:py-2 text-center border-b border-border/20 bg-secondary/10 flex flex-col items-center justify-center min-w-[85px]">
+                      <span className="text-[10px] sm:text-[9px] uppercase font-extrabold text-muted-foreground tracking-wider">
                         {DIAS_SEMANA_ABR[dia.getDay()]}
                       </span>
                       <span
                         className={cn(
-                          "text-xs font-extrabold w-6 h-6 flex items-center justify-center rounded-full mt-0.5 transition-all",
+                          "text-xs font-black w-6 h-6 flex items-center justify-center rounded-full mt-0.5 transition-all",
                           esHoy && "bg-primary text-primary-foreground shadow-md scale-105"
                         )}
                       >
@@ -1717,7 +1944,7 @@ export function AgendaCalendario({
                       {empleadosColumnas.map((emp) => (
                         <div
                           key={emp.id}
-                          className="flex-1 py-1.5 text-center text-[10px] font-bold text-muted-foreground truncate px-1"
+                          className="flex-1 py-1.5 text-center text-xs sm:text-[10px] font-extrabold text-foreground/80 truncate px-1"
                         >
                           {emp.nombre.split(' ')[0]}
                         </div>
@@ -1730,17 +1957,17 @@ export function AgendaCalendario({
           </div>
 
           {/* GRID DEL CALENDARIO */}
-          <div className="flex relative flex-1" style={{ height: `${TOTAL_HORAS * HOUR_HEIGHT}px` }}>
+          <div className="flex relative flex-1" style={{ height: `${TOTAL_HORAS * hourHeight}px` }}>
             
             {/* Columna lateral de Horas (sticky left) */}
-            <div className="w-12 md:w-20 shrink-0 sticky left-0 border-r border-border/40 bg-card z-20 select-none shadow-sm">
+            <div className="w-14 sm:w-20 shrink-0 sticky left-0 border-r border-border/40 bg-card z-20 select-none shadow-xs">
               {horasRegla.map((hora, idx) => (
                 <div
                   key={idx}
-                  className="relative text-right pr-1 md:pr-2 text-[10px] font-bold text-muted-foreground"
-                  style={{ height: `${HOUR_HEIGHT}px` }}
+                  className="relative text-right pr-1 sm:pr-2 text-xs sm:text-[10px] font-bold text-muted-foreground"
+                  style={{ height: `${hourHeight}px` }}
                 >
-                  <span className="absolute -top-2.5 right-1 md:right-2 bg-background px-0.5 md:px-1 rounded shadow-sm border border-border/10 text-[9px] sm:text-[10px] font-bold text-foreground/80">
+                  <span className="absolute -top-3 right-1 sm:right-2 bg-background px-1 rounded shadow-xs border border-border/20 text-[10px] sm:text-[11px] font-extrabold text-foreground">
                     {hora.label.replace(':00', '').replace(' p. m.', ' PM').replace(' a. m.', ' AM')}
                   </span>
                 </div>
@@ -1756,12 +1983,12 @@ export function AgendaCalendario({
                   <div
                     key={idx}
                     className="border-b border-border/20 w-full"
-                    style={{ height: `${HOUR_HEIGHT}px` }}
+                    style={{ height: `${hourHeight}px` }}
                   />
                 ))}
               </div>
 
-              {/* Líneas de cuartos de hora (más sutiles) */}
+              {/* Líneas de cuartos de hora */}
               <div className="absolute inset-0 pointer-events-none select-none z-0">
                 {Array.from({ length: TOTAL_HORAS * 4 }).map((_, idx) => {
                   if (idx % 4 === 0) return null;
@@ -1769,7 +1996,7 @@ export function AgendaCalendario({
                     <div
                       key={idx}
                       className="border-b border-border/[0.08] w-full"
-                      style={{ height: `${SLOT_HEIGHT}px` }}
+                      style={{ height: `${hourHeight / 4}px` }}
                     />
                   );
                 })}
@@ -1827,28 +2054,29 @@ export function AgendaCalendario({
                               data-provisional-card
                               tabIndex={0}
                               className={cn(
-                                "provisional-card absolute left-1 right-1 z-30 overflow-visible rounded-xl border-2 border-dashed shadow-xl transition-all duration-75 select-none focus:outline-none focus:ring-2 focus:ring-primary",
+                                "provisional-card absolute left-1 right-1 z-30 overflow-visible rounded-xl border-2 border-dashed shadow-xl transition-all duration-75 select-none focus:outline-none focus:ring-2 focus:ring-primary cursor-grab active:cursor-grabbing",
                                 provisionalSlot.isOverlap
                                   ? "border-amber-500 bg-amber-500/20 text-amber-700 dark:text-amber-300 shadow-amber-500/10"
                                   : "border-primary/80 bg-primary/20 backdrop-blur-[2px] shadow-primary/20 text-primary"
                               )}
                               style={{
-                                top: `${minutesToY(provisionalSlot.startMin)}px`,
-                                height: `${Math.max(32, minutesToY(provisionalSlot.endMin) - minutesToY(provisionalSlot.startMin))}px`,
+                                top: `${minutesToY(provisionalSlot.startMin, hourHeight)}px`,
+                                height: `${Math.max(32, minutesToY(provisionalSlot.endMin, hourHeight) - minutesToY(provisionalSlot.startMin, hourHeight))}px`,
                                 touchAction: 'none',
                               }}
                               onPointerDown={handleProvisionalBodyPointerDown}
                               onPointerMove={handleProvisionalBodyPointerMove}
                               onPointerUp={handleProvisionalBodyPointerUp}
                             >
-                              {/* Handle de resize SUPERIOR */}
+                              {/* Handle de resize SUPERIOR (Modificar Hora Inicio) */}
                               <div
-                                className="resize-handle absolute left-0 right-0 -top-2 h-4 flex items-center justify-center cursor-n-resize z-40 group/rh"
+                                className="resize-handle absolute left-0 right-0 -top-2.5 h-5 flex items-center justify-center cursor-n-resize z-40 group/rh"
+                                title="Arrastrar para ajustar la hora de inicio"
                                 onPointerDown={(e) => handleProvisionalResizePointerDown(e, 'top')}
                                 onPointerMove={handleProvisionalResizePointerMove}
                                 onPointerUp={handleProvisionalResizePointerUp}
                               >
-                                <div className="w-8 h-1.5 rounded-full bg-primary/70 group-hover/rh:bg-primary transition-colors shadow-sm" />
+                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rh:scale-110 transition-transform" />
                               </div>
 
                               {/* Borde lateral indicador */}
@@ -1857,66 +2085,33 @@ export function AgendaCalendario({
                                 provisionalSlot.isOverlap ? "bg-amber-500" : "bg-primary"
                               )} />
 
-                              {/* Contenido del bloque provisional */}
-                              <div className="relative z-10 flex flex-col justify-between h-full p-1.5 pl-3">
-                                <div className="flex items-start justify-between gap-1">
-                                  <div className="flex flex-col">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-3 h-3 shrink-0" />
-                                      <span className="text-[10px] font-black leading-tight">
-                                        {minutesToLabel(provisionalSlot.startMin)} – {minutesToLabel(provisionalSlot.endMin)}
-                                      </span>
-                                    </div>
-                                    <span className="text-[9px] font-bold opacity-90 mt-0.5">
-                                      {provisionalSlot.endMin - provisionalSlot.startMin} min
-                                    </span>
-                                  </div>
-
-                                  {/* Botón X para cancelar */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      clearProvisionalSlot();
-                                    }}
-                                    className="p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                                    title="Cancelar selección (Esc)"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
+                              {/* Contenido del bloque provisional (solo info) */}
+                              <div className="relative z-10 flex flex-col h-full p-1.5 pl-3 pointer-events-none overflow-hidden">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3 shrink-0 opacity-80" />
+                                  <span className="text-[11px] font-black leading-tight truncate">
+                                    {minutesToLabel(provisionalSlot.startMin)} – {minutesToLabel(provisionalSlot.endMin)}
+                                  </span>
                                 </div>
-
-                                {/* Solapamiento / Advertencia si aplica */}
+                                <span className="text-[10px] font-bold opacity-75 mt-0.5">
+                                  {provisionalSlot.endMin - provisionalSlot.startMin} min
+                                </span>
                                 {provisionalSlot.isOverlap && (
-                                  <div className="flex items-center gap-1 my-1 px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-900 dark:text-amber-200 font-extrabold text-[8px] border border-amber-500/40 w-fit">
+                                  <div className="flex items-center gap-1 mt-1 px-1 py-0.5 rounded bg-amber-500/30 text-amber-900 dark:text-amber-200 font-extrabold text-[9px] border border-amber-500/40 w-fit">
                                     <AlertTriangle className="w-2.5 h-2.5 shrink-0" /> Solapamiento
                                   </div>
                                 )}
-
-                                {/* Acción de confirmación "Agendar" */}
-                                <div className="mt-1 flex items-center justify-end">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleConfirmProvisional();
-                                    }}
-                                    className="h-6 px-2.5 text-[10px] font-black bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-lg flex items-center gap-1 cursor-pointer pointer-events-auto"
-                                  >
-                                    <Plus className="w-3 h-3" /> Agendar
-                                  </Button>
-                                </div>
                               </div>
 
-                              {/* Handle de resize INFERIOR */}
+                              {/* Handle de resize INFERIOR (Modificar Hora Fin) */}
                               <div
-                                className="resize-handle absolute left-0 right-0 -bottom-2 h-4 flex items-center justify-center cursor-s-resize z-40 group/rb"
+                                className="resize-handle absolute left-0 right-0 -bottom-2.5 h-5 flex items-center justify-center cursor-s-resize z-40 group/rb"
+                                title="Arrastrar para ajustar la hora de fin"
                                 onPointerDown={(e) => handleProvisionalResizePointerDown(e, 'bottom')}
                                 onPointerMove={handleProvisionalResizePointerMove}
                                 onPointerUp={handleProvisionalResizePointerUp}
                               >
-                                <div className="w-8 h-1.5 rounded-full bg-primary/70 group-hover/rb:bg-primary transition-colors shadow-sm" />
+                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rb:scale-110 transition-transform" />
                               </div>
                             </div>
                           )}
@@ -1987,7 +2182,7 @@ export function AgendaCalendario({
                               className="absolute left-1 right-1 rounded-lg border border-primary/30 bg-primary/5 pointer-events-none z-[1] flex items-center justify-center transition-all duration-75 animate-in fade-in zoom-in-95"
                               style={{
                                 top: `${hoveredSlot.top}px`,
-                                height: `${HOUR_HEIGHT / 2}px`,
+                                height: `${hourHeight / 2}px`,
                               }}
                             >
                               <span className="text-[10px] font-bold text-primary opacity-80 flex items-center gap-1">
@@ -2005,46 +2200,65 @@ export function AgendaCalendario({
                             const leftPct = colIndex * widthPct;
                             const gapPx = 1.5;
 
-                            const isSmall = heightPx < 48;
-                            const isMedium = heightPx >= 48 && heightPx < 78;
-                            const isLarge = heightPx >= 78;
+                            // ── Umbrales de densidad de contenido ──
+                            const isTiny   = heightPx < 38;
+                            const isSmall  = heightPx >= 38  && heightPx < 62;
+                            const isMedium = heightPx >= 62  && heightPx < 92;
+                            const isLarge  = heightPx >= 92;
 
-                            const isSelected = selectedCitaId === cita.id;
-                            const isBeingMoved = moveRef.current.active && moveRef.current.citaId === cita.id;
+                            const isSelected     = selectedCitaId === cita.id;
+                            const isBeingMoved   = moveRef.current.active && moveRef.current.citaId === cita.id;
                             const isBeingResized = resizeRef.current.active && resizeRef.current.citaId === cita.id;
-                            const editable = canMoveCita(cita);
+                            const editable       = canMoveCita(cita);
 
-                            let tooltipText = `${cita.cliente_nombre}\nHora: ${formatTime12h(cita.hora)} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
-                            if (cita.allowOverlap) {
-                              tooltipText += `\n[Traslape Confirmado: ${cita.overlapReason || 'Sin motivo'}]`;
-                            }
-                            if (editable) {
-                              tooltipText += '\n↕ Mantén presionado para mover';
-                            }
+                            // ── Badge de estado ──
+                            const statusBadge: Record<string, { label: string; cls: string }> = {
+                              completada:  { label: 'Completada', cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
+                              cancelada:   { label: 'Cancelada',  cls: 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30' },
+                              'no-show':   { label: 'No show',    cls: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30' },
+                              pendiente:   { label: 'Pendiente',  cls: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30' },
+                            };
+                            const statInfo = statusBadge[cita.estado];
+
+                            // ── Nombre del cliente abreviado (p. ej. "María G.") ──
+                            const fullName = cita.cliente_nombre ?? '';
+                            const nameParts = fullName.trim().split(' ');
+                            const shortName = nameParts.length > 1
+                              ? `${nameParts[0]} ${nameParts[1][0]}.`
+                              : nameParts[0] ?? '';
+
+                            // Hora de inicio y fin
+                            const startLabel = formatTime12h(cita.hora);
+                            const endMin = (cita._startMin ?? 0) + (cita.duracion ?? 0);
+                            const endLabel = minutesToLabel(endMin);
+
+                            let tooltipText = `${cita.cliente_nombre}\nHora: ${startLabel} (${cita.duracion} min)\nServicio: ${cita.servicio?.nombre || 'N/A'}\nEstilista: ${cita.empleado?.nombre || 'N/A'}`;
+                            if (cita.allowOverlap) tooltipText += `\n[Traslape: ${cita.overlapReason || 'Sin motivo'}]`;
+                            if (editable) tooltipText += '\n↕ Mantén presionado para mover';
 
                             return (
                               <div
                                 key={cita.id}
                                 title={tooltipText}
                                 className={cn(
-                                  "booking-card absolute p-2 rounded-xl border text-left transition-all duration-200 overflow-visible flex flex-col group select-none",
+                                  "booking-card absolute rounded-xl border text-left transition-shadow duration-150 overflow-hidden flex flex-col group select-none",
                                   isBeingMoved || isBeingResized
-                                    ? "opacity-40 scale-[0.98] shadow-none"
-                                    : "hover:shadow-lg hover:scale-[1.01] hover:z-30 active:scale-[0.99]",
+                                    ? "opacity-35 shadow-none"
+                                    : "hover:shadow-lg hover:z-30",
                                   isSelected && editable && "ring-2 ring-primary ring-offset-1 ring-offset-card z-20",
                                   editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                                 )}
                                 style={{
-                                  top: `${topPx}px`,
+                                  top:    `${topPx}px`,
                                   height: `${heightPx}px`,
-                                  left: `calc(${leftPct}% + ${gapPx}px)`,
-                                  width: `calc(${widthPct}% - ${gapPx * 2}px)`,
-                                  backgroundColor: cita.allowOverlap 
-                                    ? `color-mix(in srgb, ${catColor} 8%, color-mix(in srgb, #f59e0b 5%, var(--color-card)))` 
-                                    : `color-mix(in srgb, ${catColor} 10%, var(--color-card))`,
-                                  borderColor: cita.allowOverlap ? '#d97706' : `color-mix(in srgb, ${catColor} 28%, var(--color-border))`,
-                                  borderStyle: cita.allowOverlap ? 'dashed' : 'solid',
-                                  borderWidth: cita.allowOverlap ? '2px' : '1px',
+                                  left:   `calc(${leftPct}% + ${gapPx}px)`,
+                                  width:  `calc(${widthPct}% - ${gapPx * 2}px)`,
+                                  backgroundColor: cita.allowOverlap
+                                    ? `color-mix(in srgb, ${catColor} 12%, color-mix(in srgb, #f59e0b 8%, var(--color-card)))`
+                                    : `color-mix(in srgb, ${catColor} 14%, var(--color-card))`,
+                                  borderColor:  cita.allowOverlap ? '#d97706' : `color-mix(in srgb, ${catColor} 35%, var(--color-border))`,
+                                  borderStyle:  cita.allowOverlap ? 'dashed' : 'solid',
+                                  borderWidth:  cita.allowOverlap ? '2px' : '1px',
                                   zIndex: isSelected ? 20 : 5,
                                   touchAction: 'none',
                                 }}
@@ -2053,98 +2267,162 @@ export function AgendaCalendario({
                                 onPointerUp={(e) => handleCitaPointerUp(e, cita)}
                                 onPointerCancel={() => { cancelMove(); cancelResize(); }}
                               >
-                                {/* Handle de resize SUPERIOR (solo si seleccionada y editable) */}
+                                {/* Handle de resize SUPERIOR — solo visible cuando seleccionada */}
                                 {isSelected && editable && (
                                   <div
-                                    className="resize-handle absolute left-0 right-0 top-0 flex items-center justify-center cursor-n-resize z-30 rounded-t-xl group/rh"
-                                    style={{ height: `${RESIZE_HANDLE_PX + 4}px` }}
+                                    className="resize-handle absolute left-0 right-0 -top-3 flex items-center justify-center cursor-n-resize z-30 h-8 group/rh"
                                     onPointerDown={(e) => handleResizePointerDown(e, cita, 'top', diaStr, emp.id)}
                                     onPointerMove={(e) => handleResizePointerMove(e, cita)}
                                     onPointerUp={(e) => handleResizePointerUp(e, cita)}
                                     onPointerCancel={() => cancelResize()}
+                                    title="Arrastrar para cambiar la hora de inicio"
                                   >
-                                    <div className="w-8 h-1 rounded-full bg-primary/50 group-hover/rh:bg-primary transition-colors" />
+                                    <div
+                                      className="w-12 h-2 rounded-full shadow-sm transition-transform group-hover/rh:scale-110"
+                                      style={{ backgroundColor: catColor }}
+                                    />
                                   </div>
                                 )}
 
-                                {/* Indicador lateral */}
+                                {/* Indicador lateral de categoría */}
                                 <div
-                                  className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-all group-hover:w-1.5"
+                                  className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl transition-all group-hover:w-2 shrink-0"
                                   style={{ backgroundColor: catColor }}
                                 />
 
-                                {/* Contenido */}
-                                <div className="pl-1.5 flex flex-col h-full justify-between overflow-hidden">
-                                  <div className="overflow-hidden">
-                                    <div className="flex items-center gap-1 overflow-hidden">
-                                      {cita.allowOverlap && (
-                                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 font-extrabold text-[8px] shrink-0" title={`Traslape controlado: ${cita.overlapReason || 'Sin motivo'}`}>
-                                          ⚠️
+                                {/* ─────────── CONTENIDO ADAPTABLE ─────────── */}
+                                <div className="pl-2.5 pr-1 pt-1 pb-1 flex flex-col h-full justify-start overflow-hidden">
+
+                                  {/* TINY (<38px): solo nombre abreviado + hora en una línea */}
+                                  {isTiny && (
+                                    <div className="flex items-center gap-1 h-full overflow-hidden">
+                                      <p className="text-[10px] font-black text-foreground leading-none truncate">
+                                        {shortName}
+                                      </p>
+                                      <span className="text-[9px] font-bold text-foreground/60 shrink-0 leading-none">
+                                        {startLabel}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* SMALL (38–62px): nombre + hora de inicio */}
+                                  {isSmall && (
+                                    <>
+                                      <div className="flex items-center gap-1 overflow-hidden">
+                                        {cita.allowOverlap && (
+                                          <span className="text-amber-500 shrink-0 text-[10px]">⚠</span>
+                                        )}
+                                        <p className="text-[11px] font-black text-foreground leading-tight truncate">
+                                          {shortName}
+                                        </p>
+                                      </div>
+                                      <p className="text-[10px] font-bold text-foreground/70 leading-none mt-0.5 truncate">
+                                        {startLabel}
+                                      </p>
+                                    </>
+                                  )}
+
+                                  {/* MEDIUM (62–92px): nombre, rango horario, servicio */}
+                                  {isMedium && (
+                                    <>
+                                      <div className="flex items-center gap-1 overflow-hidden">
+                                        {cita.allowOverlap && (
+                                          <span className="text-amber-500 shrink-0 text-[10px]">⚠</span>
+                                        )}
+                                        <p className="text-xs font-black text-foreground leading-tight truncate">
+                                          {cita.cliente_nombre}
+                                        </p>
+                                        {editable && (
+                                          <GripVertical className="w-3 h-3 shrink-0 text-foreground/25 ml-auto" />
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] font-bold text-foreground/65 leading-none mt-0.5 truncate">
+                                        {startLabel} · {cita.duracion} min
+                                      </p>
+                                      {cita.servicio?.nombre && (
+                                        <span className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-foreground/75 truncate">
+                                          <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                          {cita.servicio.nombre}
                                         </span>
                                       )}
-                                      <p className="text-[10px] font-extrabold leading-tight text-foreground truncate group-hover:underline">
-                                        {cita.cliente_nombre}
-                                      </p>
-                                    </div>
-                                    {cita.allowOverlap && !isSmall && (
-                                      <div className="mt-0.5 flex items-center">
-                                        <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider scale-95 origin-left" title={cita.overlapReason || 'Traslape autorizado'}>
-                                          Intercalada
+                                    </>
+                                  )}
+
+                                  {/* LARGE (≥92px): todo el detalle */}
+                                  {isLarge && (
+                                    <>
+                                      {/* Fila superior: nombre + grip */}
+                                      <div className="flex items-start gap-1 overflow-hidden">
+                                        <div className="flex items-center gap-1 flex-1 overflow-hidden min-w-0">
+                                          {cita.allowOverlap && (
+                                            <span
+                                              className="inline-flex items-center justify-center w-4 h-4 rounded bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-extrabold text-[9px] shrink-0"
+                                              title={`Traslape: ${cita.overlapReason || 'Sin motivo'}`}
+                                            >⚠</span>
+                                          )}
+                                          <p className="text-xs font-black text-foreground leading-tight truncate">
+                                            {cita.cliente_nombre}
+                                          </p>
+                                        </div>
+                                        {editable && (
+                                          <GripVertical className="w-3.5 h-3.5 shrink-0 text-foreground/20 mt-0.5" />
+                                        )}
+                                      </div>
+
+                                      {/* Rango horario */}
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        <Clock className="w-2.5 h-2.5 shrink-0 text-foreground/50" />
+                                        <span className="text-[10px] font-bold text-foreground/70 truncate">
+                                          {startLabel} – {endLabel}
+                                        </span>
+                                        <span className="text-[9px] text-foreground/45 shrink-0">
+                                          {cita.duracion} min
                                         </span>
                                       </div>
-                                    )}
-                                    
-                                    {isSmall && (
-                                      <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                        {formatTime12h(cita.hora)}
-                                      </p>
-                                    )}
 
-                                    {isMedium && (
-                                      <>
-                                        <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                          {formatTime12h(cita.hora)} · {cita.duracion}m
-                                        </p>
-                                        <span className="flex items-center gap-1 mt-1 text-[8px] font-bold text-foreground/70 truncate">
+                                      {/* Servicio */}
+                                      {cita.servicio?.nombre && (
+                                        <span className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-foreground/80 truncate">
                                           <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
-                                          {cita.servicio?.nombre}
+                                          {cita.servicio.nombre}
                                         </span>
-                                      </>
-                                    )}
+                                      )}
 
-                                    {isLarge && (
-                                      <>
-                                        <p className="text-[9px] font-semibold text-foreground/75 truncate mt-0.5">
-                                          {formatTime12h(cita.hora)} · {cita.duracion} min
-                                        </p>
-                                        <div className="flex flex-col gap-1 mt-1.5 opacity-90 text-[8px] font-medium truncate">
-                                          <span className="flex items-center gap-1 text-foreground/80 truncate font-semibold">
-                                            <Scissors className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
-                                            {cita.servicio?.nombre}
-                                          </span>
-                                          {scope === 'all' && (
-                                            <span className="flex items-center gap-1 text-foreground/75 truncate font-semibold">
-                                              <User className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
-                                              {cita.empleado?.nombre}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
+                                      {/* Colaborador (solo vista 'all') */}
+                                      {scope === 'all' && cita.empleado?.nombre && (
+                                        <span className="flex items-center gap-1 mt-0.5 text-[10px] font-medium text-foreground/65 truncate">
+                                          <User className="w-2.5 h-2.5 shrink-0" style={{ color: catColor }} />
+                                          {cita.empleado.nombre.split(' ')[0]}
+                                        </span>
+                                      )}
+
+                                      {/* Badge de estado */}
+                                      {statInfo && heightPx >= 110 && (
+                                        <span className={cn(
+                                          "inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md border text-[9px] font-bold w-fit",
+                                          statInfo.cls
+                                        )}>
+                                          {statInfo.label}
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
 
-                                {/* Handle de resize INFERIOR (solo si seleccionada y editable) */}
+                                {/* Handle de resize INFERIOR — solo visible cuando seleccionada */}
                                 {isSelected && editable && (
                                   <div
-                                    className="resize-handle absolute left-0 right-0 bottom-0 flex items-center justify-center cursor-s-resize z-30 rounded-b-xl group/rb"
-                                    style={{ height: `${RESIZE_HANDLE_PX + 4}px` }}
+                                    className="resize-handle absolute left-0 right-0 -bottom-3 flex items-center justify-center cursor-s-resize z-30 h-8 group/rb"
                                     onPointerDown={(e) => handleResizePointerDown(e, cita, 'bottom', diaStr, emp.id)}
                                     onPointerMove={(e) => handleResizePointerMove(e, cita)}
                                     onPointerUp={(e) => handleResizePointerUp(e, cita)}
                                     onPointerCancel={() => cancelResize()}
+                                    title="Arrastrar para cambiar la hora de fin"
                                   >
-                                    <div className="w-8 h-1 rounded-full bg-primary/50 group-hover/rb:bg-primary transition-colors" />
+                                    <div
+                                      className="w-12 h-2 rounded-full shadow-sm transition-transform group-hover/rb:scale-110"
+                                      style={{ backgroundColor: catColor }}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -2190,9 +2468,60 @@ export function AgendaCalendario({
 
       </div>
 
+      {/* ── BARRA DE CONFIRMACIÓN PROVISIONAL ────────────────────────────────── */}
+      {provisionalSlot && (
+        <div
+          className="sticky bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom-2 fade-in duration-150"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <div className={cn(
+            "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-t shadow-2xl bg-card/95 backdrop-blur-[8px]",
+            provisionalSlot.isOverlap ? "border-amber-500/40" : "border-primary/20"
+          )}>
+            <div className={cn(
+              "w-1 h-10 rounded-full shrink-0",
+              provisionalSlot.isOverlap ? "bg-amber-500" : "bg-primary"
+            )} />
+            <div className="flex flex-col flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Clock className={cn("w-3.5 h-3.5 shrink-0", provisionalSlot.isOverlap ? "text-amber-500" : "text-primary")} />
+                <span className="text-sm font-black text-foreground leading-none truncate">
+                  {minutesToLabel(provisionalSlot.startMin)} – {minutesToLabel(provisionalSlot.endMin)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px] font-semibold text-muted-foreground">
+                  {provisionalSlot.endMin - provisionalSlot.startMin} min
+                </span>
+                {provisionalSlot.isOverlap && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="w-2.5 h-2.5 shrink-0" /> Solapamiento
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); clearProvisionalSlot(); }}
+              className="h-9 px-3 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted/60 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Cancelar</span>
+            </button>
+            <Button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleConfirmProvisional(); }}
+              className="h-9 px-4 text-xs font-black bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" /> Agendar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* ── SNACKBAR DE DESHACER ─────────────────────────────────────────────── */}
       {snackbar.visible && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-3 fade-in duration-200">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-3 fade-in duration-200">
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-foreground text-background shadow-2xl border border-border/20 text-xs font-semibold max-w-[320px]">
             <span className="truncate">{snackbar.message}</span>
             <button

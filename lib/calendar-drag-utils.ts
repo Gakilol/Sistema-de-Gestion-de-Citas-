@@ -38,22 +38,26 @@ export function isCitaEditable(estado: string): boolean {
 
 import { formatHora12h } from '@/lib/time-utils';
 
+export const MIN_HOUR_HEIGHT = 45;   // Mínimo: 45px por hora
+export const DEFAULT_HOUR_HEIGHT = 80; // Inicial / Por defecto: 80px por hora
+export const MAX_HOUR_HEIGHT = 140;  // Máximo: 140px por hora
+
 /** Snap a cualquier paso de minutos (por defecto 15 min) */
 export const snapToStep = (minutes: number, step = 15): number => {
   return Math.round(minutes / step) * step;
 };
 
 /** Convierte una posición Y dentro de una columna a minutos desde medianoche */
-export const yToMinutes = (y: number, step = 15): number => {
-  const rawMinutes = (y / HOUR_HEIGHT) * 60;
+export const yToMinutes = (y: number, step = 15, hourHeight = HOUR_HEIGHT): number => {
+  const rawMinutes = (y / hourHeight) * 60;
   const totalMinutes = HORA_INICIO * 60 + rawMinutes;
   const snapped = snapToStep(totalMinutes, step);
   return Math.min(Math.max(HORA_INICIO * 60, snapped), HORA_FIN * 60);
 };
 
 /** Convierte minutos desde medianoche a posición Y en px */
-export const minutesToY = (minutes: number): number => {
-  return ((minutes - HORA_INICIO * 60) / 60) * HOUR_HEIGHT;
+export const minutesToY = (minutes: number, hourHeight = HOUR_HEIGHT): number => {
+  return ((minutes - HORA_INICIO * 60) / 60) * hourHeight;
 };
 
 /** Formatea minutos desde medianoche a string 24h "HH:MM" */
