@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // Normalizar y validar teléfono
     let telefonoNormalizado: string | null = null;
     if (telefono !== undefined && telefono !== null && String(telefono).trim() !== '') {
-      const phoneValidation = validarYNormalizarTelefono(telefono, '505');
+      const phoneValidation = validarYNormalizarTelefono(telefono, '506');
       if (!phoneValidation.isValid) {
         return NextResponse.json(
           { error: phoneValidation.error || 'Número de teléfono inválido' },

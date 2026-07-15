@@ -15,12 +15,12 @@ interface PhoneInputProps {
 }
 
 const COUNTRIES = [
-  { code: '505', name: 'Nicaragua', flag: '🇳🇮', placeholder: '8675-7959' },
   { code: '506', name: 'Costa Rica', flag: '🇨🇷', placeholder: '8888-7777' },
+  { code: '505', name: 'Nicaragua', flag: '🇳🇮', placeholder: '8675-7959' },
 ];
 
 export function PhoneInput({ value, onChange, disabled = false, className, placeholder, optional = false }: PhoneInputProps) {
-  const [countryCode, setCountryCode] = useState('505'); // Nicaragua por defecto
+  const [countryCode, setCountryCode] = useState('506'); // Costa Rica por defecto
   const [phoneNumber, setPhoneNumber] = useState('');
 
   // Sincronizar el valor inicial e internacional recibido

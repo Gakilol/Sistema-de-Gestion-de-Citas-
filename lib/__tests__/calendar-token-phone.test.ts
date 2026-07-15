@@ -27,11 +27,15 @@ describe('Pruebas Unitarias - Sistema de Calendario y WhatsApp', () => {
       expect(normalizarTelefono('+505 8675-7959', '505')).toBe('50586757959');
     });
 
-    test('5. Teléfono costarricense con +506', () => {
+    test('5. Teléfono costarricense por defecto de 8 dígitos (88887777)', () => {
+      expect(normalizarTelefono('88887777')).toBe('50688887777');
+    });
+
+    test('6. Teléfono costarricense con +506', () => {
       expect(normalizarTelefono('+506 8888 8888', '506')).toBe('50688888888');
     });
 
-    test('6. Cliente sin teléfono o nulo', () => {
+    test('7. Cliente sin teléfono o nulo', () => {
       expect(normalizarTelefono('')).toBeNull();
       expect(normalizarTelefono('   ')).toBeNull();
       expect(normalizarTelefono(null)).toBeNull();

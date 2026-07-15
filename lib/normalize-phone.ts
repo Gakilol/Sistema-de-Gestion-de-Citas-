@@ -18,7 +18,7 @@ export interface TelefonoValidationResult {
  */
 export function validarYNormalizarTelefono(
   telefono: string | null | undefined,
-  defaultCountryCode: string = '505'
+  defaultCountryCode: string = '506'
 ): TelefonoValidationResult {
   if (telefono === null || telefono === undefined) {
     return { normalized: null, isValid: true };
@@ -48,7 +48,7 @@ export function validarYNormalizarTelefono(
 
   // Caso 2: Tiene 8 dígitos (número local sin prefijo internacional)
   if (digitsOnly.length === 8) {
-    const code = ['505', '506'].includes(defaultCountryCode) ? defaultCountryCode : '505';
+    const code = ['505', '506'].includes(defaultCountryCode) ? defaultCountryCode : '506';
     return { normalized: `${code}${digitsOnly}`, isValid: true };
   }
 
@@ -82,11 +82,11 @@ export function validarYNormalizarTelefono(
 
 /**
  * Normaliza un número telefónico para almacenamiento/WhatsApp.
- * Retorna string en formato internacional (ej. "50586757959") o null si es inválido/vacío.
+ * Retorna string en formato internacional (ej. "50688887777") o null si es inválido/vacío.
  */
 export function normalizarTelefono(
   telefono: string | null | undefined,
-  defaultCountryCode: string = '505'
+  defaultCountryCode: string = '506'
 ): string | null {
   const result = validarYNormalizarTelefono(telefono, defaultCountryCode);
   return result.isValid ? result.normalized : null;
@@ -97,7 +97,7 @@ export function normalizarTelefono(
  */
 export function esTelefonoValido(
   telefono: string | null | undefined,
-  defaultCountryCode: string = '505'
+  defaultCountryCode: string = '506'
 ): boolean {
   return validarYNormalizarTelefono(telefono, defaultCountryCode).isValid;
 }

@@ -329,7 +329,7 @@ export default function Configuracion() {
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
                     <MessageCircle className="w-3 h-3 inline mr-1"/>WhatsApp del negocio
                   </label>
-                  <Input value={negocio.whatsapp} onChange={e => setNegocio({ ...negocio, whatsapp: e.target.value })} placeholder="50588880000"/>
+                  <Input value={negocio.whatsapp} onChange={e => setNegocio({ ...negocio, whatsapp: e.target.value })} placeholder="50688880000"/>
                 </div>
               </div>
               <div>
@@ -440,8 +440,8 @@ export default function Configuracion() {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Número del salón (con código de país)</label>
                 <Input value={waConfig.numero} onChange={e => setWaConfig({ ...waConfig, numero: e.target.value })}
-                  placeholder="50588880000 (505 = Nicaragua, 506 = Costa Rica)"/>
-                <p className="text-xs text-muted-foreground mt-1">Sin guiones ni espacios. Ej: 50588880000</p>
+                  placeholder="50688880000 (506 = Costa Rica, 505 = Nicaragua)"/>
+                <p className="text-xs text-muted-foreground mt-1">Sin guiones ni espacios. Ej: 50688880000</p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Mensajes automáticos activos</p>
