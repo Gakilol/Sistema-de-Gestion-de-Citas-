@@ -42,19 +42,19 @@ export async function GET(req: NextRequest) {
         }),
       ]);
 
-      const empIds  = byEmpleado.map(e => e.empleado_id);
-      const servIds = byServicio.map(s => s.servicio_id);
+      const empIds  = byEmpleado.map((e: any) => e.empleado_id);
+      const servIds = byServicio.map((s: any) => s.servicio_id);
       const [emps, servs] = await Promise.all([
         prisma.empleado.findMany({ where: { id: { in: empIds  } }, select: { id: true, nombre: true } }),
         prisma.servicio.findMany({ where: { id: { in: servIds } }, select: { id: true, nombre: true } }),
       ]);
-      const empMap  = Object.fromEntries(emps.map(e  => [e.id, e.nombre]));
-      const servMap = Object.fromEntries(servs.map(s => [s.id, s.nombre]));
+      const empMap  = Object.fromEntries(emps.map((e: any)  => [e.id, e.nombre]));
+      const servMap = Object.fromEntries(servs.map((s: any) => [s.id, s.nombre]));
 
       return NextResponse.json({
-        porEstado:   byEstado.map(e  => ({ estado: e.estado,   cantidad: e._count.id })),
-        porEmpleado: byEmpleado.map(e => ({ nombre: empMap[e.empleado_id] ?? '—', citas: e._count.id })),
-        porServicio: byServicio.map(s => ({ nombre: servMap[s.servicio_id] ?? '—', cantidad: s._count.id })),
+        porEstado:   byEstado.map((e: any)  => ({ estado: e.estado,   cantidad: e._count.id })),
+        porEmpleado: byEmpleado.map((e: any) => ({ nombre: empMap[e.empleado_id] ?? '—', citas: e._count.id })),
+        porServicio: byServicio.map((s: any) => ({ nombre: servMap[s.servicio_id] ?? '—', cantidad: s._count.id })),
       });
     }
 
@@ -65,11 +65,11 @@ export async function GET(req: NextRequest) {
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
       });
-      const ids  = data.map(d => d.empleado_id);
+      const ids  = data.map((d: any) => d.empleado_id);
       const emps = await prisma.empleado.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, especialidad: true } });
-      const empMap = Object.fromEntries(emps.map(e => [e.id, e]));
+      const empMap = Object.fromEntries(emps.map((e: any) => [e.id, e]));
       return NextResponse.json({
-        data: data.map(d => ({
+        data: data.map((d: any) => ({
           nombre:       empMap[d.empleado_id]?.nombre       ?? '—',
           especialidad: empMap[d.empleado_id]?.especialidad ?? '—',
           citas:        d._count.id,

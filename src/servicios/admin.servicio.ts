@@ -159,25 +159,25 @@ export class AdminServicio {
 
 
     // ── Resolver nombres de servicios populares ───────────────────────
-    const servicioIds = serviciosPopularesRaw.map((s) => s.servicio_id);
+    const servicioIds = serviciosPopularesRaw.map((s: any) => s.servicio_id);
     const serviciosDetalle = await prisma.servicio.findMany({
       where: { id: { in: servicioIds } },
       select: { id: true, nombre: true },
     });
-    const servicioMap = Object.fromEntries(serviciosDetalle.map((s) => [s.id, s.nombre]));
-    const serviciosPopulares = serviciosPopularesRaw.map((s) => ({
+    const servicioMap = Object.fromEntries(serviciosDetalle.map((s: any) => [s.id, s.nombre]));
+    const serviciosPopulares = serviciosPopularesRaw.map((s: any) => ({
       nombre: servicioMap[s.servicio_id] ?? 'Desconocido',
       cantidad: s._count.servicio_id,
     }));
 
     // ── Resolver nombres de empleados en productividad ────────────────
-    const empIds = productividadEmpleados.map((e) => e.empleado_id);
+    const empIds = productividadEmpleados.map((e: any) => e.empleado_id);
     const empsDetalle = await prisma.empleado.findMany({
       where: { id: { in: empIds } },
       select: { id: true, nombre: true },
     });
-    const empMap = Object.fromEntries(empsDetalle.map((e) => [e.id, e.nombre]));
-    const productividad = productividadEmpleados.map((e) => ({
+    const empMap = Object.fromEntries(empsDetalle.map((e: any) => [e.id, e.nombre]));
+    const productividad = productividadEmpleados.map((e: any) => ({
       nombre: empMap[e.empleado_id] ?? 'Empleado',
       citas: e._count.id,
     }));
@@ -209,7 +209,7 @@ export class AdminServicio {
       citasHoy: citasHoyDetalle,
       serviciosPopulares,
       productividadEmpleados: productividad,
-      actividadReciente: actividadReciente.map((c) => ({
+      actividadReciente: actividadReciente.map((c: any) => ({
         id: c.id,
         cliente_nombre: c.cliente_nombre,
         servicio: c.servicio.nombre,

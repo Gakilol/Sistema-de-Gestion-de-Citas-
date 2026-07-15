@@ -20,12 +20,12 @@ export async function GET(req: NextRequest) {
       _count: { id: true },
     });
 
-    const empIds = [...new Set(empleadoGroupBy.map(r => r.empleado_id))];
+    const empIds = [...new Set(empleadoGroupBy.map((r: any) => r.empleado_id))];
     const emps   = await prisma.empleado.findMany({
       where: { id: { in: empIds } },
       select: { id: true, nombre: true, especialidad: true },
     });
-    const empMap = Object.fromEntries(emps.map(e => [e.id, e]));
+    const empMap = Object.fromEntries(emps.map((e: any) => [e.id, e]));
 
     const empleadoStats: Record<string, any> = {};
     for (const row of empleadoGroupBy) {
@@ -74,12 +74,12 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const servIds = [...new Set(citaServicios.map(r => r.servicio_id))];
+    const servIds = [...new Set(citaServicios.map((r: any) => r.servicio_id))];
     const servs   = await prisma.servicio.findMany({
       where: { id: { in: servIds } },
       select: { id: true, nombre: true, categoria: true },
     });
-    const servMap = Object.fromEntries(servs.map(s => [s.id, s]));
+    const servMap = Object.fromEntries(servs.map((s: any) => [s.id, s]));
 
     const servicioStats: Record<string, any> = {};
     for (const cs of citaServicios) {

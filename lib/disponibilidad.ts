@@ -226,21 +226,21 @@ export async function calcularDisponibilidad(
   const citas = await prisma.cita.findMany({ where: citasWhere });
 
   // ─── Construir lista unificada de intervalos ocupados ───────────────────
-  const descansosDia = empleado.descansos.filter(d => d.dia_semana === diaIndex);
+  const descansosDia = empleado.descansos.filter((d: any) => d.dia_semana === diaIndex);
 
   const intervalosOcupados: IntervaloOcupado[] = [
-    ...citas.map(c => ({
+    ...citas.map((c: any) => ({
       inicio: timeToMinutes(c.hora),
       fin: timeToMinutes(c.hora) + c.duracion,
       motivo: 'Cita reservada',
       allowOverlap: c.allowOverlap
     })),
-    ...descansosDia.map(d => ({
+    ...descansosDia.map((d: any) => ({
       inicio: timeToMinutes(d.hora_inicio),
       fin: timeToMinutes(d.hora_fin),
       motivo: 'Descanso'
     })),
-    ...empleado.bloqueos.map(b => ({
+    ...empleado.bloqueos.map((b: any) => ({
       inicio: timeToMinutes(b.hora_inicio),
       fin: timeToMinutes(b.hora_fin),
       motivo: b.motivo || 'Bloqueado'

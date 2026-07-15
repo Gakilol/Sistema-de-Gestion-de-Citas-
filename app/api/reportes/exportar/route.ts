@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Excel (simple XML spreadsheet compatible with Excel)
-    const xmlRows = rows.map(r => {
+    const xmlRows = rows.map((r: any) => {
       const cols = Object.values(r).map(v =>
         `<Cell><Data ss:Type="String">${String(v || '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] || c))}</Data></Cell>`
       ).join('');
