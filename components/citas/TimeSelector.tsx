@@ -1,9 +1,16 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Clock, CalendarX2, CheckCircle2, XCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getBusinessTodayString, getBusinessNowTime } from '@/lib/timezone';
+import {
+  ALL_HOURS_12,
+  NORMAL_MINUTES,
+  hour12To24h,
+  parse24hToNormal,
+  formatHora12h,
+} from '@/lib/time-utils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,29 +31,25 @@ interface TimeSelectorProps {
   fecha: string;
   servicioId?: string;
   duracionTotal?: number;
-  selectedTime: string;
+  selectedTime: string; // Formato 24h "HH:MM"
   onTimeSelect: (time: string) => void;
   excludeCitaId?: string | null;
+  canUseCustomTime?: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function timeToMinutes(time: string): number {
+  if (!time) return 0;
   const [h, m] = time.split(':').map(Number);
-  return h * 60 + m;
+  return (h || 0) * 60 + (m || 0);
 }
 
 function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const clamped = Math.max(0, Math.min(1439, minutes));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function formatHora12(time: string): string {
-  const [h, m] = time.split(':').map(Number);
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
 function validarLocal(
@@ -72,7 +75,7 @@ function validarLocal(
     if (startMin < int.fin && endMin > int.inicio) {
       return {
         valida: false,
-        motivo: `${int.motivo} (${minutesToTime(int.inicio)} - ${minutesToTime(int.fin)})`
+        motivo: `${int.motivo} (${formatHora12h(minutesToTime(int.inicio))} - ${formatHora12h(minutesToTime(int.fin))})`
       };
     }
   }
@@ -82,7 +85,16 @@ function validarLocal(
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, selectedTime, onTimeSelect, excludeCitaId }: TimeSelectorProps) {
+export function TimeSelector({
+  empleadoId,
+  fecha,
+  servicioId,
+  duracionTotal,
+  selectedTime,
+  onTimeSelect,
+  excludeCitaId,
+  canUseCustomTime = true,
+}: TimeSelectorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jornada, setJornada] = useState<Jornada | null>(null);
@@ -90,6 +102,11 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
   const [businessNow, setBusinessNow] = useState('');
 
   const duracion = duracionTotal || 30;
+
+  // Desglosar la hora 24h actual seleccionada
+  const parsedTime = useMemo(() => {
+    return parse24hToNormal(selectedTime || '08:00');
+  }, [selectedTime]);
 
   useEffect(() => {
     setBusinessNow(getBusinessNowTime());
@@ -103,7 +120,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     return fecha === getBusinessTodayString();
   }, [fecha]);
 
-  // ─── Fetch Disponibilidad (Solo intervalos y jornada) ───────────────────
+  // ─── Fetch Disponibilidad ───────────────────────────────────────────────
   useEffect(() => {
     if (!empleadoId || !fecha) {
       setJornada(null);
@@ -135,16 +152,15 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
           setJornada(data.jornada || null);
           setIntervalosOcupados(data.intervalosOcupados || []);
 
-          // ─── AUTO-SELECCIÓN: si no hay hora seleccionada, elegir el primer
-          // bloque disponible para mantener sincronizado el estado del formulario
-          // con lo que el usuario ve visualmente en los selectores de hora.
+          // ─── AUTO-SELECCIÓN: si no hay hora seleccionada, elegir el primer bloque disponible
           if (!selectedTime) {
             const primerDisponible = (data.bloques || []).find((b: { hora: string; disponible: boolean }) => b.disponible);
             if (primerDisponible) {
               onTimeSelect(primerDisponible.hora);
             } else if (data.jornada?.inicio) {
-              // Fallback: si no hay bloques libres, seleccionar inicio de jornada
               onTimeSelect(data.jornada.inicio);
+            } else {
+              onTimeSelect('08:00');
             }
           }
         }
@@ -172,13 +188,6 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     return validarLocal(selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados, true);
   }, [selectedTime, selectedMinutes, duracion, jornadaInicioMin, jornadaFinMin, intervalosOcupados, jornada]);
 
-  const isHorarioEspecial = useMemo(() => {
-    if (!selectedTime || !jornada) return false;
-    const isDiaInactivo = jornada.activo === false;
-    const outsideJornada = selectedMinutes < jornadaInicioMin || (selectedMinutes + duracion) > jornadaFinMin;
-    return isDiaInactivo || outsideJornada;
-  }, [selectedTime, selectedMinutes, duracion, jornada, jornadaInicioMin, jornadaFinMin]);
-
   const isPastTime = useMemo(() => {
     if (!selectedTime) return false;
     const todayStr = getBusinessTodayString();
@@ -190,54 +199,55 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     return false;
   }, [fecha, selectedTime, businessNow]);
 
-  // ─── Time Picker Handlers ──────────────────────────────────────────────
-  const adjustTime = useCallback((deltaMinutes: number) => {
-    let newMinutes: number;
-    if (selectedTime) {
-      newMinutes = selectedMinutes + deltaMinutes;
-    } else {
-      newMinutes = jornadaInicioMin;
+  // ─── Manejadores de Cambio de Hora / Minutos / Período ──────────────────
+  const handleSelectHour = useCallback((h12: number) => {
+    let targetPeriod: 'AM' | 'PM' = parsedTime.period;
+    if (h12 >= 8 && h12 <= 11) {
+      targetPeriod = 'AM';
+    } else if (h12 === 12 || (h12 >= 1 && h12 <= 6)) {
+      targetPeriod = 'PM';
+    } else if (h12 === 7) {
+      if (parsedTime.period !== 'PM') {
+        targetPeriod = 'AM';
+      }
     }
 
-    // Permitir cualquier hora del día (00:00 a 23:59)
-    newMinutes = Math.max(0, Math.min(1439, newMinutes));
-    onTimeSelect(minutesToTime(newMinutes));
-  }, [selectedTime, selectedMinutes, jornadaInicioMin, onTimeSelect]);
+    const time24 = hour12To24h(h12, parsedTime.minute, targetPeriod);
+    onTimeSelect(time24);
+  }, [parsedTime.minute, parsedTime.period, onTimeSelect]);
 
-  const setHour = useCallback((h: number) => {
-    const currentM = selectedTime ? selectedMinutes % 60 : 0;
-    const newMinutes = h * 60 + currentM;
-    onTimeSelect(minutesToTime(Math.max(0, Math.min(1439, newMinutes))));
-  }, [selectedTime, selectedMinutes, onTimeSelect]);
+  const handleSelectMinute = useCallback((m: number) => {
+    const time24 = hour12To24h(parsedTime.hour12, m, parsedTime.period);
+    onTimeSelect(time24);
+  }, [parsedTime.hour12, parsedTime.period, onTimeSelect]);
 
-  const setMinute = useCallback((m: number) => {
-    const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
-    const newMinutes = currentH * 60 + m;
-    onTimeSelect(minutesToTime(Math.max(0, Math.min(1439, newMinutes))));
-  }, [selectedTime, selectedMinutes, jornadaInicioMin, onTimeSelect]);
+  const handleSelectPeriod = useCallback((period: 'AM' | 'PM') => {
+    const time24 = hour12To24h(parsedTime.hour12, parsedTime.minute, period);
+    onTimeSelect(time24);
+  }, [parsedTime.hour12, parsedTime.minute, onTimeSelect]);
 
-  // ─── Empty / Loading / Error States ─────────────────────────────────────
+  // ─── Componentes de Estado ──────────────────────────────────────────────
   if (!empleadoId || !fecha) {
     return (
-      <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-xl text-muted-foreground bg-secondary/10">
+      <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-2xl text-muted-foreground bg-secondary/10">
         <Clock className="w-8 h-8 mb-2 opacity-50" />
-        <p className="text-sm text-center">Selecciona un empleado y una fecha para ver la agenda horaria.</p>
+        <p className="text-sm text-center">Selecciona un profesional y una fecha para ver la disponibilidad horaria.</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 border border-border rounded-xl bg-secondary/10">
+      <div className="flex flex-col items-center justify-center p-8 border border-border rounded-2xl bg-secondary/10">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
-        <p className="text-sm text-muted-foreground font-medium animate-pulse">Consultando agenda y colisiones...</p>
+        <p className="text-sm text-muted-foreground font-medium animate-pulse">Verificando agenda y colisiones...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center p-6 border border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800/40 rounded-xl text-red-600 dark:text-red-400">
+      <div className="flex flex-col items-center justify-center p-6 border border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800/40 rounded-2xl text-red-600 dark:text-red-400">
         <CalendarX2 className="w-8 h-8 mb-2 opacity-80" />
         <p className="font-semibold text-center">{error}</p>
         <p className="text-xs text-red-500 dark:text-red-400/70 mt-1">Intenta seleccionando otra fecha.</p>
@@ -259,9 +269,8 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
     }
 
     return (
-      <div className="space-y-1.5">
-        {/* Barra de tiempo de la Línea de Tiempo */}
-        <div className="relative h-10 bg-emerald-100/60 dark:bg-emerald-900/10 rounded-lg overflow-hidden border border-emerald-200/50 dark:border-emerald-800/20">
+      <div className="space-y-1.5 pt-2">
+        <div className="relative h-9 bg-emerald-100/60 dark:bg-emerald-900/15 rounded-xl overflow-hidden border border-emerald-200/50 dark:border-emerald-800/20">
           {/* Intervalos ocupados */}
           {intervalosOcupados.map((int, i) => {
             const left = Math.max(0, ((int.inicio - jornadaInicioMin) / jornadaDuracion) * 100);
@@ -269,13 +278,16 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
             return (
               <div
                 key={i}
-                className="absolute top-0 h-full bg-red-400/30 dark:bg-red-500/20 border-x border-red-300/40 dark:border-red-600/20"
+                className="absolute top-0 h-full bg-red-500/25 dark:bg-red-500/20 border-x border-red-400/40 dark:border-red-600/30"
                 style={{ left: `${left}%`, width: `${width}%` }}
-                title={`${int.motivo}: ${minutesToTime(int.inicio)} - ${minutesToTime(int.fin)}`}
+                title={`${int.motivo}: ${formatHora12h(minutesToTime(int.inicio))} - ${formatHora12h(minutesToTime(int.fin))}`}
               >
-                <div className="w-full h-full opacity-30" style={{
-                  backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 6px)'
-                }} />
+                <div
+                  className="w-full h-full opacity-30"
+                  style={{
+                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0.1) 6px)'
+                  }}
+                />
               </div>
             );
           })}
@@ -289,7 +301,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                 <div
                   className="absolute top-0 w-0.5 h-full bg-amber-500 z-10 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
                   style={{ left: `${currentPercentage}%` }}
-                  title={`Hora actual: ${formatHora12(businessNow)}`}
+                  title={`Hora actual: ${formatHora12h(businessNow)}`}
                 >
                   <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-500" />
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-500" />
@@ -302,20 +314,18 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
           {/* Indicador de Hora Seleccionada y Proyección de Duración */}
           {selectedTime && selectedMinutes >= 0 && (
             <>
-              {/* Proyección basada en la duración */}
               <div
                 className={cn(
                   "absolute top-0 h-full transition-all duration-300",
                   validacionActual?.valida
-                    ? "bg-primary/20 dark:bg-primary/15 border-x border-primary/45"
-                    : "bg-red-500/20 dark:bg-red-500/15 border-x border-red-500/40"
+                    ? "bg-primary/25 dark:bg-primary/20 border-x border-primary/50"
+                    : "bg-red-500/25 dark:bg-red-500/20 border-x border-red-500/50"
                 )}
                 style={{
                   left: `${((selectedMinutes - jornadaInicioMin) / jornadaDuracion) * 100}%`,
                   width: `${Math.min(100 - ((selectedMinutes - jornadaInicioMin) / jornadaDuracion) * 100, (duracion / jornadaDuracion) * 100)}%`
                 }}
               />
-              {/* Marcador de inicio */}
               <div
                 className={cn(
                   "absolute top-0 w-0.5 h-full transition-all duration-300 shadow-sm",
@@ -345,7 +355,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
                 className="absolute text-[10px] text-muted-foreground font-semibold -translate-x-1/2"
                 style={{ left: `${pos}%` }}
               >
-                {formatHora12(minutesToTime(h)).replace(':00', '')}
+                {formatHora12h(minutesToTime(h)).replace(':00', '')}
               </span>
             );
           })}
@@ -358,218 +368,196 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
   const renderStatusBanner = () => {
     if (!selectedTime) {
       return (
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border/50 text-xs text-muted-foreground">
-          <Clock className="w-4 h-4 shrink-0 opacity-60 text-primary" />
-          <span>Ajusta la hora para validar colisiones de horario en tiempo real</span>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/40 border border-border/50 text-xs text-muted-foreground">
+          <Clock className="w-4 h-4 shrink-0 text-amber-500" />
+          <span>Selecciona la hora de la cita</span>
         </div>
       );
     }
 
     if (!validacionActual) return null;
 
-    if (validacionActual.valida) {
-      return (
-        <div className="flex flex-col gap-2 w-full animate-in fade-in duration-200">
-          {isPastTime ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>La hora seleccionada ya pasó, pero se permitirá registrar la cita.</span>
-            </div>
-          ) : (
-            isHorarioEspecial && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-semibold">
-                <span className="animate-pulse">⚡</span>
-                <span>Horario especial: fuera de la jornada laboral habitual</span>
-              </div>
-            )
-          )}
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/30 dark:border-emerald-800/30 text-xs">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <div>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                ✓ Disponible
-              </span>
-              <span className="text-emerald-600/80 dark:text-emerald-400/70 ml-1.5">
-                ({formatHora12(selectedTime)} – {formatHora12(minutesToTime(selectedMinutes + duracion))})
-              </span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-red-500/10 dark:bg-red-950/20 border border-red-500/30 dark:border-red-800/30 text-xs animate-in fade-in duration-200">
-        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-        <div>
-          <span className="font-bold text-red-600 dark:text-red-400">
-            ✕ Conflicto detected
-          </span>
-          <span className="text-red-600/80 dark:text-red-400/70 ml-1.5">
-            — {validacionActual.motivo}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  // ─── Dropdown Time Picker ──────────────────────────────────────────────────
-  const renderTimePicker = () => {
-    const currentH = selectedTime ? Math.floor(selectedMinutes / 60) : Math.floor(jornadaInicioMin / 60);
-    const currentM = selectedTime ? selectedMinutes % 60 : 0;
-    const h12      = currentH === 0 ? 12 : currentH > 12 ? currentH - 12 : currentH;
-    const isPM     = currentH >= 12;
-
-    const handleHourChange = (val: string) => {
-      const h12New = parseInt(val, 10);
-      const h24New = isPM
-        ? (h12New === 12 ? 12 : h12New + 12)
-        : (h12New === 12 ? 0 : h12New);
-      setHour(h24New);
-    };
-
-    const handleMinuteChange = (val: string) => {
-      setMinute(parseInt(val, 10));
-    };
-
-    const togglePeriod = (targetPM: boolean) => {
-      if (targetPM && !isPM) {
-        const newH = currentH === 0 ? 12 : currentH + 12;
-        if (newH <= 23) setHour(newH);
-      } else if (!targetPM && isPM) {
-        const newH = currentH === 12 ? 0 : currentH - 12;
-        if (newH >= 0) setHour(newH);
-      }
-    };
-
-    // Calcular hora fin para el panel
-    const horaFinMin = selectedTime ? selectedMinutes + duracion : -1;
-    const horaFinStr = horaFinMin >= 0 ? minutesToTime(Math.min(1439, horaFinMin)) : null;
-
-    return (
-      <div className="space-y-4">
-        {/* ─── Panel de Información de Tiempo ────────────────────────────── */}
-        {selectedTime && (
-          <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-secondary/30 border border-border/50">
-            <div className="text-center">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Inicio</p>
-              <p className="text-sm font-bold text-foreground tabular-nums">{formatHora12(selectedTime)}</p>
-            </div>
-            <div className="text-center border-x border-border/40">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Duración</p>
-              <p className="text-sm font-bold text-primary tabular-nums">{duracion} min</p>
-            </div>
-            <div className="text-center">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Fin</p>
-              <p className={cn(
-                "text-sm font-bold tabular-nums",
-                validacionActual?.valida ? "text-emerald-500" : "text-red-500"
-              )}>
-                {horaFinStr ? formatHora12(horaFinStr) : '--'}
-              </p>
-            </div>
+      <div className="flex flex-col gap-1.5 w-full animate-in fade-in duration-200">
+        {/* Aviso de Hora Pasada */}
+        {isPastTime && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>La hora elegida ya pasó en la fecha actual.</span>
           </div>
         )}
 
-        {/* ─── Selectores de Hora / Minuto (00-59) / Período Botones AM/PM ──── */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center justify-center gap-2">
-            {/* Selector de Hora (1–12) */}
-            <div className="flex flex-col items-center gap-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Hora</label>
-              <select
-                value={String(h12).padStart(2, '0')}
-                onChange={e => handleHourChange(e.target.value)}
-                className="w-20 h-12 text-center text-xl font-extrabold rounded-xl bg-card border-2 border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary appearance-none"
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                  <option key={h} value={String(h).padStart(2, '0')}>
-                    {String(h).padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
+        {/* Mensaje de Restricción si el usuario no tiene permisos fuera de horario */}
+        {!canUseCustomTime && !parsedTime.isNormalRange && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>No tienes permiso para agendar citas fuera del horario normal.</span>
+          </div>
+        )}
+
+        {/* Card de Disponibilidad y Horario */}
+        {validacionActual.valida ? (
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/30 text-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Horario Disponible
+              </span>
             </div>
-
-            <span className="text-2xl font-black text-muted-foreground self-end mb-2.5">:</span>
-
-            {/* Selector de Minuto Completo (00–59) */}
-            <div className="flex flex-col items-center gap-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Minuto (00-59)</label>
-              <select
-                value={String(currentM).padStart(2, '0')}
-                onChange={e => handleMinuteChange(e.target.value)}
-                className="w-20 h-12 text-center text-xl font-extrabold rounded-xl bg-card border-2 border-border shadow-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary appearance-none"
-              >
-                {Array.from({ length: 60 }, (_, i) => i).map(m => (
-                  <option key={m} value={String(m).padStart(2, '0')}>
-                    {String(m).padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
+            <span className="text-emerald-700 dark:text-emerald-300 font-bold tabular-nums">
+              {formatHora12h(selectedTime)} – {formatHora12h(minutesToTime(selectedMinutes + duracion))} ({duracion} min)
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-500/10 dark:bg-red-950/30 border border-red-500/30 text-xs">
+            <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+            <div>
+              <span className="font-bold text-red-600 dark:text-red-400">
+                Conflicto de agenda
+              </span>
+              <span className="text-red-600/80 dark:text-red-400/80 ml-1">
+                — {validacionActual.motivo}
+              </span>
             </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
-            {/* Botones Grandes Táctiles AM / PM */}
-            <div className="flex flex-col items-center gap-1 ml-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Período</label>
-              <div className="flex bg-secondary/60 p-1 rounded-xl border border-border/60">
-                <button
-                  type="button"
-                  onClick={() => togglePeriod(false)}
-                  className={cn(
-                    "px-3 py-2 text-xs font-black rounded-lg transition-all min-w-[42px] min-h-[38px] flex items-center justify-center cursor-pointer",
-                    !isPM
-                      ? "bg-amber-500 text-white shadow-md scale-105"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                  title="Ante meridiem (Mañana)"
-                >
-                  AM
-                </button>
-                <button
-                  type="button"
-                  onClick={() => togglePeriod(true)}
-                  className={cn(
-                    "px-3 py-2 text-xs font-black rounded-lg transition-all min-w-[42px] min-h-[38px] flex items-center justify-center cursor-pointer",
-                    isPM
-                      ? "bg-indigo-600 text-white shadow-md scale-105"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                  title="Post meridiem (Tarde/Noche)"
-                >
-                  PM
-                </button>
-              </div>
+  // ─── Selector Unificado de Hora ────────────────────────────────────────
+  const renderUnifiedSelector = () => {
+    return (
+      <div className="space-y-4">
+        {/* Banner Informativo y Badge de Rango */}
+        <div className="flex items-center justify-between text-[11px] bg-secondary/30 px-3 py-2 rounded-xl border border-border/40">
+          <span className="text-muted-foreground">
+            Jornada normal: <strong className="text-foreground">8:00 AM – 6:00 PM</strong>
+          </span>
+          {parsedTime.isNormalRange ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+              <Sparkles className="w-3 h-3 text-emerald-500" /> Horario normal
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="w-3 h-3 text-amber-500" /> Fuera del horario normal
+            </span>
+          )}
+        </div>
+
+        {/* ── Visual Display: Horas (1-12) | Minutos (00-45) | Selector AM/PM ── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-secondary/20 p-4 rounded-2xl border border-border/50">
+          
+          {/* Selector de Hora 12h (1..12) */}
+          <div className="flex flex-col items-center sm:items-start gap-1.5 w-full sm:w-auto">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Hora</span>
+            <div className="grid grid-cols-6 sm:grid-cols-6 gap-1 w-full max-w-[320px]">
+              {ALL_HOURS_12.map((h) => {
+                const isSelected = parsedTime.hour12 === h;
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => handleSelectHour(h)}
+                    className={cn(
+                      "h-10 rounded-xl text-xs font-black transition-all flex items-center justify-center cursor-pointer active:scale-95",
+                      isSelected
+                        ? parsedTime.isNormalRange
+                          ? "bg-amber-500 text-black shadow-md shadow-amber-500/30 scale-105 ring-2 ring-amber-500/50"
+                          : "bg-amber-600 text-white shadow-md shadow-amber-600/40 scale-105 ring-2 ring-amber-600/50"
+                        : "bg-card hover:bg-secondary/70 text-foreground border border-border/60"
+                    )}
+                  >
+                    {h}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-            {/* Ajuste Fino Táctil Rápido (+1m, +5m, +15m, -1m, -5m, -15m) */}
-          <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
-            <span className="text-[10px] text-muted-foreground font-semibold mr-1 shrink-0">Ajuste rápido:</span>
-            {[-15, -5, -1, 1, 5, 15].map(delta => (
+          <div className="hidden sm:block text-2xl font-black text-muted-foreground/60 border-l border-border/40 h-16 my-auto mx-1" />
+
+          {/* Selector de Minutos (00, 15, 30, 45) */}
+          <div className="flex flex-col items-center gap-1.5 w-full sm:w-auto">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Minutos</span>
+            <div className="grid grid-cols-4 sm:grid-cols-2 gap-1.5 w-full max-w-[200px]">
+              {NORMAL_MINUTES.map((m) => {
+                const isSelected = parsedTime.minute === m;
+                const mStr = String(m).padStart(2, '0');
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => handleSelectMinute(m)}
+                    className={cn(
+                      "h-10 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer active:scale-95",
+                      isSelected
+                        ? "bg-primary text-primary-foreground shadow-md scale-105"
+                        : "bg-card hover:bg-secondary/70 text-foreground border border-border/60"
+                    )}
+                  >
+                    :{mStr}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="hidden sm:block text-2xl font-black text-muted-foreground/60 border-l border-border/40 h-16 my-auto mx-1" />
+
+          {/* Selector Interactivo AM / PM */}
+          <div className="flex flex-col items-center gap-1.5 w-full sm:w-auto">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Período</span>
+            <div className="flex bg-card p-1 rounded-xl border border-border/60 shadow-xs">
               <button
-                key={delta}
                 type="button"
-                onClick={() => adjustTime(delta)}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground text-xs font-bold hover:bg-primary/10 hover:border-primary/40 active:scale-95 transition-all min-h-[38px] min-w-[42px] cursor-pointer flex items-center justify-center shadow-xs"
+                onClick={() => handleSelectPeriod('AM')}
+                className={cn(
+                  "px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer active:scale-95",
+                  parsedTime.period === 'AM'
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                {delta > 0 ? `+${delta}m` : `${delta}m`}
+                AM
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => handleSelectPeriod('PM')}
+                className={cn(
+                  "px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer active:scale-95",
+                  parsedTime.period === 'PM'
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                PM
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Previsualización Formateada */}
+        <div className="text-center">
+          <p className="text-xs text-muted-foreground">
+            Hora seleccionada:{' '}
+            <strong className="text-foreground text-sm bg-secondary/40 px-2.5 py-1 rounded-md border border-border/40 tabular-nums">
+              {formatHora12h(selectedTime)}
+            </strong>
+          </p>
         </div>
       </div>
     );
   };
 
-
-  // ─── Render ─────────────────────────────────────────────────────────────
+  // ─── Render Principal ───────────────────────────────────────────────────
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Banner de Estado */}
       {renderStatusBanner()}
 
-      {/* Selector Horario Digital Preciso */}
-      {renderTimePicker()}
+      {/* Selector Horario Unificado */}
+      {renderUnifiedSelector()}
 
       {/* Línea de tiempo visual */}
       {renderTimeline()}
@@ -577,7 +565,7 @@ export function TimeSelector({ empleadoId, fecha, servicioId, duracionTotal, sel
       {/* Info footer */}
       <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 pt-1.5 border-t border-border/20">
         <span>
-          {jornada && `Jornada del estilista: ${formatHora12(jornada.inicio)} – ${formatHora12(jornada.fin)}`}
+          {jornada && `Jornada del estilista: ${formatHora12h(jornada.inicio)} – ${formatHora12h(jornada.fin)}`}
         </span>
         <span>
           {fecha.split('-').reverse().join('/')}

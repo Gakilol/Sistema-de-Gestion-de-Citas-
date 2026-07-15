@@ -124,7 +124,65 @@ export default function Empleados() {
             </Button>
           </div>
 
-          <Card className="border-border/50 overflow-hidden">
+          {/* Vista Móvil (Tarjetas) */}
+          <div className="md:hidden space-y-3">
+            {isLoading ? (
+              Array.from({length:3}).map((_,i)=>(
+                <Card key={i} className="p-4 border-border/50"><div className="skeleton h-16 w-full rounded-lg"/></Card>
+              ))
+            ) : empleados.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground text-sm border-border/50">
+                <UserRound className="w-8 h-8 mx-auto mb-2 opacity-20"/>
+                No hay empleados registrados
+              </Card>
+            ) : empleados.map(emp => (
+              <Card key={emp.id} className={cn('p-4 border-border/50 space-y-3 shadow-sm', !emp.activo && 'opacity-60')}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar nombre={emp.nombre}/>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-foreground text-sm truncate">{emp.nombre}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{emp.correo}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={()=>toggleActivo(emp)}
+                    className={cn('px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-all shrink-0 min-h-[30px]',
+                      emp.activo?'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                               :'bg-red-500/10 text-red-500')}
+                  >
+                    {emp.activo?'Activo':'Inactivo'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-xs border-t border-border/30 pt-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                      emp.rol==='ADMIN'?'bg-amber-500/15 text-amber-600 dark:text-amber-400':
+                      emp.rol==='TECH_SUPPORT'?'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400':'bg-secondary text-muted-foreground')}>
+                      {emp.rol==='ADMIN'?'Admin':emp.rol==='TECH_SUPPORT'?'Soporte':'Empleado'}
+                    </span>
+                    <span className="text-muted-foreground text-[11px] truncate max-w-[120px]">{emp.especialidad||'General'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-muted-foreground" onClick={()=>openEdit(emp)} title="Editar">
+                      <Edit className="w-4 h-4"/>
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-amber-500" onClick={()=>router.push(`/empleados/${emp.id}/horarios`)} title="Horarios">
+                      <Clock className="w-4 h-4"/>
+                    </Button>
+                    {(user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT') && (
+                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-red-500" onClick={()=>handleEliminarEmpleado(emp)} title="Eliminar">
+                        <Trash2 className="w-4 h-4"/>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Vista Escritorio (Tabla) */}
+          <Card className="hidden md:block border-border/50 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-secondary/70 border-b border-border/50">

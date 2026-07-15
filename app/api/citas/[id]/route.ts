@@ -98,7 +98,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       cancel_reason,
       allowOverlap,
       overlapReason,
+      clientUpdatedAt,
     } = body;
+
+    // ─── DETECCIÓN DE CONCURRENCIA (Drag & Drop / Resize) ────────────────────
+    // Si el cliente envió la marca de tiempo de cuando cargó la cita,
+    // comparamos con la versión actual del servidor para detectar ediciones concurrentes.
+    if (clientUpdatedAt) {
+      const clientTime = new Date(clientUpdatedAt);
+      const serverTime = new Date(citaOriginal.updated_at);
+      if (!isNaN(clientTime.getTime()) && serverTime > clientTime) {
+        return NextResponse.json({
+          type: 'CONCURRENT_EDIT',
+          message: 'Esta cita fue modificada por otro usuario desde que la abriste. Por favor recarga la información.',
+        }, { status: 409 });
+      }
+    }
+
+    // ─── VALIDACIÓN DE ESTADO EDITABLE PARA CAMBIOS DE HORARIO ───────────────
+    // Solo aplica cuando el PATCH incluye cambios de fecha/hora/duración/empleado
+    // (movimiento visual o resize), no simplemente cambio de estado o notas.
+    const esMovimientoVisual = !!(fecha || hora || (duracion !== undefined) || empleado_id);
+    const estadosSoloNota = ['COMPLETADA', 'CANCELADA', 'NO_SHOW'];
+    if (esMovimientoVisual && estadosSoloNota.includes(citaOriginal.estado)) {
+      return NextResponse.json({
+        error: `No se puede reprogramar una cita en estado "${citaOriginal.estado}". Solo se permiten cambios de notas o información no temporal.`,
+      }, { status: 422 });
+    }
+
 
     let conflictos: any[] = [];
     let hasOrphanedIntercalada = false;

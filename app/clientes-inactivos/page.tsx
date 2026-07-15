@@ -431,7 +431,80 @@ export default function ClientesInactivos() {
                 Encontrados <strong>{pagination.total}</strong> cliente{pagination.total !== 1 ? 's' : ''} inactivo{pagination.total !== 1 ? 's' : ''}
               </p>
 
-              <Card className="border-border/50 overflow-hidden shadow-sm">
+              {/* ── Vista Móvil (Tarjetas) ── */}
+              <div className="md:hidden space-y-3">
+                {clientes.map((c) => {
+                  const isVeryInactive = c.diasSinVisita > diasInactividad * 1.5;
+                  const hasRecentReminder = c.ultimoRecordatorioFecha && c.diasDesdeUltimoRecordatorio !== null && c.diasDesdeUltimoRecordatorio <= 7;
+
+                  return (
+                    <Card key={c.id} className="p-4 border-border/50 space-y-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-bold text-foreground text-sm">{c.nombre}</h3>
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">{c.telefono || 'Sin teléfono'}</p>
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
+                          isVeryInactive ? "bg-red-500/10 text-red-500" : "bg-amber-500/10 text-amber-500"
+                        )}>
+                          {c.diasSinVisita} días
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs border-t border-b border-border/30 py-2">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Última cita</span>
+                          <span className="font-medium text-foreground">{fmtDate(c.ultimaCita)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Último servicio</span>
+                          <span className="font-medium text-foreground truncate block">{c.ultimoServicioNombre}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Profesional</span>
+                          <span className="font-medium text-foreground truncate block">{c.ultimoProfesionalNombre}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Recordatorio</span>
+                          <span className="font-medium text-foreground text-[11px]">
+                            {c.ultimoRecordatorioFecha ? fmtDate(c.ultimoRecordatorioFecha) : 'Nunca'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSendReminder(c)}
+                          disabled={c._privado || !c.telefono || c.telefono === '••••••••'}
+                          className={cn(
+                            "gap-1.5 h-9 px-3 text-xs flex-1 min-h-[40px] justify-center",
+                            hasRecentReminder && "border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                          )}
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Recordatorio</span>
+                        </Button>
+
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleScheduleNew(c)}
+                          className="gap-1.5 h-9 px-3 text-xs glow-gold flex-1 min-h-[40px] justify-center"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Agendar</span>
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* ── Vista Escritorio (Tabla) ── */}
+              <Card className="hidden md:block border-border/50 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-secondary/70 text-secondary-foreground border-b border-border/50">

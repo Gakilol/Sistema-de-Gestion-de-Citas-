@@ -16,6 +16,7 @@ import { formatDBDate, getBusinessTodayString, getDefaultBookingDate, getDefault
 import { useAuth } from '@/components/providers/auth-provider';
 import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
 import { CitaResumenModal } from '@/components/citas/CitaResumenModal';
+import { CitaDetalleBottomSheet } from '@/components/citas/CitaDetalleBottomSheet';
 
 const getEmptyForm = () => ({
   cliente_id: '',
@@ -62,17 +63,11 @@ function getBusinessTomorrowString(): string {
   return d.toISOString().split('T')[0];
 }
 
+import { formatHora12h } from '@/lib/time-utils';
+
 // Helper local para convertir "HH:MM" a formato 12 horas AM/PM
 function to12h(timeStr: string): string {
-  if (!timeStr) return '';
-  const [hStr, mStr] = timeStr.split(':');
-  let h = parseInt(hStr, 10);
-  const m = mStr || '00';
-  if (isNaN(h)) return timeStr;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${m} ${ampm}`;
+  return formatHora12h(timeStr);
 }
 
 function isSameBusinessWeek(dateStr: string): boolean {
@@ -160,6 +155,8 @@ function CitasContent() {
   const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
   const [isDeleting, setIsDeleting] = useState(false);
   const [citaResumen, setCitaResumen] = useState<any>(null);
+  // Overrides optimistas para posición visual de citas siendo movidas/redimensionadas
+  const [localCitaOverrides, setLocalCitaOverrides] = useState<Record<string, { fecha?: string; hora?: string; duracion?: number; empleado_id?: string }>>({});
 
   const { user }                  = useAuth();
 
@@ -351,26 +348,10 @@ function CitasContent() {
     const emptyForm = getEmptyForm();
     emptyForm.fecha = date;
     emptyForm.hora = time;
-
-    // Al abrir desde un slot del calendario, la selección de servicios debe iniciar vacía.
-    // El horario seleccionado se preserva en emptyForm.hora.
-    
-    if (user?.rol === 'EMPLEADO') {
-      emptyForm.empleado_id = user.id || '';
-    } else {
-      const isAgendable = empleados.some(e => e.id === empleadoId);
-      if (isAgendable) {
-        emptyForm.empleado_id = empleadoId;
-      } else {
-        const isLogueadoAgendable = empleados.some(e => e.id === user?.id);
-        if (isLogueadoAgendable && user?.id) {
-          emptyForm.empleado_id = user.id;
-        } else {
-          emptyForm.empleado_id = empleados[0]?.id || '';
-        }
-      }
-    }
-
+    emptyForm.empleado_id = empleadoId;
+    emptyForm.servicio_id = '';
+    emptyForm.servicio_ids = [];
+    emptyForm.servicio_duraciones = durationMinutes ? [durationMinutes] : [];
     setForm(emptyForm);
     setClienteBusqueda('');
     setForzar(false);
@@ -594,6 +575,112 @@ function CitasContent() {
     setShowModal(true);
   };
 
+  // ─── Mover / Redimensionar cita desde el calendario (Drag & Drop / Resize) ──
+  const handleMoveCita = async (params: {
+    citaId: string;
+    fecha: string;
+    hora: string;
+    empleadoId: string;
+    duracion: number;
+    clientUpdatedAt: string;
+  }): Promise<{ error?: string; type?: string; conflicts?: any[] } | void> => {
+    const { citaId, fecha, hora, empleadoId, duracion, clientUpdatedAt } = params;
+
+    // ── 1. Snapshot anterior (para posible rollback) ──────────────────────────
+    const citaAnterior = citas.find(c => c.id === citaId);
+    if (!citaAnterior) return { error: 'Cita no encontrada en el estado local' };
+
+    const prevOverride = localCitaOverrides[citaId];
+    const prevFecha = citaAnterior._overrideFecha || new Date(citaAnterior.fecha).toISOString().split('T')[0];
+    const prevHora  = prevOverride?.hora      ?? citaAnterior.hora;
+    const prevDur   = prevOverride?.duracion  ?? citaAnterior.duracion;
+    const prevEmpId = prevOverride?.empleado_id ?? citaAnterior.empleado_id;
+
+    // ── 2. Optimistic UI ─────────────────────────────────────────────────────
+    setLocalCitaOverrides(prev => ({
+      ...prev,
+      [citaId]: { fecha, hora, duracion, empleado_id: empleadoId },
+    }));
+
+    try {
+      const res = await fetch(`/api/citas/${citaId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha,
+          hora,
+          empleado_id: empleadoId,
+          duracion,
+          clientUpdatedAt,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // ── Rollback ─────────────────────────────────────────────────────────
+        setLocalCitaOverrides(prev => ({
+          ...prev,
+          [citaId]: { fecha: prevFecha, hora: prevHora, duracion: prevDur, empleado_id: prevEmpId },
+        }));
+
+        if (res.status === 409 && data.type === 'CONCURRENT_EDIT') {
+          toast.error('⚡ Esta cita fue modificada por otra persona. Recargando...', { duration: 5000 });
+          fetchCitas();
+          return { error: data.message, type: 'CONCURRENT_EDIT' };
+        }
+
+        if (res.status === 409 && data.type === 'SCHEDULE_OVERLAP') {
+          toast.warning(
+            `⚠️ Solapamiento: ${data.message || 'El horario se cruza con otra cita.'}`,
+            { duration: 6000 }
+          );
+          return { error: data.message, type: 'SCHEDULE_OVERLAP', conflicts: data.conflicts };
+        }
+
+        const errorMsg = data.error || 'Error al actualizar la cita';
+        toast.error(errorMsg, { id: `move-cita-error-${citaId}` });
+        return { error: errorMsg };
+      }
+
+      // ── Éxito: actualizar el array de citas con los nuevos valores ────────
+      if (data.warning) {
+        toast.warning(data.warning, { duration: 8000 });
+      }
+
+      // Actualizar cita en el estado local con los datos reales del servidor
+      setCitas(prev => prev.map(c => {
+        if (c.id !== citaId) return c;
+        return {
+          ...c,
+          hora: data.cita?.hora ?? hora,
+          duracion: data.cita?.duracion ?? duracion,
+          empleado_id: data.cita?.empleado_id ?? empleadoId,
+          updated_at: data.cita?.updated_at ?? c.updated_at,
+          // Actualizar la fecha como ISO string con la nueva fecha
+          fecha: data.cita?.fecha ?? c.fecha,
+        };
+      }));
+
+      // Limpiar el override optimista ya que el estado real fue confirmado
+      setLocalCitaOverrides(prev => {
+        const next = { ...prev };
+        delete next[citaId];
+        return next;
+      });
+
+      return; // éxito, sin error
+    } catch (err: any) {
+      // ── Rollback en caso de error de red ─────────────────────────────────
+      setLocalCitaOverrides(prev => ({
+        ...prev,
+        [citaId]: { fecha: prevFecha, hora: prevHora, duracion: prevDur, empleado_id: prevEmpId },
+      }));
+      toast.error('Error de conexión al actualizar la cita');
+      return { error: err.message };
+    }
+  };
+
   const filteredAndSortedCitas = useMemo(() => {
     let result = [...citas];
     const todayStr = getBusinessTodayString();
@@ -672,58 +759,58 @@ function CitasContent() {
   const paginated  = filteredAndSortedCitas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const mainContent = (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6 space-y-3 sm:space-y-5 page-enter overflow-x-hidden">
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-row items-center justify-between gap-2">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Gestión de Citas</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Gestión de Citas</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 {vistaModo === 'lista' && `${filteredAndSortedCitas.length} de `}
                 {citas.length} cita{citas.length !== 1 ? 's' : ''} en total
               </p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4" /> Nueva Cita
+            <Button onClick={openCreate} className="gap-1.5 glow-gold h-9 px-3 text-xs sm:text-sm shrink-0 min-h-[38px]">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva Cita</span><span className="sm:hidden">Nueva</span>
             </Button>
           </div>
 
           {/* Barra de Vista e Integración de Scope */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/30 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/30 pb-3">
             {/* Selector de Pestaña Principal (Modo) */}
-            <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start">
+            <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 self-start shrink-0">
               <button
                 type="button"
                 onClick={() => setVistaModo('lista')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
                   vistaModo === 'lista'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
-                <ListIcon className="w-3.5 h-3.5" /> Lista de Citas
+                <ListIcon className="w-3.5 h-3.5" /> Lista
               </button>
               <button
                 type="button"
                 onClick={() => setVistaModo('agenda')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
                   vistaModo === 'agenda'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
-                <CalendarIcon className="w-3.5 h-3.5" /> Calendario / Agenda
+                <CalendarIcon className="w-3.5 h-3.5" /> Agenda
               </button>
             </div>
 
             {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
             {canSeeAll && (
-              <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 self-start md:self-auto shadow-inner">
+              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 self-start sm:self-auto shadow-inner shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -731,25 +818,25 @@ function CitasContent() {
                     setFiltroEmpleado('');
                   }}
                   className={cn(
-                    "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                    "px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
                     scope === 'mine'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  {vistaModo === 'agenda' ? 'Ver mi agenda' : 'Mis Citas'}
+                  {vistaModo === 'agenda' ? 'Mi agenda' : 'Mis Citas'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setScope('all')}
                   className={cn(
-                    "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                    "px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
                     scope === 'all'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  {vistaModo === 'agenda' ? 'Ver agenda de todos' : 'Ver Todas'}
+                  {vistaModo === 'agenda' ? 'Agenda de todos' : 'Ver Todas'}
                 </button>
               </div>
             )}
@@ -1263,6 +1350,8 @@ function CitasContent() {
                 onEditCita={openEdit}
                 onViewCita={(cita) => setCitaResumen(cita)}
                 onSlotClick={openCreateFromSlot}
+                onMoveCita={handleMoveCita}
+                localCitaOverrides={localCitaOverrides}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
                 isLoading={isLoading}
@@ -1964,19 +2053,21 @@ function CitasContent() {
         </div>
       )}
 
-      {/* Modal de Resumen de Cita */}
-      {citaResumen && (
-        <CitaResumenModal
-          cita={citaResumen}
-          user={user}
-          onClose={() => setCitaResumen(null)}
-          onEdit={(cita) => {
-            setCitaResumen(null);
-            openEdit(cita);
-          }}
-        />
-      )}
 
+
+      {/* Bottom Sheet de Detalle de Cita */}
+      <CitaDetalleBottomSheet
+        open={!!citaResumen}
+        onOpenChange={(open) => {
+          if (!open) setCitaResumen(null);
+        }}
+        cita={citaResumen}
+        user={user}
+        onEdit={(cita) => {
+          setCitaResumen(null);
+          openEdit(cita);
+        }}
+      />
     </>
   );
 }

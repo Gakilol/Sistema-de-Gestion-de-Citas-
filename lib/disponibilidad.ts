@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { validateNormalBusinessTime } from './time-utils';
 
 const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
@@ -55,6 +56,14 @@ export function validarHoraExacta(
 
   if (duracion <= 0) {
     return { valida: false, motivo: 'La duración debe ser mayor a 0' };
+  }
+
+  // Si NO se permite horario extendido/personalizado, validar reglas estrictas de negocio (8:00 AM - 6:00 PM e intervalos de 15m)
+  if (!permitirHorarioExtendido) {
+    const businessValidation = validateNormalBusinessTime(horaStr);
+    if (!businessValidation.valid) {
+      return { valida: false, motivo: businessValidation.error || 'Hora no permitida en horario laboral' };
+    }
   }
 
   const startMin = timeToMinutes(horaStr);
