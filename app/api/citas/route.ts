@@ -274,42 +274,22 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
-    let idClienteFinal = cliente_id;
-    let finalClienteNombre = cliente_nombre;
-    let finalClienteTelefono = cliente_telefono;
+    let idClienteFinal: string | null = cliente_id || null;
+    let finalClienteNombre = cliente_nombre.trim();
+    let finalClienteTelefono: string | null = cliente_telefono?.trim() || null;
 
     if (idClienteFinal) {
       const dbCliente = await prisma.cliente.findUnique({
         where: { id: idClienteFinal }
       });
       if (dbCliente) {
-        finalClienteNombre = dbCliente.nombre;
-        finalClienteTelefono = dbCliente.telefono ?? undefined;
-      }
-    } else if (cliente_nombre) {
-      const existe = await prisma.cliente.findFirst({
-        where: {
-          nombre: cliente_nombre.trim(),
-          ...(cliente_telefono ? { telefono: cliente_telefono.trim() } : {})
-        }
-      });
-      if (existe) {
-        idClienteFinal = existe.id;
-        finalClienteNombre = existe.nombre;
-        finalClienteTelefono = existe.telefono ?? undefined;
+        finalClienteNombre = dbCliente.nombre.trim();
+        finalClienteTelefono = dbCliente.telefono?.trim() || null;
       } else {
-        const nuevoC = await prisma.cliente.create({
-          data: {
-            nombre:   cliente_nombre.trim(),
-            telefono: cliente_telefono?.trim() || null,
-            createdByUserId: userId,
-          }
-        });
-        idClienteFinal = nuevoC.id;
-        finalClienteNombre = nuevoC.nombre;
-        finalClienteTelefono = nuevoC.telefono ?? undefined;
+        idClienteFinal = null;
       }
     }
+
 
     // ─── TRANSACCIÓN: Guardar cita + relaciones ──────────────────────────────
     const hasConflict = conflictosBloqueantes.length > 0;

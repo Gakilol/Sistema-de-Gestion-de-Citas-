@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -434,8 +434,8 @@ function CitasContent() {
       toast.error('Selecciona una hora');
       return;
     }
-    if (!form.cliente_id) {
-      toast.error('Debes seleccionar un cliente existente');
+    if (!form.cliente_id && !form.cliente_nombre?.trim()) {
+      toast.error('Debes seleccionar o ingresar un cliente');
       return;
     }
     setSaving(true);
@@ -779,38 +779,38 @@ function CitasContent() {
           </div>
 
           {/* Barra de Vista e Integración de Scope */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/30 pb-3">
+          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 border-b border-border/30 pb-2 sm:pb-3 w-full">
             {/* Selector de Pestaña Principal (Modo) */}
-            <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 self-start shrink-0">
+            <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shrink-0">
               <button
                 type="button"
                 onClick={() => setVistaModo('lista')}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
                   vistaModo === 'lista'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
-                <ListIcon className="w-3.5 h-3.5" /> Lista
+                <ListIcon className="w-3.5 h-3.5 shrink-0" /> <span>Lista</span>
               </button>
               <button
                 type="button"
                 onClick={() => setVistaModo('agenda')}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
                   vistaModo === 'agenda'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
-                <CalendarIcon className="w-3.5 h-3.5" /> Agenda
+                <CalendarIcon className="w-3.5 h-3.5 shrink-0" /> <span>Agenda</span>
               </button>
             </div>
 
             {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
             {canSeeAll && (
-              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 self-start sm:self-auto shadow-inner shrink-0">
+              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shadow-inner shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -818,7 +818,7 @@ function CitasContent() {
                     setFiltroEmpleado('');
                   }}
                   className={cn(
-                    "px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
+                    "px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px] whitespace-nowrap",
                     scope === 'mine'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -830,7 +830,7 @@ function CitasContent() {
                   type="button"
                   onClick={() => setScope('all')}
                   className={cn(
-                    "px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
+                    "px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px] whitespace-nowrap",
                     scope === 'all'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -1397,16 +1397,34 @@ function CitasContent() {
                 {/* ─── Selector Inteligente de Cliente ──────────────────── */}
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Cliente *</label>
-                {form.cliente_id ? (
-                  /* Cliente ya seleccionado: mostrar tarjeta */
-                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-emerald-500/8 border border-emerald-500/30">
-                    <div className="flex items-center gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <div>
-                        <p className="text-sm font-bold text-foreground">{form.cliente_nombre}</p>
-                        {form.cliente_telefono && (
+                {form.cliente_id || form.cliente_nombre ? (
+                  /* Cliente seleccionado (registrado u ocasional) */
+                  <div className={cn(
+                    "flex items-center justify-between gap-2 p-3 rounded-xl border transition-all",
+                    form.cliente_id 
+                      ? "bg-emerald-500/8 border-emerald-500/30" 
+                      : "bg-amber-500/8 border-amber-500/30"
+                  )}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {form.cliente_id ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <UserCheck className="w-4 h-4 text-amber-500 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-foreground truncate">{form.cliente_nombre}</p>
+                          {!form.cliente_id && (
+                            <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25 shrink-0">
+                              cliente ocasional
+                            </span>
+                          )}
+                        </div>
+                        {form.cliente_telefono ? (
                           <p className="text-xs text-muted-foreground">{form.cliente_telefono}</p>
-                        )}
+                        ) : !form.cliente_id ? (
+                          <p className="text-xs text-muted-foreground">Sin teléfono o correo registrado</p>
+                        ) : null}
                       </div>
                     </div>
                     <button
@@ -1415,7 +1433,7 @@ function CitasContent() {
                         setForm((prev: any) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
                         setClienteBusqueda('');
                       }}
-                      className="text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-md px-2 py-1 transition-colors"
+                      className="text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-md px-2 py-1 transition-colors shrink-0"
                     >
                       Cambiar
                     </button>
@@ -1438,22 +1456,43 @@ function CitasContent() {
                     />
                     {clienteDropdownOpen && (
                       <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border shadow-xl rounded-xl overflow-hidden">
-                        {/* ─── Botón "+ Nuevo Cliente" siempre visible ───── */}
-                        <button
-                          type="button"
-                          className="w-full text-left px-4 py-2.5 flex items-center gap-2.5 bg-primary/5 hover:bg-primary/10 border-b border-border/50 transition-colors group"
-                          onClick={() => {
-                            setClienteDropdownOpen(false);
-                            setFormNuevoCliente({ nombre: clienteBusqueda, telefono: '', correo: '', notas: '' });
-                            setPhoneValidCliente(false);
-                            setShowCrearCliente(true);
-                          }}
-                        >
-                          <span className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/25 transition-colors">
-                            <UserPlus className="w-3.5 h-3.5 text-primary" />
-                          </span>
-                          <span className="text-sm font-semibold text-primary">+ Nuevo Cliente</span>
-                        </button>
+                        {/* ─── Acciones de Creación / Agendamiento Rápido ───── */}
+                        <div className="p-2 bg-muted/20 border-b border-border/50 flex flex-row flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            className="flex-1 min-w-[120px] text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25 rounded-lg px-2.5 py-2 flex items-center justify-center gap-1.5 transition-colors group shrink-0"
+                            onClick={() => {
+                              setClienteDropdownOpen(false);
+                              setFormNuevoCliente({ nombre: clienteBusqueda, telefono: '', correo: '', notas: '' });
+                              setPhoneValidCliente(false);
+                              setShowCrearCliente(true);
+                            }}
+                          >
+                            <UserPlus className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="truncate">+ Nuevo Cliente</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!clienteBusqueda.trim()}
+                            className="flex-1 min-w-[140px] text-xs font-semibold text-foreground bg-secondary hover:bg-secondary/80 border border-border/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2.5 py-2 flex items-center justify-center gap-1.5 transition-colors group shrink-0"
+                            onClick={() => {
+                              const nombreLimpio = clienteBusqueda.trim();
+                              if (!nombreLimpio) return;
+                              setForm((prev: any) => ({
+                                ...prev,
+                                cliente_id: '',
+                                cliente_nombre: nombreLimpio,
+                                cliente_telefono: '',
+                              }));
+                              setClienteDropdownOpen(false);
+                            }}
+                            title={!clienteBusqueda.trim() ? "Escriba un nombre en el buscador primero" : "Agendar cita utilizando solo el nombre"}
+                          >
+                            <UserCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span className="truncate">Agendar solo con nombre</span>
+                          </button>
+                        </div>
 
                         {clientesFiltrados.length > 0 ? (
                           <ul className="divide-y divide-border/40 max-h-48 overflow-y-auto">
@@ -1503,11 +1542,17 @@ function CitasContent() {
                       const val = e.target.value;
                       if (!val) return;
                       const s = servicios.find(srv => srv.id === val);
-                      setForm((prev: any) => ({
-                        ...prev,
-                        servicio_ids: [...prev.servicio_ids, val],
-                        servicio_duraciones: [...prev.servicio_duraciones, s ? s.duracion : 30],
-                      }));
+                      setForm((prev: any) => {
+                        const isFirstWithSlotDuration = prev.servicio_ids.length === 0 && prev.servicio_duraciones.length === 1;
+                        const newDurations = isFirstWithSlotDuration
+                          ? [prev.servicio_duraciones[0]]
+                          : [...prev.servicio_duraciones, s ? s.duracion : 30];
+                        return {
+                          ...prev,
+                          servicio_ids: [...prev.servicio_ids, val],
+                          servicio_duraciones: newDurations,
+                        };
+                      });
                     }}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >

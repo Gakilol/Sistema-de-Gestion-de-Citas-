@@ -57,7 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const telefonoNormalizado = normalizarTelefono(cita.cliente_telefono);
     if (!telefonoNormalizado) {
       return NextResponse.json(
-        { error: 'El cliente no tiene un número telefónico registrado.' },
+        { error: 'Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.' },
         { status: 400 }
       );
     }

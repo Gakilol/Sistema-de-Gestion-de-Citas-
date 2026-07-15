@@ -1,12 +1,12 @@
 // lib/calendar-drag-utils.ts
 // Utilidades de tiempo, snap y traslape para el gestor de selección en el Calendario / Agenda NovaCita
 
-export const HORA_INICIO = 7; // 7 AM
-export const HORA_FIN = 20;   // 8 PM
+export const HORA_INICIO = 5; // 5 AM
+export const HORA_FIN = 23;   // 11 PM
 export const TOTAL_HORAS = HORA_FIN - HORA_INICIO + 1;
 export const HOUR_HEIGHT = 80; // 1 hora = 80px
 export const SLOT_HEIGHT = HOUR_HEIGHT / 4; // 15 min por defecto = 20px
-export const MIN_HEIGHT = 42;  // 42px min height
+export const MIN_HEIGHT = 15;  // 15px min height (permite citas y selecciones desde 15 min)
 export const MIN_DRAG_MINUTES = 5; // Duración mínima de la selección al crear (5 minutos)
 export const TOUCH_LONG_PRESS_MS = 350; // Retardo long-press para toque
 export const TOUCH_MOVE_THRESHOLD = 8; // Umbral de movimiento en px para cancelar long-press
@@ -52,7 +52,7 @@ export const yToMinutes = (y: number, step = 15, hourHeight = HOUR_HEIGHT): numb
   const rawMinutes = (y / hourHeight) * 60;
   const totalMinutes = HORA_INICIO * 60 + rawMinutes;
   const snapped = snapToStep(totalMinutes, step);
-  return Math.min(Math.max(HORA_INICIO * 60, snapped), HORA_FIN * 60);
+  return Math.min(Math.max(HORA_INICIO * 60, snapped), (HORA_FIN + 1) * 60 - step);
 };
 
 /** Convierte minutos desde medianoche a posición Y en px */

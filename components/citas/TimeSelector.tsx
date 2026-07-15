@@ -201,17 +201,7 @@ export function TimeSelector({
 
   // ─── Manejadores de Cambio de Hora / Minutos / Período ──────────────────
   const handleSelectHour = useCallback((h12: number) => {
-    let targetPeriod: 'AM' | 'PM' = parsedTime.period;
-    if (h12 >= 8 && h12 <= 11) {
-      targetPeriod = 'AM';
-    } else if (h12 === 12 || (h12 >= 1 && h12 <= 6)) {
-      targetPeriod = 'PM';
-    } else if (h12 === 7) {
-      if (parsedTime.period !== 'PM') {
-        targetPeriod = 'AM';
-      }
-    }
-
+    const targetPeriod: 'AM' | 'PM' = parsedTime.period;
     const time24 = hour12To24h(h12, parsedTime.minute, targetPeriod);
     onTimeSelect(time24);
   }, [parsedTime.minute, parsedTime.period, onTimeSelect]);

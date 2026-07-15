@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { userRole } = getUserContext(req);
-    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO';
+    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
     const resultado = await calcularDisponibilidad(
       id, 

@@ -27,29 +27,29 @@ describe('Pruebas Unitarias - Motor de Selección de Rango Horario en Calendario
     });
 
     test('yToMinutes convierte posición en píxeles (top) a minutos exactos con snap de 5 minutos', () => {
-      // HORA_INICIO = 7 AM (420 min). HOUR_HEIGHT = 80px.
-      // y = 0px -> 7:00 AM (420 min)
-      expect(yToMinutes(0, 5)).toBe(420);
+      // HORA_INICIO = 5 AM (300 min). HOUR_HEIGHT = 80px.
+      // y = 0px -> 5:00 AM (300 min)
+      expect(yToMinutes(0, 5)).toBe(300);
 
-      // y = 80px (1 hora) -> 8:00 AM (480 min)
-      expect(yToMinutes(80, 5)).toBe(480);
+      // y = 80px (1 hora) -> 6:00 AM (360 min)
+      expect(yToMinutes(80, 5)).toBe(360);
 
-      // y = 40px (30 min) -> 7:30 AM (450 min)
-      expect(yToMinutes(40, 5)).toBe(450);
+      // y = 40px (30 min) -> 5:30 AM (330 min)
+      expect(yToMinutes(40, 5)).toBe(330);
 
-      // y = 33.3px (~25 min) -> snap a 7:25 AM (445 min)
-      expect(yToMinutes(33.3, 5)).toBe(445);
+      // y = 33.3px (~25 min) -> snap a 5:25 AM (325 min)
+      expect(yToMinutes(33.3, 5)).toBe(325);
     });
 
     test('minutesToY convierte minutos a coordenadas Y en la cuadrícula', () => {
-      // 7:00 AM = 420 min -> 0px
-      expect(minutesToY(420)).toBe(0);
+      // 5:00 AM = 300 min -> 0px
+      expect(minutesToY(300)).toBe(0);
 
-      // 8:00 AM = 480 min -> 80px
-      expect(minutesToY(480)).toBe(80);
+      // 6:00 AM = 360 min -> 80px
+      expect(minutesToY(360)).toBe(80);
 
-      // 7:30 AM = 450 min -> 40px
-      expect(minutesToY(450)).toBe(40);
+      // 5:30 AM = 330 min -> 40px
+      expect(minutesToY(330)).toBe(40);
     });
 
     test('minutesToTimeStr y timeStrToMinutes son conversiones inversas exactas', () => {

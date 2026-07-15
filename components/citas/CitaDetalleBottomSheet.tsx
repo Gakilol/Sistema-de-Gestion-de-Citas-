@@ -101,13 +101,17 @@ export function CitaDetalleBottomSheet({
   // Acción de Enviar por WhatsApp / Compartir
   const handleEnviarWhatsApp = async () => {
     if (!cita?.id) return;
+    if (!cita?.cliente_telefono?.trim()) {
+      toast.error('Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.');
+      return;
+    }
     setEnviando(true);
     try {
       const res = await fetch(`/api/citas/${cita.id}/calendario`);
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Error al obtener enlace para el cliente');
+        toast.error(data.error || 'Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.');
         return;
       }
 
@@ -265,25 +269,31 @@ export function CitaDetalleBottomSheet({
           {/* Acciones Rápidas */}
           <DrawerFooter className="p-4 border-t border-border/40 bg-background/95 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2">
             {canSendCalendar && (
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  onClick={handleEnviarWhatsApp}
-                  disabled={enviando || isOffline}
-                  className="h-11 text-xs font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white shadow-md active:scale-[0.98] gap-1.5"
-                >
-                  {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-                  Enviar a cliente
-                </Button>
+              cita.cliente_telefono ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleEnviarWhatsApp}
+                    disabled={enviando || isOffline}
+                    className="h-11 text-xs font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white shadow-md active:scale-[0.98] gap-1.5"
+                  >
+                    {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
+                    Enviar a cliente
+                  </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={handleCopiarMensaje}
-                  className="h-11 text-xs font-semibold active:scale-[0.98] gap-1.5 border-border/50"
-                >
-                  {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiado ? 'Copiado' : 'Copiar info'}
-                </Button>
-              </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleCopiarMensaje}
+                    className="h-11 text-xs font-semibold active:scale-[0.98] gap-1.5 border-border/50"
+                  >
+                    {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiado ? 'Copiado' : 'Copiar info'}
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] font-medium text-amber-700 dark:text-amber-300 text-center leading-relaxed">
+                  Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.
+                </div>
+              )
             )}
 
             {canEdit && (

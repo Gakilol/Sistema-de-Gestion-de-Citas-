@@ -245,38 +245,46 @@ export function CitaResumenModal({ cita, user, onClose, onEdit }: CitaResumenMod
         {/* ── Acciones ── */}
         <div className="shrink-0 border-t border-border/40 p-4 sm:p-5 space-y-2.5 bg-card pb-safe">
 
-          {/* Enviar al calendario */}
+          {/* Enviar al calendario / Acciones WhatsApp */}
           {canSendCalendar && (
             <div className="space-y-2">
-              <Button
-                onClick={handleEnviarCalendario}
-                disabled={enviando}
-                className="w-full gap-2 h-11 text-sm font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white border-0 shadow-lg shadow-[#25D366]/20 active:scale-[0.99] transition-transform"
-              >
-                {enviando ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <MessageCircle className="w-4 h-4" />
-                )}
-                Enviar al calendario
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleCopiarMensaje}
-                className="w-full gap-2 h-10 text-xs font-semibold active:scale-[0.99] transition-transform"
-              >
-                {copiado ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    Copiar mensaje y vínculo
-                  </>
-                )}
-              </Button>
+              {cita.cliente_telefono ? (
+                <>
+                  <Button
+                    onClick={handleEnviarCalendario}
+                    disabled={enviando}
+                    className="w-full gap-2 h-11 text-sm font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white border-0 shadow-lg shadow-[#25D366]/20 active:scale-[0.99] transition-transform"
+                  >
+                    {enviando ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4" />
+                    )}
+                    Enviar al calendario
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCopiarMensaje}
+                    className="w-full gap-2 h-10 text-xs font-semibold active:scale-[0.99] transition-transform"
+                  >
+                    {copiado ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        Copiar mensaje y vínculo
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[12px] font-medium text-amber-700 dark:text-amber-300 text-center leading-relaxed">
+                  Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.
+                </div>
+              )}
             </div>
           )}
 

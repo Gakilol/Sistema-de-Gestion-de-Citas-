@@ -163,46 +163,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // ─── GESTIÓN DE CLIENTE EN EDICIÓN ──────────────────────────────────────
-    let idClienteFinal = cliente_id;
-    let finalClienteNombre = cliente_nombre;
-    let finalClienteTelefono = cliente_telefono;
-
-    if (idClienteFinal) {
-      const dbCliente = await prisma.cliente.findUnique({
-        where: { id: idClienteFinal }
-      });
-      if (dbCliente) {
-        finalClienteNombre = dbCliente.nombre;
-        finalClienteTelefono = dbCliente.telefono;
-      }
-    } else if (cliente_nombre && !idClienteFinal) {
-      const existe = await prisma.cliente.findFirst({
-        where: {
-          nombre: cliente_nombre.trim(),
-          ...(cliente_telefono ? { telefono: cliente_telefono.trim() } : {})
-        }
-      });
-      if (existe) {
-        idClienteFinal = existe.id;
-        finalClienteNombre = existe.nombre;
-        finalClienteTelefono = existe.telefono;
-      } else {
-        const nuevoC = await prisma.cliente.create({
-          data: {
-            nombre:   cliente_nombre.trim(),
-            telefono: cliente_telefono?.trim() || null,
-            createdByUserId: userId,
-          }
+    if (cliente_id !== undefined) {
+      if (cliente_id) {
+        const dbCliente = await prisma.cliente.findUnique({
+          where: { id: cliente_id }
         });
-        idClienteFinal = nuevoC.id;
-        finalClienteNombre = nuevoC.nombre;
-        finalClienteTelefono = nuevoC.telefono;
+        if (dbCliente) {
+          dataToUpdate.cliente_id = dbCliente.id;
+          dataToUpdate.cliente_nombre = dbCliente.nombre.trim();
+          dataToUpdate.cliente_telefono = dbCliente.telefono?.trim() || null;
+        } else {
+          dataToUpdate.cliente_id = null;
+        }
+      } else {
+        dataToUpdate.cliente_id = null;
       }
     }
 
-    if (idClienteFinal)             dataToUpdate.cliente_id       = idClienteFinal;
-    if (finalClienteNombre)         dataToUpdate.cliente_nombre   = finalClienteNombre.trim();
-    if (finalClienteTelefono !== undefined) dataToUpdate.cliente_telefono = finalClienteTelefono?.trim() || null;
+    if (cliente_nombre && (!cliente_id || dataToUpdate.cliente_id === null)) {
+      dataToUpdate.cliente_nombre = cliente_nombre.trim();
+    }
+    if (cliente_telefono !== undefined && (!cliente_id || dataToUpdate.cliente_id === null)) {
+      dataToUpdate.cliente_telefono = cliente_telefono ? cliente_telefono.trim() : null;
+    }
 
     let finalServicioIds = servicio_ids;
     if (!finalServicioIds && servicio_id) {

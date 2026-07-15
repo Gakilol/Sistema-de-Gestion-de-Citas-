@@ -942,7 +942,7 @@ export function AgendaCalendario({
       originalDayStr: dayStr,
       originalEmpleadoId: empleadoId,
       originalStartMin: startMin,
-      originalEndMin: Math.min(HORA_FIN * 60, startMin + 60),
+      originalEndMin: Math.min((HORA_FIN + 1) * 60, startMin + 60),
       startMinutes: startMin,
       grabOffsetY: 0,
       pointerId: e.pointerId,
@@ -971,7 +971,7 @@ export function AgendaCalendario({
 
         try { colEl.setPointerCapture(e.pointerId); } catch {}
 
-        const endMin = Math.min(HORA_FIN * 60, startMin + 60);
+        const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 60);
         const isOverlap = checkOverlap(citasPorDia[dayStr] || [], empleadoId, startMin, endMin);
         setProvisionalSlot({
           dayStr,
@@ -1089,7 +1089,7 @@ export function AgendaCalendario({
 
     // Caso A: Clic simple o Tap rápido en espacio vacío -> slot por defecto de 60 min
     if (isPendingTouchTap || isPendingMouseClick || (!wasDragged && !wasActive)) {
-      const endMin = Math.min(HORA_FIN * 60, startMin + 60);
+      const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 60);
       const isOverlap = checkOverlap(citasPorDia[dayStr] || [], empleadoId, startMin, endMin);
 
       setProvisionalSlot({
@@ -1240,7 +1240,7 @@ export function AgendaCalendario({
       const dur = pDrag.originalEndMin - pDrag.originalStartMin;
       // Ajuste estricto a incrementos de 15 minutos
       const newStartMin = yToMinutes(Math.max(0, y), 15, hourHeight);
-      const clampedStart = Math.min(Math.max(HORA_INICIO * 60, newStartMin), HORA_FIN * 60 - dur);
+      const clampedStart = Math.min(Math.max(HORA_INICIO * 60, newStartMin), (HORA_FIN + 1) * 60 - dur);
       const newEndMin = clampedStart + dur;
 
       const isOverlap = checkOverlap(citasPorDia[targetDayStr] || [], targetEmpleadoId, clampedStart, newEndMin);
@@ -1340,7 +1340,7 @@ export function AgendaCalendario({
       newStartMin = Math.max(HORA_INICIO * 60, newStartMin);
     } else {
       newEndMin = Math.max(snapMin, provisionalSlot.startMin + 15);
-      newEndMin = Math.min(HORA_FIN * 60, newEndMin);
+      newEndMin = Math.min((HORA_FIN + 1) * 60, newEndMin);
     }
 
     pDrag.wasDragged = true;
@@ -1523,7 +1523,7 @@ export function AgendaCalendario({
       const y = e.clientY - colRect.top - mv.grabOffsetY;
       const newStartMin = yToMinutes(Math.max(0, y), 5, hourHeight);
       const duration = mv.cita.duracion || 30;
-      const clampedStart = Math.min(newStartMin, HORA_FIN * 60 - duration);
+      const clampedStart = Math.min(Math.max(HORA_INICIO * 60, newStartMin), (HORA_FIN + 1) * 60 - duration);
 
       moveRef.current.currentStartMin = clampedStart;
       moveRef.current.currentDayStr = targetDayStr;
@@ -1688,7 +1688,7 @@ export function AgendaCalendario({
     } else {
       // Redimensionar desde abajo: cambiar hora fin, mantener inicio
       newEndMin = Math.max(snapMin, rs.currentStartMin + MIN_APPOINTMENT_MINUTES);
-      newEndMin = Math.min(HORA_FIN * 60, newEndMin);
+      newEndMin = Math.min((HORA_FIN + 1) * 60, newEndMin);
     }
 
     resizeRef.current.currentStartMin = newStartMin;
@@ -2061,7 +2061,7 @@ export function AgendaCalendario({
                               )}
                               style={{
                                 top: `${minutesToY(provisionalSlot.startMin, hourHeight)}px`,
-                                height: `${Math.max(32, minutesToY(provisionalSlot.endMin, hourHeight) - minutesToY(provisionalSlot.startMin, hourHeight))}px`,
+                                height: `${Math.max(15, minutesToY(provisionalSlot.endMin, hourHeight) - minutesToY(provisionalSlot.startMin, hourHeight))}px`,
                                 touchAction: 'none',
                               }}
                               onPointerDown={handleProvisionalBodyPointerDown}
@@ -2070,13 +2070,13 @@ export function AgendaCalendario({
                             >
                               {/* Handle de resize SUPERIOR (Modificar Hora Inicio) */}
                               <div
-                                className="resize-handle absolute left-0 right-0 -top-2.5 h-5 flex items-center justify-center cursor-n-resize z-40 group/rh"
+                                className="resize-handle absolute left-0 right-0 -top-3 h-6 flex items-center justify-center cursor-n-resize z-40 group/rh select-none touch-none"
                                 title="Arrastrar para ajustar la hora de inicio"
                                 onPointerDown={(e) => handleProvisionalResizePointerDown(e, 'top')}
                                 onPointerMove={handleProvisionalResizePointerMove}
                                 onPointerUp={handleProvisionalResizePointerUp}
                               >
-                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rh:scale-110 transition-transform" />
+                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rh:scale-110 transition-transform pointer-events-none" />
                               </div>
 
                               {/* Borde lateral indicador */}
@@ -2086,7 +2086,7 @@ export function AgendaCalendario({
                               )} />
 
                               {/* Contenido del bloque provisional (solo info) */}
-                              <div className="relative z-10 flex flex-col h-full p-1.5 pl-3 pointer-events-none overflow-hidden">
+                              <div className="relative z-10 flex flex-col h-full p-1 pl-2.5 pointer-events-none overflow-hidden">
                                 <div className="flex items-center gap-1">
                                   <Clock className="w-3 h-3 shrink-0 opacity-80" />
                                   <span className="text-[11px] font-black leading-tight truncate">
@@ -2097,7 +2097,7 @@ export function AgendaCalendario({
                                   {provisionalSlot.endMin - provisionalSlot.startMin} min
                                 </span>
                                 {provisionalSlot.isOverlap && (
-                                  <div className="flex items-center gap-1 mt-1 px-1 py-0.5 rounded bg-amber-500/30 text-amber-900 dark:text-amber-200 font-extrabold text-[9px] border border-amber-500/40 w-fit">
+                                  <div className="flex items-center gap-1 mt-0.5 px-1 py-0.5 rounded bg-amber-500/30 text-amber-900 dark:text-amber-200 font-extrabold text-[9px] border border-amber-500/40 w-fit">
                                     <AlertTriangle className="w-2.5 h-2.5 shrink-0" /> Solapamiento
                                   </div>
                                 )}
@@ -2105,13 +2105,13 @@ export function AgendaCalendario({
 
                               {/* Handle de resize INFERIOR (Modificar Hora Fin) */}
                               <div
-                                className="resize-handle absolute left-0 right-0 -bottom-2.5 h-5 flex items-center justify-center cursor-s-resize z-40 group/rb"
+                                className="resize-handle absolute left-0 right-0 -bottom-3 h-6 flex items-center justify-center cursor-s-resize z-40 group/rb select-none touch-none"
                                 title="Arrastrar para ajustar la hora de fin"
                                 onPointerDown={(e) => handleProvisionalResizePointerDown(e, 'bottom')}
                                 onPointerMove={handleProvisionalResizePointerMove}
                                 onPointerUp={handleProvisionalResizePointerUp}
                               >
-                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rb:scale-110 transition-transform" />
+                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rb:scale-110 transition-transform pointer-events-none" />
                               </div>
                             </div>
                           )}
