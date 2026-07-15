@@ -34,7 +34,7 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
     const cleanVal = value.replace(/\D/g, '');
 
     // Buscar si el valor recibido comienza con alguno de los códigos de país de COUNTRIES
-    const matchedCountry = COUNTRIES.find(c => cleanVal.length >= 11 && cleanVal.startsWith(c.code));
+    const matchedCountry = COUNTRIES.find(c => cleanVal.startsWith(c.code));
     if (matchedCountry) {
       setCountryCode(matchedCountry.code);
       setPhoneNumber(cleanVal.slice(matchedCountry.code.length, matchedCountry.code.length + 8));
