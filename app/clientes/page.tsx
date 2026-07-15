@@ -295,6 +295,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
     if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
@@ -357,7 +358,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
             El cliente quedará registrado y podrá programarle una cita desde el panel correspondiente.
           </p>
           <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
             <Button type="submit" disabled={saving} className="glow-gold">
               {saving ? 'Guardando...' : 'Registrar Cliente'}
             </Button>
@@ -369,7 +370,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
 }
 
 // ─── Modal Editar Cliente ───────────────────────────────────────────────────
-function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente; onClose: () => void; onUpdated: (data: { nombre: string; telefono: string | null; correo: string | null }) => void }) {
+function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente; onClose: () => void; onUpdated: (data: { nombre: string; telefono: string | null; correo: string | null; notas: string | null }) => void }) {
   const [form, setForm] = useState({
     nombre: cliente.nombre || '',
     telefono: cliente.telefono || '',
@@ -381,6 +382,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
     if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
@@ -395,8 +397,9 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
       toast.success('Cliente actualizado exitosamente');
       onUpdated({
         nombre: form.nombre.trim(),
-        telefono: form.telefono?.trim() || null,
-        correo: form.correo?.trim().toLowerCase() || null,
+        telefono: data.cliente?.telefono ?? (form.telefono?.trim() || null),
+        correo: data.cliente?.correo ?? (form.correo?.trim().toLowerCase() || null),
+        notas: data.cliente?.notas ?? (form.notas?.trim() || null),
       });
       onClose();
     } catch (err: any) {
@@ -444,7 +447,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
             />
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
             <Button type="submit" disabled={saving} className="glow-gold">
               {saving ? 'Guardando...' : 'Guardar Cambios'}
             </Button>

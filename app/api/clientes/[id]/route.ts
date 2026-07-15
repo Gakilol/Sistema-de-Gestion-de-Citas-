@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { getUserContext } from '@/lib/auth-helpers';
+import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,27 +38,44 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Normalizar y validar teléfono
+    let telefonoNormalizado: string | null = null;
+    if (telefono !== undefined && telefono !== null && String(telefono).trim() !== '') {
+      const phoneValidation = validarYNormalizarTelefono(telefono, '505');
+      if (!phoneValidation.isValid) {
+        return NextResponse.json(
+          { error: phoneValidation.error || 'Número de teléfono inválido' },
+          { status: 400 }
+        );
+      }
+      telefonoNormalizado = phoneValidation.normalized;
+    }
+
+    // Sanitizar correo y notas vacíos a null
+    const correoNormalizado = correo && String(correo).trim() !== '' ? String(correo).trim().toLowerCase() : null;
+    const notasNormalizadas = notas && String(notas).trim() !== '' ? String(notas).trim() : null;
+
     // Validar teléfono duplicado (solo si se provee uno)
-    if (telefono && telefono.trim()) {
+    if (telefonoNormalizado) {
       const duplicadoTel = await prisma.cliente.findFirst({
         where: {
-          telefono: telefono.trim(),
+          telefono: telefonoNormalizado,
           id: { not: id },
         },
       });
       if (duplicadoTel) {
         return NextResponse.json(
-          { error: `Ya existe un cliente con el teléfono ${telefono.trim()} (${duplicadoTel.nombre})` },
+          { error: `Ya existe un cliente con el teléfono ${telefonoNormalizado} (${duplicadoTel.nombre})` },
           { status: 409 }
         );
       }
     }
 
     // Validar correo duplicado (solo si se provee uno)
-    if (correo && correo.trim()) {
+    if (correoNormalizado) {
       const duplicadoEmail = await prisma.cliente.findFirst({
         where: {
-          correo: correo.trim().toLowerCase(),
+          correo: correoNormalizado,
           id: { not: id },
         },
       });
@@ -69,15 +87,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Construcción explícita del objeto data con campos válidos de Prisma
+    const data = {
+      nombre: nombre.trim(),
+      telefono: telefonoNormalizado,
+      correo: correoNormalizado,
+      notas: notasNormalizadas,
+    };
+
     const clienteActualizado = await prisma.cliente.update({
       where: { id },
-      data: {
-        nombre: nombre.trim(),
-        telefono: telefono?.trim() || null,
-        correo: correo?.trim().toLowerCase() || null,
-        notes: (notas !== undefined) ? (notas?.trim() || null) : undefined, // Keep existing notas field mapping if it is renamed or if it has notes, wait, schema is notas.
-        notas: notas?.trim() || null,
-      } as any, // Cast to any in case of database fields naming variation
+      data,
     });
 
     await logAudit({
@@ -99,8 +119,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ cliente: clienteActualizado, mensaje: 'Cliente actualizado exitosamente' }, { status: 200 });
   } catch (error: any) {
-    console.error('Error al actualizar cliente:', error);
-    return NextResponse.json({ error: error.message || 'Error interno al procesar actualización' }, { status: 400 });
+    console.error('[CLIENT_UPDATE_ERROR] Error al actualizar cliente:', error);
+    return NextResponse.json(
+      { error: 'No se pudo actualizar la información del cliente. Por favor verifica los datos e intenta de nuevo.' },
+      { status: 500 }
+    );
   }
 }
 

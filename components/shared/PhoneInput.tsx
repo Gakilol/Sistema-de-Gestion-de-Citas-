@@ -15,12 +15,12 @@ interface PhoneInputProps {
 }
 
 const COUNTRIES = [
+  { code: '505', name: 'Nicaragua', flag: '🇳🇮', placeholder: '8675-7959' },
   { code: '506', name: 'Costa Rica', flag: '🇨🇷', placeholder: '8888-7777' },
-  { code: '505', name: 'Nicaragua', flag: '🇳🇮', placeholder: '8888-7777' },
 ];
 
 export function PhoneInput({ value, onChange, disabled = false, className, placeholder, optional = false }: PhoneInputProps) {
-  const [countryCode, setCountryCode] = useState('506'); // Costa Rica por defecto
+  const [countryCode, setCountryCode] = useState('505'); // Nicaragua por defecto
   const [phoneNumber, setPhoneNumber] = useState('');
 
   // Sincronizar el valor inicial e internacional recibido
@@ -34,16 +34,14 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
     const cleanVal = value.replace(/\D/g, '');
 
     // Buscar si el valor recibido comienza con alguno de los códigos de país de COUNTRIES
-    const matchedCountry = COUNTRIES.find(c => cleanVal.startsWith(c.code));
+    const matchedCountry = COUNTRIES.find(c => cleanVal.length >= 11 && cleanVal.startsWith(c.code));
     if (matchedCountry) {
       setCountryCode(matchedCountry.code);
-      setPhoneNumber(cleanVal.slice(matchedCountry.code.length));
+      setPhoneNumber(cleanVal.slice(matchedCountry.code.length, matchedCountry.code.length + 8));
     } else if (cleanVal.length === 8) {
-      // Si no tiene código de país pero mide 8, conservar el country actual y rellenar
       setPhoneNumber(cleanVal);
     } else {
-      // Fallback
-      setPhoneNumber(cleanVal);
+      setPhoneNumber(cleanVal.slice(0, 8));
     }
   }, [value]);
 
@@ -79,15 +77,27 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
 
   // Manejar el cambio del número telefónico
   const handlePhoneChange = (val: string) => {
-    // Permitir solo números y guiones, pero guardar solo dígitos
-    const cleanDigits = val.replace(/\D/g, '').slice(0, 8);
+    const cleanAll = val.replace(/\D/g, '');
+    let activeCountry = countryCode;
+    let cleanDigits = cleanAll;
+
+    // Si el usuario pega un número completo con prefijo (ej: 50586757959 o +505 8675-7959)
+    const matched = COUNTRIES.find(c => cleanAll.length >= 11 && cleanAll.startsWith(c.code));
+    if (matched) {
+      activeCountry = matched.code;
+      setCountryCode(matched.code);
+      cleanDigits = cleanAll.slice(matched.code.length, matched.code.length + 8);
+    } else {
+      cleanDigits = cleanAll.slice(0, 8);
+    }
+
     setPhoneNumber(cleanDigits);
 
-    const fullFormatted = cleanDigits ? `${countryCode}${cleanDigits}` : '';
+    const fullFormatted = cleanDigits ? `${activeCountry}${cleanDigits}` : '';
     const isValid = cleanDigits.length === 0 && optional ? true : (
       cleanDigits.length === 8 && (
-        (countryCode === '505' && ['8', '7', '5', '6', '2'].includes(cleanDigits[0])) ||
-        (countryCode === '506' && ['8', '7', '6', '5', '2', '4'].includes(cleanDigits[0]))
+        (activeCountry === '505' && ['8', '7', '5', '6', '2'].includes(cleanDigits[0])) ||
+        (activeCountry === '506' && ['8', '7', '6', '5', '2', '4'].includes(cleanDigits[0]))
       )
     );
     onChange(fullFormatted, isValid);

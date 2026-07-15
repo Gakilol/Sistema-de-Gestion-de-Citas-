@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext, maskClientDataIfRestricted } from '@/lib/auth-helpers';
+import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
 
 const CreateClienteSchema = z.object({
   nombre: z.string().min(2, 'El nombre es obligatorio (mínimo 2 caracteres)').max(150).trim(),
@@ -123,7 +124,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ clientes, total: clientes.length }, { status: 200 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[CLIENTS_GET_ERROR] Error al obtener clientes:', err);
+    return NextResponse.json({ error: 'Error al consultar la lista de clientes' }, { status: 500 });
   }
 }
 
@@ -151,23 +153,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
     }
 
+    // Normalizar y validar teléfono
+    let telefonoNormalizado: string | null = null;
+    if (telefono !== undefined && telefono !== null && String(telefono).trim() !== '') {
+      const phoneValidation = validarYNormalizarTelefono(telefono, '505');
+      if (!phoneValidation.isValid) {
+        return NextResponse.json(
+          { error: phoneValidation.error || 'Número de teléfono inválido' },
+          { status: 400 }
+        );
+      }
+      telefonoNormalizado = phoneValidation.normalized;
+    }
+
+    const correoNormalizado = correo && String(correo).trim() !== '' ? String(correo).trim().toLowerCase() : null;
+    const notasNormalizadas = notas && String(notas).trim() !== '' ? String(notas).trim() : null;
+
     // Validar teléfono duplicado (solo si se provee uno)
-    if (telefono && telefono.trim()) {
+    if (telefonoNormalizado) {
       const duplicadoTel = await prisma.cliente.findFirst({
-        where: { telefono: telefono.trim() },
+        where: { telefono: telefonoNormalizado },
       });
       if (duplicadoTel) {
         const errorMsg = userRole === 'EMPLEADO'
           ? 'Ya existe un cliente con estos datos. Contacte a un administrador para verificar la información.'
-          : `Ya existe un cliente con el teléfono ${telefono.trim()} (${duplicadoTel.nombre})`;
+          : `Ya existe un cliente con el teléfono ${telefonoNormalizado} (${duplicadoTel.nombre})`;
         return NextResponse.json({ error: errorMsg }, { status: 409 });
       }
     }
 
     // Validar correo duplicado (solo si se provee uno)
-    if (correo && correo.trim()) {
+    if (correoNormalizado) {
       const duplicadoEmail = await prisma.cliente.findFirst({
-        where: { correo: correo.trim().toLowerCase() },
+        where: { correo: correoNormalizado },
       });
       if (duplicadoEmail) {
         const errorMsg = userRole === 'EMPLEADO'
@@ -179,10 +197,10 @@ export async function POST(req: NextRequest) {
 
     const nuevoCliente = await prisma.cliente.create({
       data: {
-        nombre:  nombre.trim(),
-        telefono: telefono?.trim() || null,
-        correo:   correo?.trim().toLowerCase() || null,
-        notas:   notas?.trim() || null,
+        nombre: nombre.trim(),
+        telefono: telefonoNormalizado,
+        correo: correoNormalizado,
+        notas: notasNormalizadas,
         createdByUserId: userId,
       },
     });
@@ -197,6 +215,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ cliente: nuevoCliente, mensaje: 'Cliente registrado exitosamente' }, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[CLIENT_CREATE_ERROR] Error al crear cliente:', err);
+    return NextResponse.json({ error: 'No se pudo crear el cliente. Por favor intente nuevamente.' }, { status: 500 });
   }
 }
+

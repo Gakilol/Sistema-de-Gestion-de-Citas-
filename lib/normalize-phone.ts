@@ -1,61 +1,104 @@
 // lib/normalize-phone.ts
-// Normalización central de teléfonos para WhatsApp.
+// Normalización central de teléfonos para Nicaragua (+505) y Costa Rica (+506).
 // Reglas:
-//   - Elimina espacios, guiones, paréntesis y otros caracteres no numéricos (excepto +).
-//   - Mantiene el código internacional si ya existe.
-//   - Para números costarricenses de 8 dígitos, agrega 506.
-//   - Retorna null si el teléfono es inválido o está vacío.
-//   - NO modifica el teléfono guardado en la base de datos.
-//   - NO registra el teléfono completo en logs.
+//   - Elimina espacios, guiones, paréntesis y signos +.
+//   - Si el teléfono está vacío o compuesto solo por espacios, retorna null.
+//   - Evita duplicar prefijo si ya incluye 505 o 506.
+//   - Para Nicaragua (505), valida que el número local tenga exactamente 8 dígitos.
+//   - Formato unificado de retorno: "505XXXXXXXX" o "506XXXXXXXX".
 
-/**
- * Normaliza un número telefónico para uso con WhatsApp.
- * @returns String con solo dígitos y código de país, o null si es inválido.
- */
-export function normalizarTelefono(telefono: string | null | undefined): string | null {
-  if (!telefono || typeof telefono !== 'string') return null;
-
-  // Eliminar todo excepto dígitos y +
-  let cleaned = telefono.replace(/[^\d+]/g, '');
-
-  // Si empieza con +, removemos el + y dejamos los dígitos
-  if (cleaned.startsWith('+')) {
-    cleaned = cleaned.substring(1);
-  }
-
-  // Eliminar cualquier carácter no numérico restante
-  cleaned = cleaned.replace(/\D/g, '');
-
-  // Validar que queden dígitos
-  if (!cleaned || cleaned.length < 7) return null;
-
-  // Si es un número costarricense de 8 dígitos (sin código de país)
-  if (cleaned.length === 8) {
-    return `506${cleaned}`;
-  }
-
-  // Si ya tiene código de país (más de 8 dígitos), retornar como está
-  // Validar longitud razonable (entre 10 y 15 dígitos con código de país)
-  if (cleaned.length >= 10 && cleaned.length <= 15) {
-    return cleaned;
-  }
-
-  // Si tiene 9 dígitos podría ser un caso especial; asumimos CR con formato raro
-  if (cleaned.length === 9 && !cleaned.startsWith('506')) {
-    return null; // Ambiguo, mejor no adivinar
-  }
-
-  // Si tiene exactamente 11 dígitos y empieza con 506, es CR completo
-  if (cleaned.length === 11 && cleaned.startsWith('506')) {
-    return cleaned;
-  }
-
-  return cleaned.length >= 7 ? cleaned : null;
+export interface TelefonoValidationResult {
+  normalized: string | null;
+  isValid: boolean;
+  error?: string;
 }
 
 /**
- * Valida si un teléfono normalizado es apto para WhatsApp.
+ * Valida y normaliza un número telefónico.
  */
-export function esTelefonoValido(telefono: string | null | undefined): boolean {
-  return normalizarTelefono(telefono) !== null;
+export function validarYNormalizarTelefono(
+  telefono: string | null | undefined,
+  defaultCountryCode: string = '505'
+): TelefonoValidationResult {
+  if (telefono === null || telefono === undefined) {
+    return { normalized: null, isValid: true };
+  }
+
+  const rawTrimmed = telefono.trim();
+  if (rawTrimmed === '') {
+    return { normalized: null, isValid: true };
+  }
+
+  // Eliminar todo lo que no sea dígito
+  const digitsOnly = rawTrimmed.replace(/\D/g, '');
+
+  if (digitsOnly.length === 0) {
+    return { normalized: null, isValid: true };
+  }
+
+  // Caso 1: Tiene 11 dígitos y empieza con 505 o 506 (prefijo de 3 dígitos + 8 locales)
+  if (digitsOnly.length === 11) {
+    const prefix = digitsOnly.slice(0, 3);
+    const localPart = digitsOnly.slice(3);
+
+    if (prefix === '505' || prefix === '506') {
+      return { normalized: digitsOnly, isValid: true };
+    }
+  }
+
+  // Caso 2: Tiene 8 dígitos (número local sin prefijo internacional)
+  if (digitsOnly.length === 8) {
+    const code = ['505', '506'].includes(defaultCountryCode) ? defaultCountryCode : '505';
+    return { normalized: `${code}${digitsOnly}`, isValid: true };
+  }
+
+  // Si tiene prefijo 505 pero la cantidad de dígitos tras el prefijo no es 8
+  if (digitsOnly.startsWith('505') && digitsOnly.length !== 11) {
+    const localLen = digitsOnly.length - 3;
+    return {
+      normalized: null,
+      isValid: false,
+      error: `El número de Nicaragua debe tener exactamente 8 dígitos locales (se recibieron ${localLen}).`,
+    };
+  }
+
+  // Si tiene prefijo 506 pero la cantidad de dígitos tras el prefijo no es 8
+  if (digitsOnly.startsWith('506') && digitsOnly.length !== 11) {
+    const localLen = digitsOnly.length - 3;
+    return {
+      normalized: null,
+      isValid: false,
+      error: `El número de Costa Rica debe tener exactamente 8 dígitos locales (se recibieron ${localLen}).`,
+    };
+  }
+
+  // Si la longitud total no es 8 ni 11
+  return {
+    normalized: null,
+    isValid: false,
+    error: `El número de teléfono no es válido. Debe tener 8 dígitos locales (recibidos ${digitsOnly.length}).`,
+  };
 }
+
+/**
+ * Normaliza un número telefónico para almacenamiento/WhatsApp.
+ * Retorna string en formato internacional (ej. "50586757959") o null si es inválido/vacío.
+ */
+export function normalizarTelefono(
+  telefono: string | null | undefined,
+  defaultCountryCode: string = '505'
+): string | null {
+  const result = validarYNormalizarTelefono(telefono, defaultCountryCode);
+  return result.isValid ? result.normalized : null;
+}
+
+/**
+ * Valida si un teléfono normalizado es apto para WhatsApp o almacenamiento.
+ */
+export function esTelefonoValido(
+  telefono: string | null | undefined,
+  defaultCountryCode: string = '505'
+): boolean {
+  return validarYNormalizarTelefono(telefono, defaultCountryCode).isValid;
+}
+
