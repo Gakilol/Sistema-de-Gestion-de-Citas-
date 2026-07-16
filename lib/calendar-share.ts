@@ -47,7 +47,7 @@ export function getHorarioLegible(horaInicioStr: string, duracionMin: number = 3
   return {
     horaInicio,
     horaFin,
-    textoHorario: `${horaInicio} – ${horaFin}`,
+    textoHorario: horaInicio,
   };
 }
 
@@ -67,7 +67,6 @@ export function buildSharePayload(cita: CalendarEventShareData) {
     `👤 *Cliente:* ${cita.cliente_nombre}\n` +
     `📅 *Fecha:* ${fechaLegible}\n` +
     `⏰ *Horario:* ${textoHorario}\n` +
-    `💈 *Atendido por:* ${profesional}\n` +
     `✂️ *Servicio(s):* ${textoServicios}\n\n` +
     `¡Te esperamos puntual! Si deseas cancelar o reprogramar, por favor avísanos con anticipación.`;
 
