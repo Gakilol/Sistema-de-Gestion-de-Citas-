@@ -10,6 +10,7 @@ import {
   hour12To24h,
   parse24hToNormal,
   formatHora12h,
+  resolveAutoPeriod,
 } from '@/lib/time-utils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -201,10 +202,10 @@ export function TimeSelector({
 
   // ─── Manejadores de Cambio de Hora / Minutos / Período ──────────────────
   const handleSelectHour = useCallback((h12: number) => {
-    const targetPeriod: 'AM' | 'PM' = parsedTime.period;
+    const targetPeriod: 'AM' | 'PM' = resolveAutoPeriod(h12);
     const time24 = hour12To24h(h12, parsedTime.minute, targetPeriod);
     onTimeSelect(time24);
-  }, [parsedTime.minute, parsedTime.period, onTimeSelect]);
+  }, [parsedTime.minute, onTimeSelect]);
 
   const handleSelectMinute = useCallback((m: number) => {
     const time24 = hour12To24h(parsedTime.hour12, m, parsedTime.period);

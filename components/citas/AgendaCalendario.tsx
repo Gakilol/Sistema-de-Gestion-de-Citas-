@@ -942,7 +942,7 @@ export function AgendaCalendario({
       originalDayStr: dayStr,
       originalEmpleadoId: empleadoId,
       originalStartMin: startMin,
-      originalEndMin: Math.min((HORA_FIN + 1) * 60, startMin + 30),
+      originalEndMin: Math.min((HORA_FIN + 1) * 60, startMin + 60),
       startMinutes: startMin,
       grabOffsetY: 0,
       pointerId: e.pointerId,
@@ -971,7 +971,7 @@ export function AgendaCalendario({
 
         try { colEl.setPointerCapture(e.pointerId); } catch {}
 
-        const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 30);
+        const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 60);
         const isOverlap = checkOverlap(citasPorDia[dayStr] || [], empleadoId, startMin, endMin);
         setProvisionalSlot({
           dayStr,
@@ -1089,7 +1089,7 @@ export function AgendaCalendario({
 
     // Caso A: Clic simple o Tap rápido en espacio vacío -> slot por defecto de 30 min
     if (isPendingTouchTap || isPendingMouseClick || (!wasDragged && !wasActive)) {
-      const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 30);
+      const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 60);
       const isOverlap = checkOverlap(citasPorDia[dayStr] || [], empleadoId, startMin, endMin);
 
       setProvisionalSlot({
@@ -1678,7 +1678,7 @@ export function AgendaCalendario({
 
     const colRect = colEl.getBoundingClientRect();
     const y = e.clientY - colRect.top;
-    const snapMin = yToMinutes(Math.max(0, y), 5, hourHeight);
+    const snapMin = yToMinutes(Math.max(0, y), 15, hourHeight);
 
     let newStartMin = rs.currentStartMin;
     let newEndMin = rs.currentEndMin;
@@ -2107,13 +2107,13 @@ export function AgendaCalendario({
 
                               {/* Handle de resize INFERIOR (Modificar Hora Fin) */}
                               <div
-                                className="resize-handle absolute left-0 right-0 -bottom-3 h-6 flex items-center justify-center cursor-s-resize z-40 group/rb select-none touch-none"
+                                className="resize-handle absolute left-0 right-0 -bottom-4.5 h-11 flex items-center justify-center cursor-s-resize z-40 group/rb select-none touch-none"
                                 title="Arrastrar para ajustar la hora de fin"
                                 onPointerDown={(e) => handleProvisionalResizePointerDown(e, 'bottom')}
                                 onPointerMove={handleProvisionalResizePointerMove}
                                 onPointerUp={handleProvisionalResizePointerUp}
                               >
-                                <div className="w-10 h-1.5 rounded-full bg-primary shadow-xs group-hover/rb:scale-110 transition-transform pointer-events-none" />
+                                <div className="w-12 h-2 rounded-full bg-primary shadow-xs group-hover/rb:scale-110 transition-transform pointer-events-none" />
                               </div>
                             </div>
                           )}
@@ -2414,7 +2414,7 @@ export function AgendaCalendario({
                                 {/* Handle de resize INFERIOR — solo visible cuando seleccionada */}
                                 {isSelected && editable && (
                                   <div
-                                    className="resize-handle absolute left-0 right-0 -bottom-3 flex items-center justify-center cursor-s-resize z-30 h-8 group/rb"
+                                    className="resize-handle absolute left-0 right-0 -bottom-4.5 flex items-center justify-center cursor-s-resize z-30 h-11 group/rb touch-none"
                                     onPointerDown={(e) => handleResizePointerDown(e, cita, 'bottom', diaStr, emp.id)}
                                     onPointerMove={(e) => handleResizePointerMove(e, cita)}
                                     onPointerUp={(e) => handleResizePointerUp(e, cita)}
@@ -2440,23 +2440,7 @@ export function AgendaCalendario({
           </div>
         </div>
 
-        {/* ESTADO VACÍO */}
-        {!isLoading && totalCitasVisibles === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 bg-background/5 pointer-events-none z-10">
-            <div className="text-center p-6 max-w-sm bg-card/90 backdrop-blur-[3px] border border-border/80 rounded-2xl shadow-xl pointer-events-auto flex flex-col items-center">
-              <CalendarIcon className="w-8 h-8 text-muted-foreground mb-3 animate-bounce" />
-              <h3 className="text-sm font-bold text-foreground mb-1">Sin citas programadas</h3>
-              <p className="text-xs text-muted-foreground max-w-[250px] leading-relaxed">
-                {vista === 'dia' 
-                  ? 'No hay citas registradas para este día.' 
-                  : `No hay citas registradas para esta ${vista === 'semana' ? 'semana' : 'agenda de 3 días'}.`}
-              </p>
-              <p className="text-[10px] text-muted-foreground/60 mt-2">
-                💡 Haz click o arrastra en el calendario para agendar
-              </p>
-            </div>
-          </div>
-        )}
+
 
         {/* OVERLAY DE CARGA */}
         {isLoading && (
