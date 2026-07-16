@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       take: 20,
     });
 
-    const topClientes = topClientesRaw.map((r, i) => ({
+    const topClientes = topClientesRaw.map((r: any, i: number) => ({
       rank:      i + 1,
       nombre:    r.cliente_nombre,
       clienteId: r.cliente_id,
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       where,
       select: { cliente_id: true },
       distinct: ['cliente_id'],
-    }).then(rows => rows.length);
+    }).then((rows: any[]) => rows.length);
 
     // New clients in period (first appointment ever is within period)
     const clientesNuevosRaw: any[] = await prisma.$queryRaw`

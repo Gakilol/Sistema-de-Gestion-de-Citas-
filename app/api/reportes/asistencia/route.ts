@@ -73,18 +73,18 @@ export async function GET(req: NextRequest) {
       where: { fecha: { gte: filters.from, lte: filters.to }, estado: { in: ['COMPLETADA', 'NO_SHOW'] } },
       _count: { id: true },
     });
-    const empIds = porEmpleadoRaw.map(r => r.empleado_id);
+    const empIds = porEmpleadoRaw.map((r: any) => r.empleado_id);
     const emps   = await prisma.empleado.findMany({ where: { id: { in: empIds } }, select: { id: true, nombre: true } });
-    const empMap = Object.fromEntries(emps.map(e => [e.id, e.nombre]));
+    const empMap = Object.fromEntries(emps.map((e: any) => [e.id, e.nombre]));
 
     const completadasByEmp = await prisma.cita.groupBy({
       by: ['empleado_id'],
       where: { fecha: { gte: filters.from, lte: filters.to }, estado: 'COMPLETADA' },
       _count: { id: true },
     });
-    const completadasEmpMap = Object.fromEntries(completadasByEmp.map(r => [r.empleado_id, r._count.id]));
+    const completadasEmpMap = Object.fromEntries(completadasByEmp.map((r: any) => [r.empleado_id, r._count.id]));
 
-    const porEmpleado = porEmpleadoRaw.map(r => {
+    const porEmpleado = porEmpleadoRaw.map((r: any) => {
       const total = r._count.id;
       const comp  = completadasEmpMap[r.empleado_id] || 0;
       const tasa  = safeRate(comp, total);
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
         tasaAsistencia: tasa,
         nivel: tasa >= 90 ? 'excelente' : tasa >= 75 ? 'aceptable' : 'riesgo',
       };
-    }).sort((a, b) => b.tasaAsistencia - a.tasaAsistencia);
+    }).sort((a: any, b: any) => b.tasaAsistencia - a.tasaAsistencia);
 
     // Attendance by service
     const porServicioRaw = await prisma.cita.groupBy({
@@ -108,12 +108,12 @@ export async function GET(req: NextRequest) {
       where: { fecha: { gte: filters.from, lte: filters.to }, estado: 'COMPLETADA' },
       _count: { id: true },
     });
-    const completadasServMap = Object.fromEntries(completadasByServ.map(r => [r.servicio_id, r._count.id]));
-    const servicioIds = porServicioRaw.map(r => r.servicio_id);
+    const completadasServMap = Object.fromEntries(completadasByServ.map((r: any) => [r.servicio_id, r._count.id]));
+    const servicioIds = porServicioRaw.map((r: any) => r.servicio_id);
     const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: servicioIds } }, select: { id: true, nombre: true } });
-    const servicioMap = Object.fromEntries(serviciosDb.map(s => [s.id, s.nombre]));
+    const servicioMap = Object.fromEntries(serviciosDb.map((s: any) => [s.id, s.nombre]));
 
-    const porServicio = porServicioRaw.map(r => {
+    const porServicio = porServicioRaw.map((r: any) => {
       const total = r._count.id;
       const comp  = completadasServMap[r.servicio_id] || 0;
       const tasa  = safeRate(comp, total);
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
         tasaAsistencia: tasa,
         nivel: tasa >= 90 ? 'excelente' : tasa >= 75 ? 'aceptable' : 'riesgo',
       };
-    }).sort((a, b) => b.tasaAsistencia - a.tasaAsistencia);
+    }).sort((a: any, b: any) => b.tasaAsistencia - a.tasaAsistencia);
 
     return NextResponse.json({
       resumen: {

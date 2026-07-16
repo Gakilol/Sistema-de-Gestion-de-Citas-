@@ -195,7 +195,7 @@ export async function GET(req: NextRequest) {
     const employees = await prisma.empleado.findMany({
       select: { id: true, nombre: true, correo: true, rol: true }
     });
-    const employeesMap = new Map(employees.map(e => [e.id, e]));
+    const employeesMap = new Map<string, any>(employees.map((e: any) => [e.id, e]));
 
     // Mapear logs con los valores legacy si los nuevos son null
     const mappedLogs = mapLegacyAuditLogs(logs, employeesMap);

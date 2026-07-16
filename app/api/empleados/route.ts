@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
         return 5;
       };
 
-      empleados = empleados.sort((a, b) => {
+      empleados = empleados.sort((a: any, b: any) => {
         const prioA = getPriority(a.nombre);
         const prioB = getPriority(b.nombre);
         if (prioA !== prioB) return prioA - prioB;
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       });
     } else {
       // default sorting for general list
-      empleados = empleados.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      empleados = empleados.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
     return NextResponse.json({ empleados }, { status: 200 });

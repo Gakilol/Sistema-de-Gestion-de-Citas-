@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
       stats.totalInactivos = allRawIds.length;
 
       // Count "sin recordatorio" (no reminder log ever)
-      const clientsWithReminder = new Set(reminderLogs.map(l => l.entityId));
+      const clientsWithReminder = new Set(reminderLogs.map((l: any) => l.entityId));
       stats.sinRecordatorio = allRawIds.filter(id => !clientsWithReminder.has(id)).length;
 
       // Count "enviados este mes" (reminders created in current calendar month)
@@ -207,7 +207,7 @@ export async function GET(req: NextRequest) {
         // But let's double check to be safe:
         const hasAccess = userRole !== 'EMPLEADO' || (
           lastAppt && lastAppt.empleado_id === userId
-        ) || lastCompletedAppointments.some(appt => appt.cliente_id === r.id && appt.empleado_id === userId);
+        ) || lastCompletedAppointments.some((appt: any) => appt.cliente_id === r.id && appt.empleado_id === userId);
 
         const maskedTelefono = hasAccess ? r.telefono : '••••••••';
 

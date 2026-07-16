@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       REPROGRAMADA: 'Reprogramada',
     };
 
-    const rows = citas.map(c => ({
+    const rows = citas.map((c: any) => ({
       Fecha:            c.fecha ? new Date(c.fecha).toISOString().split('T')[0] : '',
       Hora:             c.hora,
       Estado:           estadoLabel[c.estado] || c.estado,
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       const csvLines = [
         `# Reporte: Citas | Período: ${filters.rawFrom} al ${filters.rawTo} | Generado: ${new Date().toISOString()}`,
         headers.join(','),
-        ...rows.map(r =>
+        ...rows.map((r: any) =>
           headers.map(h => {
             const val = String((r as any)[h] || '').replace(/"/g, '""');
             return val.includes(',') || val.includes('"') ? `"${val}"` : val;

@@ -11,8 +11,10 @@ export interface CustomJWTPayload extends JWTPayload {
 function getRequiredSecret(envVar: string, fallbackForDev: string): string {
   const secret = process.env[envVar];
   if (!secret) {
-    // Para facilitar pruebas en producción, permitimos el fallback pero emitimos una advertencia clara
-    console.warn(`[ADVERTENCIA DE SEGURIDAD] ${envVar} no está configurada en producción. Usando valor de desarrollo/fallback.`);
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`[SEGURIDAD CRÍTICA] Variable de entorno ${envVar} requerida no está configurada en producción.`);
+    }
+    console.warn(`[ADVERTENCIA DE SEGURIDAD] ${envVar} no está configurada. Usando clave de desarrollo por defecto.`);
     return fallbackForDev;
   }
   return secret;

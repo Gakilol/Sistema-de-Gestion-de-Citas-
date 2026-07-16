@@ -108,6 +108,23 @@ export function validarHoraExacta(
   return { valida: true, motivo: 'Disponible' };
 }
 
+let cachedConfig: any = null;
+let cachedConfigTimestamp = 0;
+const CONFIG_CACHE_TTL = 30000; // 30 segundos
+
+async function getConfiguracionCached(dbClient: any = prisma) {
+  const now = Date.now();
+  if (cachedConfig && (now - cachedConfigTimestamp < CONFIG_CACHE_TTL)) {
+    return cachedConfig;
+  }
+  const config = await dbClient.configuracion.findUnique({ where: { id: 'default' } });
+  if (config) {
+    cachedConfig = config;
+    cachedConfigTimestamp = now;
+  }
+  return config || cachedConfig;
+}
+
 // ─── Cálculo completo de disponibilidad ─────────────────────────────────────
 export async function calcularDisponibilidad(
   empleadoId: string, 
@@ -116,11 +133,12 @@ export async function calcularDisponibilidad(
   duracionTotal?: number | null,
   horaRequerida?: string | null,
   excludeCitaId?: string | null,
-  permitirHorarioExtendido: boolean = false
+  permitirHorarioExtendido: boolean = false,
+  dbClient: any = prisma
 ) {
   const fechaDate = parseYYYYMMDD(fechaYYYYMMDD);
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await dbClient.empleado.findUnique({
     where: { id: empleadoId },
     include: {
       vacaciones: {
@@ -180,7 +198,7 @@ export async function calcularDisponibilidad(
     domingo:   { activo: false, inicio: '09:00', fin: '13:00' },
   };
 
-  const config = await prisma.configuracion.findUnique({ where: { id: 'default' } });
+  const config = await getConfiguracionCached(dbClient);
   const horariosGlobales = (config?.horarios as any) || DEFAULT_HORARIOS_GLOBALES;
   const configDia = horariosGlobales[diaNombre] || DEFAULT_HORARIOS_GLOBALES[diaNombre];
 
@@ -240,7 +258,7 @@ export async function calcularDisponibilidad(
     citasWhere.id = { not: excludeCitaId };
   }
 
-  const citas = await prisma.cita.findMany({ where: citasWhere });
+  const citas = await dbClient.cita.findMany({ where: citasWhere });
 
   // ─── Construir lista unificada de intervalos ocupados ───────────────────
   const descansosDia = empleado.descansos.filter((d: any) => d.dia_semana === diaIndex);
@@ -351,7 +369,8 @@ export async function detectarConflictos(
   fechaYYYYMMDD: string,
   hora: string,
   duracion: number,
-  excludeCitaId?: string | null
+  excludeCitaId?: string | null,
+  dbClient: any = prisma
 ): Promise<ConflictoCita[]> {
   const startMin = timeToMinutes(hora);
   const endMin = startMin + duracion;
@@ -366,7 +385,7 @@ export async function detectarConflictos(
     citasWhere.id = { not: excludeCitaId };
   }
 
-  const citas = await prisma.cita.findMany({
+  const citas = await dbClient.cita.findMany({
     where: citasWhere,
     include: {
       servicio: { select: { nombre: true } },

@@ -106,19 +106,19 @@ export async function GET(req: NextRequest) {
       orderBy: { _count: { id: 'desc' } },
       take: 10,
     });
-    const servicioIds = porServicioRaw.map(r => r.servicio_id);
+    const servicioIds = porServicioRaw.map((r: any) => r.servicio_id);
     const servicios = await prisma.servicio.findMany({ where: { id: { in: servicioIds } }, select: { id: true, nombre: true } });
-    const servicioMap = Object.fromEntries(servicios.map(s => [s.id, s.nombre]));
-    const porServicio = porServicioRaw.map(r => ({ nombre: servicioMap[r.servicio_id] || '—', total: r._count.id }));
+    const servicioMap = Object.fromEntries(servicios.map((s: any) => [s.id, s.nombre]));
+    const porServicio = porServicioRaw.map((r: any) => ({ nombre: servicioMap[r.servicio_id] || '—', total: r._count.id }));
 
     // Total for percentages
-    const total = porServicio.reduce((s, r) => s + r.total, 0);
+    const total = porServicio.reduce((s: number, r: any) => s + r.total, 0);
 
     return NextResponse.json({
       porDiaSemana,
       porHora,
       heatmap,
-      porServicio: porServicio.map(r => ({ ...r, pct: total > 0 ? Math.round((r.total / total) * 1000) / 10 : 0 })),
+      porServicio: porServicio.map((r: any) => ({ ...r, pct: total > 0 ? Math.round((r.total / total) * 1000) / 10 : 0 })),
       insights: {
         diaMasSolicitado: maxDia,
         diaMenosSolicitado: minDia,

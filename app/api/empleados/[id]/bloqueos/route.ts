@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     // format dates back to YYYY-MM-DD for visual fields
-    const formattedBloqueos = bloqueos.map(b => ({
+    const formattedBloqueos = bloqueos.map((b: any) => ({
       ...b,
       fecha: b.fecha.toISOString().split('T')[0]
     }));
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { empleado_id: id }
     });
 
-    const formattedBloqueos = updatedBloqueos.map(b => ({
+    const formattedBloqueos = updatedBloqueos.map((b: any) => ({
       ...b,
       fecha: b.fecha.toISOString().split('T')[0]
     }));

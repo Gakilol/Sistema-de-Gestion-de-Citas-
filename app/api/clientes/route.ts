@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const clientes = clientesData.map((c) => {
+    const clientes = clientesData.map((c: any) => {
       let citasCompletadas = 0;
       let ultimaCita = c.createdAt;
       let primeraCita = c.createdAt;
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
       return maskClientDataIfRestricted(rawCliente, userId, userRole);
     });
 
-    clientes.sort((a, b) => b.totalCitas - a.totalCitas);
+    clientes.sort((a: any, b: any) => b.totalCitas - a.totalCitas);
 
     return NextResponse.json({ clientes, total: clientes.length }, { status: 200 });
   } catch (err: any) {

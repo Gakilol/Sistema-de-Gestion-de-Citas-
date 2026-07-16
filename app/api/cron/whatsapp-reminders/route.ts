@@ -98,7 +98,7 @@ async function handleCron(req: NextRequest) {
       const { cita, diffMinutes } = item;
 
       const servicioNombres = cita.citaServicios.length > 0
-        ? cita.citaServicios.map(cs => cs.servicio.nombre).join(' + ')
+        ? cita.citaServicios.map((cs: any) => cs.servicio.nombre).join(' + ')
         : cita.servicio.nombre;
 
       const mensaje = mensajeRecordatorioUnaHora({

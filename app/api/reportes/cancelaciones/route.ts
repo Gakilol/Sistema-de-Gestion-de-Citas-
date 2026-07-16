@@ -69,10 +69,10 @@ export async function GET(req: NextRequest) {
       orderBy: { _count: { id: 'desc' } },
       take: 10,
     });
-    const empIds = porEmpleadoRaw.map(r => r.empleado_id);
+    const empIds = porEmpleadoRaw.map((r: any) => r.empleado_id);
     const emps   = await prisma.empleado.findMany({ where: { id: { in: empIds } }, select: { id: true, nombre: true } });
-    const empMap = Object.fromEntries(emps.map(e => [e.id, e.nombre]));
-    const porEmpleado = porEmpleadoRaw.map(r => ({ nombre: empMap[r.empleado_id] || '—', total: r._count.id }));
+    const empMap = Object.fromEntries(emps.map((e: any) => [e.id, e.nombre]));
+    const porEmpleado = porEmpleadoRaw.map((r: any) => ({ nombre: empMap[r.empleado_id] || '—', total: r._count.id }));
 
     // By service
     const porServicioRaw = await prisma.cita.groupBy({
@@ -82,10 +82,10 @@ export async function GET(req: NextRequest) {
       orderBy: { _count: { id: 'desc' } },
       take: 10,
     });
-    const servIds = porServicioRaw.map(r => r.servicio_id);
+    const servIds = porServicioRaw.map((r: any) => r.servicio_id);
     const servs   = await prisma.servicio.findMany({ where: { id: { in: servIds } }, select: { id: true, nombre: true } });
-    const servMap = Object.fromEntries(servs.map(s => [s.id, s.nombre]));
-    const porServicio = porServicioRaw.map(r => ({ nombre: servMap[r.servicio_id] || '—', total: r._count.id }));
+    const servMap = Object.fromEntries(servs.map((s: any) => [s.id, s.nombre]));
+    const porServicio = porServicioRaw.map((r: any) => ({ nombre: servMap[r.servicio_id] || '—', total: r._count.id }));
 
     // Clients with most cancellations
     const porClienteRaw = await prisma.cita.groupBy({
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       orderBy: { _count: { id: 'desc' } },
       take: 10,
     });
-    const clientesConMasCancelaciones = porClienteRaw.map(r => ({
+    const clientesConMasCancelaciones = porClienteRaw.map((r: any) => ({
       nombre:    r.cliente_nombre,
       total:     r._count.id,
       clienteId: r.cliente_id,

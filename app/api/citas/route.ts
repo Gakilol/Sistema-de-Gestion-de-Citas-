@@ -79,14 +79,12 @@ export async function GET(req: NextRequest) {
         }
       },
       orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
-    });
-
-    const filtradas = busqueda
-      ? citas.filter(c =>
+    });    const filtradas = busqueda
+      ? citas.filter((c: any) =>
           c.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
           (c.cliente_telefono && c.cliente_telefono.includes(busqueda)) ||
           c.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-          c.citaServicios.some(cs => cs.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+          c.citaServicios.some((cs: any) => cs.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()))
         )
       : citas;
 
@@ -136,7 +134,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar que el empleado sea agendable
-    // Asegurarse que finalEmpleadoId está definido en este punto del flujo
     if (!finalEmpleadoId) {
       return NextResponse.json({ error: 'Debe especificar el empleado para la cita' }, { status: 400 });
     }
@@ -160,7 +157,7 @@ export async function POST(req: NextRequest) {
         const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: ids } } });
         
         serviciosParaCita = servicios_seleccionados.map((sel: any) => {
-          const sDb = serviciosDb.find(s => s.id === sel.id);
+          const sDb = serviciosDb.find((s: any) => s.id === sel.id);
           if (!sDb) {
             throw new Error(`El servicio seleccionado no existe o no está disponible`);
           }
@@ -174,7 +171,6 @@ export async function POST(req: NextRequest) {
         if (!ids[0]) {
           return NextResponse.json({ error: 'No se especificaron servicios para la cita' }, { status: 400 });
         }
-        // Filtrar posibles undefined antes de pasar a Prisma
         const idsDefinidos = ids.filter((id): id is string => id !== undefined && id !== null);
         if (idsDefinidos.length === 0) {
           return NextResponse.json({ error: 'No se especificaron servicios para la cita' }, { status: 400 });
@@ -182,7 +178,7 @@ export async function POST(req: NextRequest) {
         const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: idsDefinidos } } });
         
         serviciosParaCita = idsDefinidos.map((id: string) => {
-          const sDb = serviciosDb.find(s => s.id === id);
+          const sDb = serviciosDb.find((s: any) => s.id === id);
           if (!sDb) {
             throw new Error(`El servicio con ID ${id} no fue encontrado`);
           }
@@ -198,80 +194,8 @@ export async function POST(req: NextRequest) {
 
     const duracionCalculada = serviciosParaCita.reduce((sum, s) => sum + s.duracion, 0);
     const primerServicioId  = serviciosParaCita[0].id;
-
-    // ─── VALIDACIÓN DE DISPONIBILIDAD ───────────────────────────────────────
     const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
-
     const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
-    const disponibilidad = await calcularDisponibilidad(
-      finalEmpleadoId,
-      fecha.split('T')[0],
-      primerServicioId,
-      duracionCalculada,
-      hora,
-      null,
-      permitirHorarioExtendido
-    );
-
-    if (!disponibilidad.disponible) {
-      return NextResponse.json({ error: 'El empleado no está disponible este día: ' + disponibilidad.motivo }, { status: 400 });
-    }
-
-    if (!disponibilidad.jornada) {
-      return NextResponse.json({ error: 'No se pudo determinar la jornada laboral' }, { status: 400 });
-    }
-
-    // ─── DETECCIÓN Y VALIDACIÓN DE TRASLAPES CONTROLADOS ───────────────────
-    const conflictos = await detectarConflictos(
-      finalEmpleadoId,
-      fecha.split('T')[0],
-      hora,
-      duracionCalculada,
-      null
-    );
-
-    const isOverlapRequested = allowOverlap === true;
-    const conflictosBloqueantes = conflictos.filter(c => !c.allowOverlap);
-
-    if (conflictosBloqueantes.length > 0) {
-      if (!isOverlapRequested) {
-        // Devolver un error controlado con los detalles de la cita en conflicto
-        return NextResponse.json({
-          type: 'SCHEDULE_OVERLAP',
-          message: 'El horario se cruza con otra cita.',
-          conflicts: conflictosBloqueantes
-        }, { status: 409 });
-      }
-
-      // Validar que un empleado solo pueda confirmar traslapes en su propia agenda
-      if (userRole === 'EMPLEADO' && finalEmpleadoId !== userId) {
-        return NextResponse.json({ error: 'No tienes permiso para crear traslapes en la agenda de otros empleados.' }, { status: 403 });
-      }
-      if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT' && userRole !== 'EMPLEADO') {
-        return NextResponse.json({ error: 'No tienes permiso para confirmar traslapes.' }, { status: 403 });
-      }
-    }
-
-    // Ejecutar validación de hora exacta
-    // Si hay traslape confirmado, filtramos las citas para que no bloqueen la validación,
-    // pero mantenemos bloqueos y descansos.
-    const intervalosFiltrados = (conflictosBloqueantes.length > 0 && isOverlapRequested)
-      ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
-      : disponibilidad.intervalosOcupados;
-
-    const validacion = validarHoraExacta(
-      hora,
-      duracionCalculada,
-      disponibilidad.jornada.inicio,
-      disponibilidad.jornada.fin,
-      intervalosFiltrados,
-      permitirHorarioExtendido,
-      disponibilidad.turnosEmpleado
-    );
-
-    if (!validacion.valida) {
-      return NextResponse.json({ error: 'Hora no disponible: ' + validacion.motivo }, { status: 400 });
-    }
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
     let idClienteFinal: string | null = cliente_id || null;
@@ -290,10 +214,76 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ─── TRANSACCIÓN ATÓMICA: Validación + Guardar cita ─────────────────────
+    const result = await prisma.$transaction(async (tx: any) => {
+      const disponibilidad = await calcularDisponibilidad(
+        finalEmpleadoId,
+        fecha.split('T')[0],
+        primerServicioId,
+        duracionCalculada,
+        hora,
+        null,
+        permitirHorarioExtendido,
+        tx
+      );
 
-    // ─── TRANSACCIÓN: Guardar cita + relaciones ──────────────────────────────
-    const hasConflict = conflictosBloqueantes.length > 0;
-    const cita = await prisma.$transaction(async (tx) => {
+      if (!disponibilidad.disponible) {
+        return { error: 'El empleado no está disponible este día: ' + disponibilidad.motivo, status: 400 };
+      }
+
+      if (!disponibilidad.jornada) {
+        return { error: 'No se pudo determinar la jornada laboral', status: 400 };
+      }
+
+      const conflictos = await detectarConflictos(
+        finalEmpleadoId,
+        fecha.split('T')[0],
+        hora,
+        duracionCalculada,
+        null,
+        tx
+      );
+
+      const isOverlapRequested = allowOverlap === true;
+      const conflictosBloqueantes = conflictos.filter(c => !c.allowOverlap);
+
+      if (conflictosBloqueantes.length > 0) {
+        if (!isOverlapRequested) {
+          return {
+            type: 'SCHEDULE_OVERLAP',
+            message: 'El horario se cruza con otra cita.',
+            conflicts: conflictosBloqueantes,
+            status: 409
+          };
+        }
+
+        if (userRole === 'EMPLEADO' && finalEmpleadoId !== userId) {
+          return { error: 'No tienes permiso para crear traslapes en la agenda de otros empleados.', status: 403 };
+        }
+        if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT' && userRole !== 'EMPLEADO') {
+          return { error: 'No tienes permiso para confirmar traslapes.', status: 403 };
+        }
+      }
+
+      const intervalosFiltrados = (conflictosBloqueantes.length > 0 && isOverlapRequested)
+        ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
+        : disponibilidad.intervalosOcupados;
+
+      const validacion = validarHoraExacta(
+        hora,
+        duracionCalculada,
+        disponibilidad.jornada.inicio,
+        disponibilidad.jornada.fin,
+        intervalosFiltrados,
+        permitirHorarioExtendido,
+        disponibilidad.turnosEmpleado
+      );
+
+      if (!validacion.valida) {
+        return { error: 'Hora no disponible: ' + validacion.motivo, status: 400 };
+      }
+
+      const hasConflict = conflictosBloqueantes.length > 0;
       const c = await tx.cita.create({
         data: {
           cliente_id:       idClienteFinal,
@@ -306,7 +296,6 @@ export async function POST(req: NextRequest) {
           duracion:         duracionCalculada,
           notas,
           created_by:       userId,
-          // Guardar información de traslape
           allowOverlap:     hasConflict && isOverlapRequested,
           overlapReason:    hasConflict && isOverlapRequested ? overlapReason : null,
           overlapConfirmedById: hasConflict && isOverlapRequested ? userId : null,
@@ -323,8 +312,17 @@ export async function POST(req: NextRequest) {
         }))
       });
 
-      return c;
+      return { cita: c, conflictos, status: 201 };
     });
+
+    if ('error' in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    if ('type' in result && result.type === 'SCHEDULE_OVERLAP') {
+      return NextResponse.json(result, { status: result.status });
+    }
+
+    const { cita, conflictos } = result;
 
     const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
     await logAudit({

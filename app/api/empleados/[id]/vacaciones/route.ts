@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { empleado_id: id }
     });
 
-    const formattedVacaciones = vacaciones.map(v => ({
+    const formattedVacaciones = vacaciones.map((v: any) => ({
       ...v,
       fecha_inicio: v.fecha_inicio.toISOString().split('T')[0],
       fecha_fin: v.fecha_fin.toISOString().split('T')[0]
@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { empleado_id: id }
     });
 
-    const formattedVacaciones = updatedVacaciones.map(v => ({
+    const formattedVacaciones = updatedVacaciones.map((v: any) => ({
       ...v,
       fecha_inicio: v.fecha_inicio.toISOString().split('T')[0],
       fecha_fin: v.fecha_fin.toISOString().split('T')[0]

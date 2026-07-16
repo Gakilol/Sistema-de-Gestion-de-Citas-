@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
           userId: true,
           realizadoPor: true
         }
-      }).then(res => {
+      }).then((res: any[]) => {
         const uniqueUsers = new Set();
-        res.forEach(l => {
+        res.forEach((l: any) => {
           const userIdentifier = l.userId || l.realizadoPor;
           if (userIdentifier) uniqueUsers.add(userIdentifier);
         });

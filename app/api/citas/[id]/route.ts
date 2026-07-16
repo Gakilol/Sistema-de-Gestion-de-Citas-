@@ -221,7 +221,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const idsUnicos = [...new Set(finalServicioIds)] as string[];
         const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: idsUnicos } } });
         duracionFinal = finalServicioIds.reduce((sum: number, sid: string) => {
-          const sDb = serviciosDb.find(s => s.id === sid);
+          const sDb = serviciosDb.find((s: any) => s.id === sid);
           return sum + (sDb?.duracion || 30);
         }, 0);
       }
@@ -349,7 +349,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Cita original ya cargada y validada arriba
 
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
-    const cita = await prisma.$transaction(async (tx) => {
+    const cita = await prisma.$transaction(async (tx: any) => {
       let serviciosParaActualizar: { id: string; duracion: number }[] = [];
       let flagActualizarServicios = false;
 
@@ -361,7 +361,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         // Preservar duplicados: cada elemento de la lista origina su propio CitaServicio
         serviciosParaActualizar = servicios_seleccionados.map((sel: any) => {
-          const sDb = serviciosDb.find(s => s.id === sel.id);
+          const sDb = serviciosDb.find((s: any) => s.id === sel.id);
           if (!sDb) {
             throw new Error(`El servicio seleccionado no existe o no está disponible`);
           }
@@ -378,7 +378,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         // Preservar duplicados usando el array original
         serviciosParaActualizar = finalServicioIds.map((sid: string) => {
-          const sDb = serviciosDb.find(s => s.id === sid);
+          const sDb = serviciosDb.find((s: any) => s.id === sid);
           if (!sDb) {
             throw new Error(`El servicio con ID ${sid} no fue encontrado`);
           }
