@@ -25,6 +25,13 @@ function getJwtSecret(): string {
 }
 
 function getJwtRefreshSecret(): string {
+  if (process.env.JWT_REFRESH_SECRET) {
+    return process.env.JWT_REFRESH_SECRET;
+  }
+  const mainSecret = process.env.JWT_SECRET;
+  if (mainSecret) {
+    return `${mainSecret}_refresh`;
+  }
   return getRequiredSecret('JWT_REFRESH_SECRET', 'dev-only-secret-refresh-change-me-in-production');
 }
 
