@@ -142,15 +142,10 @@ export async function calcularDisponibilidad(
   if (!empleado) throw new Error('Empleado no encontrado');
 
   let duracionServicio = 30;
-  if (duracionTotal !== undefined && duracionTotal !== null) {
-    duracionServicio = duracionTotal;
-  } else if (servicioId) {
-    const servicio = await prisma.servicio.findUnique({ where: { id: servicioId } });
-    if (servicio) duracionServicio = servicio.duracion;
-  }
-
-  if (empleado.vacaciones.length > 0) {
-    return { disponible: false, motivo: 'De vacaciones', bloques: [], jornada: null, intervalosOcupados: [], turnosEmpleado: undefined };
+    if (empleado.vacaciones.length > 0) {
+    if (!permitirHorarioExtendido) {
+      return { disponible: false, motivo: 'De vacaciones', bloques: [], jornada: null, intervalosOcupados: [], turnosEmpleado: undefined };
+    }
   }
 
   const diaIndex = fechaDate.getUTCDay();
@@ -204,7 +199,20 @@ export async function calcularDisponibilidad(
   // ─── Calcular jornada dinámica ──────────────────────────────────────────
   let jornada: { inicio: string; fin: string; activo: boolean };
 
-  if (tieneTurnosIndividuales && turnosEmpleadoDia!.length > 0) {
+  if (permitirHorarioExtendido) {
+    // Si se permite horario extendido, usar jornada amplia por defecto (5:00 a 23:00) si fuera de jornada habitual
+    const inicioTemplrano = (tieneTurnosIndividuales && turnosEmpleadoDia!.length > 0)
+      ? Math.min(...turnosEmpleadoDia!.map(t => timeToMinutes(t.inicio)), 5 * 60)
+      : 5 * 60;
+    const finTarde = (tieneTurnosIndividuales && turnosEmpleadoDia!.length > 0)
+      ? Math.max(...turnosEmpleadoDia!.map(t => timeToMinutes(t.fin)), 23 * 60)
+      : 23 * 60;
+    jornada = {
+      inicio: minutesToTime(inicioTemplrano),
+      fin: minutesToTime(finTarde),
+      activo: true
+    };
+  } else if (tieneTurnosIndividuales && turnosEmpleadoDia!.length > 0) {
     // Jornada basada en turnos individuales del empleado
     const inicioMasTemplrano = Math.min(...turnosEmpleadoDia!.map(t => timeToMinutes(t.inicio)));
     const finMasTarde = Math.max(...turnosEmpleadoDia!.map(t => timeToMinutes(t.fin)));

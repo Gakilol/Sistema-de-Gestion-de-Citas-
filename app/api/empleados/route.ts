@@ -86,13 +86,7 @@ export async function POST(req: NextRequest) {
     }
     const { nombre, correo, telefono, password, especialidad, tituloCliente, horario, rol } = parseResult.data;
 
-    // TECH_SUPPORT no puede crear usuarios con rol ADMIN
-    if (userRole === 'TECH_SUPPORT' && rol === 'ADMIN') {
-      return NextResponse.json(
-        { error: 'El soporte técnico no puede crear usuarios con rol de Administrador.' },
-        { status: 403 }
-      );
-    }
+    // TECH_SUPPORT y ADMIN pueden crear usuarios con cualquier rol
 
     const existe = await prisma.empleado.findUnique({ where: { correo } });
     if (existe) {

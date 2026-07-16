@@ -942,7 +942,7 @@ export function AgendaCalendario({
       originalDayStr: dayStr,
       originalEmpleadoId: empleadoId,
       originalStartMin: startMin,
-      originalEndMin: Math.min((HORA_FIN + 1) * 60, startMin + 60),
+      originalEndMin: Math.min((HORA_FIN + 1) * 60, startMin + 30),
       startMinutes: startMin,
       grabOffsetY: 0,
       pointerId: e.pointerId,
@@ -971,7 +971,7 @@ export function AgendaCalendario({
 
         try { colEl.setPointerCapture(e.pointerId); } catch {}
 
-        const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 60);
+        const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 30);
         const isOverlap = checkOverlap(citasPorDia[dayStr] || [], empleadoId, startMin, endMin);
         setProvisionalSlot({
           dayStr,
@@ -1087,9 +1087,9 @@ export function AgendaCalendario({
 
     if (pDrag.dayStr !== dayStr || pDrag.empleadoId !== empleadoId) return;
 
-    // Caso A: Clic simple o Tap rápido en espacio vacío -> slot por defecto de 60 min
+    // Caso A: Clic simple o Tap rápido en espacio vacío -> slot por defecto de 30 min
     if (isPendingTouchTap || isPendingMouseClick || (!wasDragged && !wasActive)) {
-      const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 60);
+      const endMin = Math.min((HORA_FIN + 1) * 60, startMin + 30);
       const isOverlap = checkOverlap(citasPorDia[dayStr] || [], empleadoId, startMin, endMin);
 
       setProvisionalSlot({
@@ -1385,7 +1385,6 @@ export function AgendaCalendario({
     citaEmpleadoId: string,
   ) => {
     if ((e.target as HTMLElement).closest('.resize-handle')) return;
-    if (!canMoveCita(cita)) return;
     if (!isStateIdleOr('moving-appointment')) return;
 
     e.stopPropagation();
@@ -1397,6 +1396,7 @@ export function AgendaCalendario({
     const grabOffsetY = e.clientY - rect.top;
 
     const startMin = timeToMinutes(cita.hora);
+    const isEditable = canMoveCita(cita);
 
     moveRef.current = {
       active: false,
@@ -1417,37 +1417,39 @@ export function AgendaCalendario({
       pending: true,
     };
 
-    if (e.pointerType === 'mouse') {
-      citaMousePendingRef.current = true;
-      try { card.setPointerCapture(e.pointerId); } catch {}
-    } else {
-      // Touch: long-press para activar movimiento
-      citaLongPressTimerRef.current = setTimeout(() => {
-        if (!moveRef.current.pending || moveRef.current.citaId !== cita.id) return;
-        moveRef.current.active = true;
-        moveRef.current.pending = false;
-
-        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-          try { navigator.vibrate([20, 40]); } catch {}
-        }
-
+    if (isEditable) {
+      if (e.pointerType === 'mouse') {
+        citaMousePendingRef.current = true;
         try { card.setPointerCapture(e.pointerId); } catch {}
+      } else {
+        // Touch: long-press para activar movimiento
+        citaLongPressTimerRef.current = setTimeout(() => {
+          if (!moveRef.current.pending || moveRef.current.citaId !== cita.id) return;
+          moveRef.current.active = true;
+          moveRef.current.pending = false;
 
-        // Mostrar ghost inmediatamente
-        const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
-        const duration = cita.duracion || 30;
-        const topPx = minutesToY(startMin, hourHeight);
-        const heightPx = Math.max(MIN_HEIGHT, duration * (hourHeight / 60));
-        setMoveGhost({
-          topPx, heightPx,
-          dayStr: citaDayStr,
-          empleadoId: citaEmpleadoId,
-          startLabel: minutesToLabel(startMin),
-          endLabel: minutesToLabel(startMin + duration),
-          isOverlap: false,
-          catColor,
-        });
-      }, CITA_MOVE_LONG_PRESS_MS);
+          if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+            try { navigator.vibrate([20, 40]); } catch {}
+          }
+
+          try { card.setPointerCapture(e.pointerId); } catch {}
+
+          // Mostrar ghost inmediatamente
+          const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
+          const duration = cita.duracion || 30;
+          const topPx = minutesToY(startMin, hourHeight);
+          const heightPx = Math.max(MIN_HEIGHT, duration * (hourHeight / 60));
+          setMoveGhost({
+            topPx, heightPx,
+            dayStr: citaDayStr,
+            empleadoId: citaEmpleadoId,
+            startLabel: minutesToLabel(startMin),
+            endLabel: minutesToLabel(startMin + duration),
+            isOverlap: false,
+            catColor,
+          });
+        }, CITA_MOVE_LONG_PRESS_MS);
+      }
     }
   }, [canMoveCita]);
 

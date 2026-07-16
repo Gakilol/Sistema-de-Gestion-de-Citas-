@@ -112,13 +112,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // Caso 3: TECH_SUPPORT no puede cambiar roles a ADMIN (solo ADMIN puede hacer eso)
-    if (userRole === 'TECH_SUPPORT' && body.rol === 'ADMIN') {
-      return NextResponse.json(
-        { error: 'El soporte técnico no puede asignar el rol de Administrador.' },
-        { status: 403 }
-      );
-    }
 
     const dataToUpdate: any = {};
     if (body.nombre) dataToUpdate.nombre = body.nombre;
@@ -217,13 +210,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       }
     }
 
-    // TECH_SUPPORT no puede eliminar usuarios ADMIN
-    if (userRole === 'TECH_SUPPORT' && empleado.rol === 'ADMIN') {
-      return NextResponse.json(
-        { error: 'El soporte técnico no puede eliminar administradores.' },
-        { status: 403 }
-      );
-    }
 
     // 1. Eliminar citas asociadas (ya sean asignadas al empleado o creadas por él)
     await prisma.cita.deleteMany({

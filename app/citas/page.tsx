@@ -296,6 +296,12 @@ function CitasContent() {
     setClientesList(cD.clientes || []);
   };
 
+  useEffect(() => {
+    if (user?.rol === 'TECH_SUPPORT') {
+      setScope('all');
+    }
+  }, [user]);
+
   // Carga reactiva de citas en base al scope y filtro de empleado
   useEffect(() => {
     fetchCitas(scope, filtroEmpleado);
@@ -778,39 +784,39 @@ function CitasContent() {
             </Button>
           </div>
 
-          {/* Barra de Vista e Integración de Scope */}
-          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 border-b border-border/30 pb-2 sm:pb-3 w-full">
+          {/* Barra de Vista e Integración de Scope (Fila Única en Móvil y Escritorio) */}
+          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 border-b border-border/30 pb-2 sm:pb-3 w-full flex-nowrap overflow-x-auto no-scrollbar">
             {/* Selector de Pestaña Principal (Modo) */}
             <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shrink-0">
               <button
                 type="button"
                 onClick={() => setVistaModo('lista')}
                 className={cn(
-                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px]",
                   vistaModo === 'lista'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
-                <ListIcon className="w-3.5 h-3.5 shrink-0" /> <span>Lista</span>
+                <ListIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> <span>Lista</span>
               </button>
               <button
                 type="button"
                 onClick={() => setVistaModo('agenda')}
                 className={cn(
-                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px]",
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px]",
                   vistaModo === 'agenda'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
-                <CalendarIcon className="w-3.5 h-3.5 shrink-0" /> <span>Agenda</span>
+                <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> <span>Agenda</span>
               </button>
             </div>
 
             {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
             {canSeeAll && (
-              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shadow-inner shrink-0">
+              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shadow-inner shrink-0 ml-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -818,7 +824,7 @@ function CitasContent() {
                     setFiltroEmpleado('');
                   }}
                   className={cn(
-                    "px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px] whitespace-nowrap",
+                    "px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px] whitespace-nowrap",
                     scope === 'mine'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -830,7 +836,7 @@ function CitasContent() {
                   type="button"
                   onClick={() => setScope('all')}
                   className={cn(
-                    "px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[34px] whitespace-nowrap",
+                    "px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px] whitespace-nowrap",
                     scope === 'all'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"

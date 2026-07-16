@@ -71,15 +71,15 @@ export function getScopedAppointmentWhere(
     return { empleado_id: userId };
   }
 
-  // ADMIN and TECH_SUPPORT
-  if (scope === 'all') {
+  // TECH_SUPPORT y consultas con scope='all'
+  if (role === 'TECH_SUPPORT' || scope === 'all') {
     if (filterEmpleadoId && filterEmpleadoId !== '') {
       return { empleado_id: filterEmpleadoId };
     }
     return {};
   }
 
-  // Default scope is 'mine'
+  // Default scope for ADMIN is 'mine'
   return { empleado_id: userId };
 }
 
