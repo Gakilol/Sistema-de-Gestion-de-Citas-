@@ -1361,6 +1361,7 @@ function CitasContent() {
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
                 isLoading={isLoading}
+                isModalOpen={showModal}
               />
             </div>
           )}

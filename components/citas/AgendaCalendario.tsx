@@ -54,6 +54,7 @@ interface AgendaCalendarioProps {
   selectedDateStr: string;
   setSelectedDateStr: (date: string) => void;
   isLoading?: boolean;
+  isModalOpen?: boolean;
 }
 
 const DIAS_SEMANA_ABR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -171,6 +172,7 @@ export function AgendaCalendario({
   selectedDateStr,
   setSelectedDateStr,
   isLoading = false,
+  isModalOpen,
 }: AgendaCalendarioProps) {
   const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('dia');
   const [hoveredSlot, setHoveredSlot] = useState<{ dayStr: string; empleadoId: string; top: number; timeLabel: string } | null>(null);
@@ -660,11 +662,71 @@ export function AgendaCalendario({
     }
   }, [stopAutoScroll]);
 
-  /** Cancela y elimina por completo el bloque provisional */
+  /** Cancela y elimina por completo el bloque provisional de forma atómica */
   const clearProvisionalSlot = useCallback(() => {
-    cancelDrag();
+    stopAutoScroll();
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressPendingRef.current = false;
+    mousePendingRef.current = false;
+
+    const pDrag = provisionalDragRef.current;
+    if (pDrag.targetCol && pDrag.pointerId >= 0) {
+      try { pDrag.targetCol.releasePointerCapture(pDrag.pointerId); } catch {}
+    }
+    provisionalDragRef.current = {
+      active: false,
+      mode: 'create',
+      dayStr: '',
+      empleadoId: '',
+      originalDayStr: '',
+      originalEmpleadoId: '',
+      originalStartMin: 0,
+      originalEndMin: 0,
+      startMinutes: 0,
+      grabOffsetY: 0,
+      pointerId: -1,
+      startX: 0,
+      startY: 0,
+      pointerType: '',
+      targetCol: null,
+      pending: false,
+      wasDragged: false,
+    };
+    setHoveredSlot(null);
     setProvisionalSlot(null);
-  }, [cancelDrag]);
+    if (
+      interactionStateRef.current === 'selecting' ||
+      interactionStateRef.current === 'moving-selection' ||
+      interactionStateRef.current === 'resizing-start' ||
+      interactionStateRef.current === 'resizing-end'
+    ) {
+      interactionStateRef.current = 'idle';
+    }
+  }, [stopAutoScroll]);
+
+  // ─── Efectos de Limpieza Automática de Selección Provisional ─────────────────
+
+  // 1. Limpiar cuando el modal de citas se cierra (por Cancelar, X, Escape, click fuera o Guardado exitoso)
+  useEffect(() => {
+    if (isModalOpen === false) {
+      clearProvisionalSlot();
+    }
+  }, [isModalOpen, clearProvisionalSlot]);
+
+  // 2. Limpiar cuando cambia la fecha, vista, filtro de empleado, scope o empleado móvil
+  useEffect(() => {
+    clearProvisionalSlot();
+  }, [selectedDateStr, vista, filtroEmpleado, scope, activeMobileEmpId, clearProvisionalSlot]);
+
+  // 3. Limpiar al desmontarse el componente
+  useEffect(() => {
+    return () => {
+      clearProvisionalSlot();
+    };
+  }, [clearProvisionalSlot]);
 
   /** Confirmación explícita: abre el formulario con la selección provisional configurada */
   const handleConfirmProvisional = useCallback(() => {
