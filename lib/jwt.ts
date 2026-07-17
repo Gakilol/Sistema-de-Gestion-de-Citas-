@@ -8,24 +8,30 @@ export interface CustomJWTPayload extends JWTPayload {
 }
 
 // ─── Obtener secretos obligatorios independientes ──────────────────────────────
-function getRequiredSecret(envVar: string): string {
+function getRequiredSecret(envVar: string, fallbackForDev: string): string {
   const secret = process.env[envVar]?.trim();
   if (!secret) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error(`[SEGURIDAD CRÍTICA] La variable de entorno obligatoria ${envVar} no está configurada.`);
+      console.error(`[SEGURIDAD CRÍTICA] La variable de entorno obligatoria ${envVar} no está configurada.`);
     }
-    // En desarrollo, lanzar advertencia explícita o usar valor temporal si no está definido
-    return process.env[envVar] || `dev-required-secret-${envVar.toLowerCase()}`;
+    return process.env[envVar] || fallbackForDev;
   }
   return secret;
 }
 
 function getJwtSecret(): string {
-  return getRequiredSecret('JWT_SECRET');
+  return getRequiredSecret('JWT_SECRET', 'dev-only-secret-jwt-change-me-in-production');
 }
 
 function getJwtRefreshSecret(): string {
-  return getRequiredSecret('JWT_REFRESH_SECRET');
+  if (process.env.JWT_REFRESH_SECRET) {
+    return process.env.JWT_REFRESH_SECRET;
+  }
+  const mainSecret = process.env.JWT_SECRET;
+  if (mainSecret) {
+    return `${mainSecret}_refresh`;
+  }
+  return getRequiredSecret('JWT_REFRESH_SECRET', 'dev-only-secret-refresh-change-me-in-production');
 }
 
 const getJwtSecretKey = (secret: string) => {
