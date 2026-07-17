@@ -120,7 +120,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       `Fecha: ${fechaLegible}`,
       `Hora: ${horaInicio12h}`,
       `Servicio: ${serviciosTexto || 'Servicio general'}`,
-      `Atendido por: ${profesional}`,
       ``,
       `Guarda tu cita en Google Calendar:`,
       publicUrl,
@@ -137,7 +136,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       `Fecha: ${fechaLegible}`,
       `Hora: ${horaInicio12h}`,
       `Servicio: ${serviciosTexto || 'Servicio general'}`,
-      `Atendido por: ${profesional}`,
       ``,
       `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
     ].join('\n');
