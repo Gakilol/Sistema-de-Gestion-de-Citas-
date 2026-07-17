@@ -60,6 +60,19 @@ export function getBusinessTodayString(): string {
 }
 
 /**
+ * Retorna la fecha de mañana en la zona horaria del negocio en formato 'YYYY-MM-DD'.
+ */
+export function getBusinessTomorrowString(): string {
+  const todayStr = getBusinessTodayString();
+  const [year, month, day] = todayStr.split('-').map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
+  const ry = tomorrow.getUTCFullYear();
+  const rm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+  const rd = String(tomorrow.getUTCDate()).padStart(2, '0');
+  return `${ry}-${rm}-${rd}`;
+}
+
+/**
  * Retorna la hora actual en la zona horaria del negocio en formato de 24 horas 'HH:MM'.
  */
 export function getBusinessNowTime(): string {

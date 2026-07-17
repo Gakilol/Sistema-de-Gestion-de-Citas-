@@ -43,9 +43,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
-            <AuthProvider>
-              {children}
-            </AuthProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
           <Toaster
             position="top-right"
             richColors

@@ -84,7 +84,7 @@ export async function syncCitaEstados(): Promise<void> {
       }
 
       if (targetEstado !== cita.estado) {
-        console.log(`[AUTOMATIZACIÓN] ${cita.id} "${cita.cliente_nombre}" ${fechaStr} ${cita.hora}: ${cita.estado} → ${targetEstado}`);
+        console.log(`[AUTOMATIZACIÓN] Cita ${cita.id} (${fechaStr} ${cita.hora}): ${cita.estado} → ${targetEstado}`);
         const updateData: any = { estado: targetEstado };
         // Set tracking timestamps for analytics
         if (targetEstado === EstadoCita.COMPLETADA && !cita.completed_at) {

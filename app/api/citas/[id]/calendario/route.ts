@@ -102,30 +102,59 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const profesional = cita.empleado.nombre;
 
-    // Construir mensaje de WhatsApp según especificación exacta
-    const mensaje = [
-      `Hola ${cita.cliente_nombre},`,
+    // Obtener servicios
+    let serviciosTexto = '';
+    if (cita.citaServicios && cita.citaServicios.length > 0) {
+      serviciosTexto = cita.citaServicios.map((cs: any) => cs.servicio?.nombre).filter(Boolean).join(', ');
+    } else if (cita.servicio?.nombre) {
+      serviciosTexto = cita.servicio.nombre;
+    }
+
+    // 1. Mensaje de Confirmación (con enlace para guardar en Google Calendar)
+    const mensajeConfirmacion = [
+      `HAIR STYLE Salon & Barber`,
       ``,
-      `Le compartimos los detalles de su cita en HAIR STYLE Salon & Barber.`,
+      `Hola ${cita.cliente_nombre},`,
+      `Su cita ha sido confirmada con éxito.`,
       ``,
       `Fecha: ${fechaLegible}`,
       `Hora: ${horaInicio12h}`,
+      `Servicio: ${serviciosTexto || 'Servicio general'}`,
+      `Atendido por: ${profesional}`,
       ``,
-      `Puede agregar la cita a su calendario desde el siguiente vínculo:`,
-      ``,
+      `Guarda tu cita en Google Calendar:`,
       publicUrl,
       ``,
-      `Le agradecemos presentarse 5 minutos antes de su cita.`,
+      `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
     ].join('\n');
 
-    // Construir enlace wa.me
-    const waUrl = `https://wa.me/${telefonoNormalizado}?text=${encodeURIComponent(mensaje)}`;
+    // 2. Mensaje de Recordatorio
+    const mensajeRecordatorio = [
+      `HAIR STYLE Salon & Barber`,
+      ``,
+      `Hola ${cita.cliente_nombre}, le recordamos su próxima cita:`,
+      ``,
+      `Fecha: ${fechaLegible}`,
+      `Hora: ${horaInicio12h}`,
+      `Servicio: ${serviciosTexto || 'Servicio general'}`,
+      `Atendido por: ${profesional}`,
+      ``,
+      `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
+    ].join('\n');
+
+    // Construir enlaces wa.me
+    const waUrlConfirmacion = `https://wa.me/${telefonoNormalizado}?text=${encodeURIComponent(mensajeConfirmacion)}`;
+    const waUrlRecordatorio = `https://wa.me/${telefonoNormalizado}?text=${encodeURIComponent(mensajeRecordatorio)}`;
 
     return NextResponse.json({
       token,
       url: publicUrl,
-      mensaje,
-      waUrl,
+      mensaje: mensajeConfirmacion,
+      mensajeConfirmacion,
+      mensajeRecordatorio,
+      waUrl: waUrlConfirmacion,
+      waUrlConfirmacion,
+      waUrlRecordatorio,
       clienteNombre: cita.cliente_nombre,
       profesional,
       fecha: fechaLegible,

@@ -54,3 +54,20 @@ dump.rdb
 
 # TypeScript
 *.tsbuildinfo
+
+# Agent skills and local AI instructions
+.agents/
+.agent/
+**/.agents/
+**/.agent/
+skills-lock.json
+
+
+# Local Markdown documentation
+*.md
+**/*.md
+
+# Test artifacts
+playwright-report/
+test-results/
+*.trace.zip

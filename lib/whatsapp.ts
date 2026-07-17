@@ -29,17 +29,17 @@ function fmtFecha(d: string | Date): string {
 //// ─── Confirmación de cita ───────────────────────────────────────────────────
 export function mensajeConfirmacion(cita: CitaWA): string {
   const lines = [
-    `*${SALON_NAME}*`,
+    `${SALON_NAME}`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Su cita ha sido *confirmada*. Aqui estan los detalles:`,
+    `Su cita ha sido confirmada con éxito. Aquí están los detalles:`,
     ``,
-    `*Fecha:* ${fmtFecha(cita.fecha)}`,
-    `*Hora:* ${formatTo12h(cita.hora)}`,
-    cita.duracion ? `*Duracion:* ${cita.duracion} minutos` : null,
-    cita.notas ? `*Notas:* ${cita.notas}` : null,
+    `Fecha: ${fmtFecha(cita.fecha)}`,
+    `Hora: ${formatTo12h(cita.hora)}`,
+    cita.duracion ? `Duracion: ${cita.duracion} minutos` : null,
+    cita.notas ? `Notas: ${cita.notas}` : null,
     ``,
-    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ];
   return lines.filter((l) => l !== null).join('\n');
 }
@@ -47,15 +47,14 @@ export function mensajeConfirmacion(cita: CitaWA): string {
 // ─── Recordatorio ───────────────────────────────────────────────────────────
 export function mensajeRecordatorio(cita: CitaWA): string {
   const lines = [
-    `HAIR STYLE Salon & Barber`,
+    `${SALON_NAME}`,
     ``,
-    `Hola ${cita.cliente_nombre}, Recordarle su cita. `,
-    `Aqui estan los detalles:`,
+    `Hola ${cita.cliente_nombre}, le recordamos su cita:`,
+    ``,
     `Fecha: ${fmtFecha(cita.fecha)}`,
     `Hora: ${formatTo12h(cita.hora)}`,
     ``,
-    `Le agradecemos presentarse 5 minutos`,
-    ` antes de su cita para una mejor atenció`
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ];
 
   return lines.filter(line => line !== null).join('\n');
@@ -64,14 +63,14 @@ export function mensajeRecordatorio(cita: CitaWA): string {
 // ─── Recordatorio 1 Hora Antes ───────────────────────────────────────────────
 export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
   const lines = [
-    `*${SALON_NAME}* ⏱️`,
+    `${SALON_NAME}`,
     ``,
-    `Hola *${cita.cliente_nombre}*,`,
-    `Le recordamos que su cita está programada para *hoy*:`,
+    `Hola ${cita.cliente_nombre},`,
+    `Le recordamos que su cita está programada para hoy:`,
     ``,
-    `*Hora:* ${formatTo12h(cita.hora)}`,
+    `Hora: ${formatTo12h(cita.hora)}`,
     ``,
-    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ];
   return lines.filter(Boolean).join('\n');
 }
@@ -79,12 +78,12 @@ export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
 // ─── Cancelación ────────────────────────────────────────────────────────────
 export function mensajeCancelacion(cita: CitaWA): string {
   return [
-    `*${SALON_NAME}*`,
+    `${SALON_NAME}`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Su cita del *${fmtFecha(cita.fecha)}* a las *${formatTo12h(cita.hora)}* ha sido cancelada.`,
+    `Su cita del ${fmtFecha(cita.fecha)} a las ${formatTo12h(cita.hora)} ha sido cancelada.`,
     ``,
-    `Si desea reagendar, no duda en contactarnos.`,
+    `Si desea reagendar, no dude en contactarnos.`,
     `Hasta pronto.`,
   ].join('\n');
 }
@@ -92,15 +91,15 @@ export function mensajeCancelacion(cita: CitaWA): string {
 // ─── Reprogramación ─────────────────────────────────────────────────────────
 export function mensajeReprogramacion(cita: CitaWA): string {
   return [
-    `*${SALON_NAME}*`,
+    `${SALON_NAME}`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Su cita ha sido *reprogramada*:`,
+    `Su cita ha sido reprogramada:`,
     ``,
-    `*Nueva fecha:* ${fmtFecha(cita.fecha)}`,
-    `*Nueva hora:* ${formatTo12h(cita.hora)}`,
+    `Nueva fecha: ${fmtFecha(cita.fecha)}`,
+    `Nueva hora: ${formatTo12h(cita.hora)}`,
     ``,
-    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención`,
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ].join('\n');
 }
 

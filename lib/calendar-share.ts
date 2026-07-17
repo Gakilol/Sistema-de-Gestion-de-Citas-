@@ -63,12 +63,12 @@ export function buildSharePayload(cita: CalendarEventShareData) {
   const textoServicios = servicios.length > 0 ? servicios.join(', ') : 'Servicio general';
 
   const mensajeBase =
-    `✨ *Recordatorio de Cita en HAIR STYLE Salon & Barber* ✨\n\n` +
-    `👤 *Cliente:* ${cita.cliente_nombre}\n` +
-    `📅 *Fecha:* ${fechaLegible}\n` +
-    `⏰ *Horario:* ${textoHorario}\n` +
-    `✂️ *Servicio(s):* ${textoServicios}\n\n` +
-    `¡Te esperamos puntual! Si deseas cancelar o reprogramar, por favor avísanos con anticipación.`;
+    `Recordatorio de Cita en HAIR STYLE Salon & Barber\n\n` +
+    `Cliente: ${cita.cliente_nombre}\n` +
+    `Fecha: ${fechaLegible}\n` +
+    `Horario: ${textoHorario}\n` +
+    `Servicio(s): ${textoServicios}\n\n` +
+    `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`;
 
   return {
     fechaLegible,

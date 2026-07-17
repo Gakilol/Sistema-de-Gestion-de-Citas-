@@ -28,6 +28,7 @@ import {
   checkOverlap,
   isCitaEditable,
 } from '@/lib/calendar-drag-utils';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 
 interface AgendaCalendarioProps {
   citas: any[];
@@ -263,6 +264,44 @@ export function AgendaCalendario({
       } catch {}
     }
   }, []);
+
+  // Notificaciones de escritorio y audio nativo
+  const { requestPermission } = useBrowserNotifications(citas);
+
+  // Solicitar permiso de notificaciones al montar la pantalla
+  useEffect(() => {
+    requestPermission();
+  }, [requestPermission]);
+
+  // Atajos de teclado rápidos (N = Nueva cita, Ctrl+K = Buscar)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si se está escribiendo en un input, textarea o contenido editable
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[type="search"], input[placeholder*="Buscar"], input[placeholder*="buscar"]') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+        }
+      } else if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        onSlotClick({
+          date: selectedDateStr,
+          time: '09:00',
+          empleadoId: filtroEmpleado === 'TODOS' ? (empleados[0]?.id || '') : filtroEmpleado,
+          durationMinutes: 30,
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onSlotClick, selectedDateStr, filtroEmpleado, empleados]);
 
   // Ref de estado de interacción del bloque PROVISIONAL (creación / movimiento / resize)
   const provisionalDragRef = useRef<ProvisionalDragRef>({

@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { prisma } from '@/lib/db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-jwt-change-me-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || '';
 
 
 export async function GET(req: NextRequest) {

@@ -93,21 +93,24 @@ export function CitaResumenModal({ cita, user, onClose, onEdit }: CitaResumenMod
     servicios = [cita.servicio.nombre];
   }
 
-  // ─── Enviar al calendario ──────────────────────────────────────────────────
-  const handleEnviarCalendario = async () => {
+  // ─── Enviar por WhatsApp ───────────────────────────────────────────────────
+  const handleEnviarWhatsApp = async (tipo: 'confirmacion' | 'recordatorio') => {
     setEnviando(true);
     try {
       const res = await fetch(`/api/citas/${cita.id}/calendario`);
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Error al generar enlace de calendario');
+        toast.error(data.error || 'Error al generar enlace');
         return;
       }
 
-      // Abrir WhatsApp con el mensaje
-      if (data.waUrl) {
-        window.open(data.waUrl, '_blank', 'noopener,noreferrer');
+      const targetUrl = tipo === 'confirmacion' 
+        ? (data.waUrlConfirmacion || data.waUrl) 
+        : (data.waUrlRecordatorio || data.waUrl);
+
+      if (targetUrl) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
       }
     } catch (err: any) {
       toast.error('Error al conectar con el servidor');
@@ -250,18 +253,35 @@ export function CitaResumenModal({ cita, user, onClose, onEdit }: CitaResumenMod
             <div className="space-y-2">
               {cita.cliente_telefono ? (
                 <>
-                  <Button
-                    onClick={handleEnviarCalendario}
-                    disabled={enviando}
-                    className="w-full gap-2 h-11 text-sm font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white border-0 shadow-lg shadow-[#25D366]/20 active:scale-[0.99] transition-transform"
-                  >
-                    {enviando ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <MessageCircle className="w-4 h-4" />
-                    )}
-                    Enviar al calendario
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => handleEnviarWhatsApp('confirmacion')}
+                      disabled={enviando}
+                      className="w-full gap-1.5 h-11 text-xs font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white border-0 shadow-lg shadow-[#25D366]/20 active:scale-[0.99] transition-transform"
+                    >
+                      {enviando ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      )}
+                      Enviar a cliente
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleEnviarWhatsApp('recordatorio')}
+                      disabled={enviando}
+                      className="w-full gap-1.5 h-11 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg active:scale-[0.99] transition-transform"
+                    >
+                      {enviando ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Clock className="w-3.5 h-3.5" />
+                      )}
+                      Enviar recordatorio
+                    </Button>
+                  </div>
+
                   <Button
                     variant="outline"
                     onClick={handleCopiarMensaje}

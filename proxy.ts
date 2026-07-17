@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// ─── Uso de fallback si la variable no está (para facilitar pruebas) ──────────
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-jwt-change-me-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || '';
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;
   const path = req.nextUrl.pathname;
 

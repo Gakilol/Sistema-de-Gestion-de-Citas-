@@ -99,7 +99,7 @@ export function CitaDetalleBottomSheet({
   const { fechaLegible, textoHorario, servicios, profesional, mensajeBase } = buildSharePayload(cita);
 
   // Acción de Enviar por WhatsApp / Compartir
-  const handleEnviarWhatsApp = async () => {
+  const handleEnviarWhatsApp = async (tipo: 'confirmacion' | 'recordatorio') => {
     if (!cita?.id) return;
     if (!cita?.cliente_telefono?.trim()) {
       toast.error('Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.');
@@ -111,14 +111,17 @@ export function CitaDetalleBottomSheet({
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Este cliente fue agendado solamente con nombre y no tiene teléfono registrado.');
+        toast.error(data.error || 'No se pudo obtener la información de la cita');
         return;
       }
 
-      if (data.waUrl) {
-        window.open(data.waUrl, '_blank', 'noopener,noreferrer');
+      const targetUrl = tipo === 'confirmacion' 
+        ? (data.waUrlConfirmacion || data.waUrl) 
+        : (data.waUrlRecordatorio || data.waUrl);
+
+      if (targetUrl) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
       } else {
-        // Fallback a URL de WhatsApp estándar si la API no devuelve una específica
         const encodedMsg = encodeURIComponent(mensajeBase);
         const telClean = cita.cliente_telefono?.replace(/\D/g, '') || '';
         const waUrl = telClean ? `https://wa.me/${telClean}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
@@ -270,20 +273,32 @@ export function CitaDetalleBottomSheet({
           <DrawerFooter className="p-4 border-t border-border/40 bg-background/95 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2">
             {canSendCalendar && (
               cita.cliente_telefono ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={handleEnviarWhatsApp}
-                    disabled={enviando || isOffline}
-                    className="h-11 text-xs font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white shadow-md active:scale-[0.98] gap-1.5"
-                  >
-                    {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-                    Enviar a cliente
-                  </Button>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => handleEnviarWhatsApp('confirmacion')}
+                      disabled={enviando || isOffline}
+                      className="h-11 text-xs font-bold bg-[#25D366] hover:bg-[#1ebe5a] text-white shadow-md active:scale-[0.98] gap-1.5"
+                    >
+                      {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
+                      Enviar a cliente
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleEnviarWhatsApp('recordatorio')}
+                      disabled={enviando || isOffline}
+                      className="h-11 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-[0.98] gap-1.5"
+                    >
+                      {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+                      Enviar recordatorio
+                    </Button>
+                  </div>
 
                   <Button
                     variant="outline"
                     onClick={handleCopiarMensaje}
-                    className="h-11 text-xs font-semibold active:scale-[0.98] gap-1.5 border-border/50"
+                    className="w-full h-10 text-xs font-semibold active:scale-[0.98] gap-1.5 border-border/50"
                   >
                     {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     {copiado ? 'Copiado' : 'Copiar info'}

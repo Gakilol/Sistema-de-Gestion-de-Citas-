@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const REMEMBER_DEVICE_SECRET = process.env.REMEMBER_DEVICE_SECRET || process.env.JWT_SECRET || 'fallback-dev-only-secret-remember-device';
+const REMEMBER_DEVICE_SECRET = process.env.REMEMBER_DEVICE_SECRET || process.env.JWT_SECRET || '';
 
 export const REMEMBER_COOKIE_NAME = 'remember_token';
 export const REMEMBER_COOKIE_MAX_AGE = 60 * 24 * 60 * 60; // 60 días en segundos

@@ -1366,8 +1366,6 @@ function CitasContent() {
             </div>
           )}
 
-
-
         </div>
       </main>
 

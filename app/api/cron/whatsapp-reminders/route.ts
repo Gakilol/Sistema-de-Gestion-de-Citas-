@@ -149,10 +149,12 @@ async function handleCron(req: NextRequest) {
           console.error(`[CRON] Fallo de red al enviar recordatorio para Cita ${cita.id}:`, fetchErr);
         }
       } else {
-        // Modo simulación en consola
-        console.log(`\n--- [SIMULACIÓN WHATSAPP ENVIADO (Cita a iniciar en ${Math.round(diffMinutes)} min)] ---`);
-        console.log(`Para: ${cita.cliente_telefono || 'Sin teléfono'}`);
-        console.log(`Contenido:\n${mensaje}`);
+        // Modo simulación en consola (sin exponer PII completa en logs)
+        const maskedPhone = cita.cliente_telefono
+          ? `${cita.cliente_telefono.slice(0, 3)}••••${cita.cliente_telefono.slice(-2)}`
+          : 'Sin teléfono';
+        console.log(`\n--- [SIMULACIÓN WHATSAPP ENVIADO (Cita id: ${cita.id}, inician en ${Math.round(diffMinutes)} min)] ---`);
+        console.log(`Para: ${maskedPhone}`);
         console.log('-------------------------------------------------------------------------\n');
       }
 
