@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db';
 import { verificarTokenCalendario } from '@/lib/calendar-token';
 import { formatDBDateLong } from '@/lib/timezone';
 import { formatTo12h } from '@/lib/utils';
+import { calcularFinCita } from '@/lib/calendar-event';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
@@ -64,12 +65,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       );
     }
 
-    // Calcular hora de fin
-    const [h, m] = cita.hora.split(':').map(Number);
-    const totalMin = h * 60 + m + cita.duracion;
-    const hFin = Math.floor(totalMin / 60);
-    const mFin = totalMin % 60;
-    const horaFin = `${String(hFin).padStart(2, '0')}:${String(mFin).padStart(2, '0')}`;
+    const fechaStr = cita.fecha.toISOString().split('T')[0];
+    const fin = calcularFinCita(fechaStr, cita.hora, cita.duracion);
 
     // Obtener servicios reales (solo si existen)
     let servicios: string[] = [];
@@ -96,7 +93,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     }
 
     // Formatear fecha
-    const fechaStr = cita.fecha.toISOString().split('T')[0];
     const fechaLegible = formatDBDateLong(cita.fecha);
 
     // Retornar SOLO datos públicos seguros
@@ -105,9 +101,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       fecha: fechaStr,
       fechaLegible,
       horaInicio: formatTo12h(cita.hora),
-      horaFin: formatTo12h(horaFin),
+      horaFin: formatTo12h(fin.hora),
       horaInicioRaw: cita.hora,
-      horaFinRaw: horaFin,
+      horaFinRaw: fin.hora,
       duracion: cita.duracion,
       profesional: cita.empleado?.nombre || '',
       servicios: servicios.length > 0 ? servicios : null,

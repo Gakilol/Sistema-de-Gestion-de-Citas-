@@ -2,7 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { registrarAuditoria } from '@/lib/auditoria';
-import { getUserContext, maskClientDataIfRestricted } from '@/lib/auth-helpers';
+import { getUserContext } from '@/lib/auth-helpers';
+import { buildClientResponse } from '@/lib/client-privacy';
 import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
 
 const CreateClienteSchema = z.object({
@@ -21,48 +22,35 @@ const CreateClienteSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
     const busqueda = req.nextUrl.searchParams.get('q') ?? '';
 
-    let whereClause: any = {};
-    if (busqueda) {
-      if (userRole === 'EMPLEADO') {
-        // Un empleado no debe poder buscar por teléfono o correo de clientes ajenos
-        whereClause = {
+    const searchWhere = busqueda
+      ? {
           OR: [
-            { nombre: { contains: busqueda, mode: 'insensitive' } },
-            {
-              AND: [
-                {
-                  OR: [
-                    { telefono: { contains: busqueda, mode: 'insensitive' } },
-                    { correo: { contains: busqueda, mode: 'insensitive' } },
-                  ]
-                },
-                {
-                  OR: [
-                    { createdByUserId: userId },
-                    { citas: { some: { empleado_id: userId ?? '' } } }
-                  ]
-                }
-              ]
-            }
-          ]
-        };
-      } else {
-        whereClause = {
-          OR: [
-            { nombre:  { contains: busqueda, mode: 'insensitive' } },
-            { telefono: { contains: busqueda, mode: 'insensitive' } },
-            { correo:  { contains: busqueda, mode: 'insensitive' } },
+            { nombre: { contains: busqueda, mode: 'insensitive' as const } },
+            { telefono: { contains: busqueda, mode: 'insensitive' as const } },
+            { correo: { contains: busqueda, mode: 'insensitive' as const } },
           ],
-        };
-      }
-    }
+        }
+      : {};
+    const employeeAccessWhere = {
+      OR: [
+        { createdByUserId: userId },
+        { citas: { some: { empleado_id: userId } } },
+      ],
+    };
+    const whereClause = userRole === 'EMPLEADO'
+      ? { AND: [employeeAccessWhere, searchWhere] }
+      : searchWhere;
 
     const clientesData = await prisma.cliente.findMany({
       where: whereClause,
       include: {
         citas: {
+          ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
           select: {
             id: true,
             fecha: true,
@@ -117,7 +105,7 @@ export async function GET(req: NextRequest) {
         historial: c.citas.slice(0, 10),
       };
 
-      return maskClientDataIfRestricted(rawCliente, userId, userRole);
+      return buildClientResponse(rawCliente, userRole);
     });
 
     clientes.sort((a: any, b: any) => b.totalCitas - a.totalCitas);

@@ -107,6 +107,7 @@ describe('Pruebas Unitarias - Sistema de Calendario y WhatsApp', () => {
         hora: '14:00',
         duracion: 30,
         profesional: 'Carlos Barbero',
+        zonaHoraria: 'America/Costa_Rica',
         servicios: ['Corte de Cabello', 'Barba'],
         ubicacion: 'San José, Costa Rica',
       });

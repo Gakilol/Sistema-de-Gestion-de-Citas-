@@ -160,7 +160,7 @@ export function CitaDetalleBottomSheet({
       <DrawerPortal>
         <DrawerOverlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs transition-opacity" />
 
-        <DrawerContent className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[85vh] flex-col rounded-t-3xl border-t border-border/40 bg-background/98 shadow-2xl backdrop-blur-md outline-none">
+        <DrawerContent className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[90dvh] min-h-0 flex-col rounded-t-3xl border-t border-border/40 bg-background/98 shadow-2xl backdrop-blur-md outline-none sm:max-h-[85vh]">
           {/* Indicador de Deslizar */}
           <div className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-muted-foreground/30" />
 
@@ -197,7 +197,7 @@ export function CitaDetalleBottomSheet({
               variant="ghost"
               size="icon"
               onClick={() => onOpenChange(false)}
-              className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
+              className="size-11 rounded-xl text-muted-foreground hover:text-foreground"
               aria-label="Cerrar"
             >
               <X className="w-4 h-4" />
@@ -205,7 +205,7 @@ export function CitaDetalleBottomSheet({
           </DrawerHeader>
 
           {/* Información Compacta */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 custom-scrollbar">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-3 custom-scrollbar">
             {/* Cliente */}
             <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/20 border border-border/30">
               <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
@@ -298,7 +298,7 @@ export function CitaDetalleBottomSheet({
                   <Button
                     variant="outline"
                     onClick={handleCopiarMensaje}
-                    className="w-full h-10 text-xs font-semibold active:scale-[0.98] gap-1.5 border-border/50"
+                    className="w-full h-11 text-xs font-semibold active:scale-[0.98] gap-1.5 border-border/50"
                   >
                     {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     {copiado ? 'Copiado' : 'Copiar info'}

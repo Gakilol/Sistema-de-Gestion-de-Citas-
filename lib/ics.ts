@@ -6,7 +6,7 @@
 // - Saltos de línea CRLF
 // - UID estable por cita
 // - Escapado correcto de caracteres especiales
-// - Zona horaria America/Costa_Rica
+// - Zona horaria configurada por el negocio
 // - No incluir precios ni datos sensibles
 
 const CRLF = '\r\n';
@@ -36,23 +36,6 @@ function generarUID(citaId: string): string {
  * Formatea una fecha+hora en formato iCalendar con zona horaria.
  * Formato: TZID=America/Costa_Rica:YYYYMMDDTHHmmss
  */
-function formatearFechaICS(fechaYMD: string, hora: string): string {
-  const [year, month, day] = fechaYMD.split('-');
-  const [h, m] = hora.split(':');
-  return `${year}${month}${day}T${h.padStart(2, '0')}${m.padStart(2, '0')}00`;
-}
-
-/**
- * Calcula la hora de fin sumando minutos a la hora de inicio.
- */
-function calcularHoraFin(hora: string, duracionMin: number): string {
-  const [h, m] = hora.split(':').map(Number);
-  const totalMin = h * 60 + m + duracionMin;
-  const hFin = Math.floor(totalMin / 60);
-  const mFin = totalMin % 60;
-  return `${String(hFin).padStart(2, '0')}:${String(mFin).padStart(2, '0')}`;
-}
-
 /**
  * Genera el DTSTAMP en formato UTC (momento actual).
  */
@@ -76,6 +59,7 @@ export interface ICSParams {
   profesional: string;
   servicios?: string[]; // nombres de servicios (solo si existen)
   ubicacion?: string;   // dirección del negocio (solo si existe)
+  zonaHoraria: string;
 }
 
 /**
@@ -91,26 +75,17 @@ export function generarICS(params: ICSParams): string {
     profesional,
     servicios,
     ubicacion,
+    zonaHoraria,
   } = params;
 
-  const horaFin = calcularHoraFin(hora, duracion);
-  const dtStart = formatearFechaICS(fecha, hora);
-  const dtEnd = formatearFechaICS(fecha, horaFin);
+  const fin = calcularFinCita(fecha, hora, duracion);
+  const dtStart = formatCalendarDateTime({ fecha, hora });
+  const dtEnd = formatCalendarDateTime(fin);
   const uid = generarUID(citaId);
   const dtstamp = generarDTSTAMP();
 
-  const summary = escapeICS('Cita en HAIR STYLE Salon & Barber');
-
-  // Construir descripción
-  const descParts: string[] = [
-    `Profesional: ${profesional}`,
-  ];
-  if (servicios && servicios.length > 0) {
-    descParts.push(`Servicios: ${servicios.join(', ')}`);
-  }
-  descParts.push('');
-  descParts.push('Recuerde presentarse 5 minutos antes de su cita.');
-  const description = escapeICS(descParts.join('\n'));
+  const summary = escapeICS(CALENDAR_EVENT_TITLE);
+  const description = escapeICS(buildCalendarDescription({ profesional, servicios }));
 
   // Construir el evento
   const lines: string[] = [
@@ -122,8 +97,8 @@ export function generarICS(params: ICSParams): string {
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${dtstamp}`,
-    `DTSTART;TZID=America/Costa_Rica:${dtStart}`,
-    `DTEND;TZID=America/Costa_Rica:${dtEnd}`,
+    `DTSTART;TZID=${zonaHoraria}:${dtStart}`,
+    `DTEND;TZID=${zonaHoraria}:${dtEnd}`,
     `SUMMARY:${summary}`,
     `DESCRIPTION:${description}`,
   ];
@@ -137,3 +112,4 @@ export function generarICS(params: ICSParams): string {
 
   return lines.join(CRLF) + CRLF;
 }
+import { buildCalendarDescription, calcularFinCita, CALENDAR_EVENT_TITLE, formatCalendarDateTime } from './calendar-event';

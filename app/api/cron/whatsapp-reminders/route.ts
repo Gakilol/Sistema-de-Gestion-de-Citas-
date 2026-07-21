@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { syncCitaEstados } from '@/lib/automatizacion';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import { mensajeRecordatorioUnaHora } from '@/lib/whatsapp';
+import { getCronSecret, isAuthorizedCronRequest } from '@/lib/security-secrets';
 
 export async function GET(req: NextRequest) {
   return handleCron(req);
@@ -14,6 +15,15 @@ export async function POST(req: NextRequest) {
 
 async function handleCron(req: NextRequest) {
   try {
+    const authorization = req.headers.get('authorization');
+    if (!getCronSecret()) {
+      console.error('[SECURITY_CONFIGURATION] CRON_SECRET is not configured. Rejecting cron request.');
+      return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
+    }
+    if (!isAuthorizedCronRequest(authorization)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     // Verificar si los recordatorios automáticos o las notificaciones están desactivadas
     if (process.env.DISABLE_REMINDER_JOBS === 'true' || process.env.DISABLE_NOTIFICATIONS === 'true') {
       console.log('[CRON] Envío de recordatorios abortado: recordatorios automáticos desactivados.');
@@ -21,15 +31,6 @@ async function handleCron(req: NextRequest) {
         mensaje: 'Recordatorios automáticos desactivados.',
         procesados: 0
       }, { status: 200 });
-    }
-
-    // 1. Proteger el endpoint en producción usando el secreto de Vercel Cron
-    const authHeader = req.headers.get('authorization');
-    if (process.env.NODE_ENV === 'production') {
-      const cronSecret = process.env.CRON_SECRET;
-      if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-      }
     }
 
     console.log('[CRON] Iniciando tarea periódica de recordatorios de WhatsApp...');
@@ -91,7 +92,7 @@ async function handleCron(req: NextRequest) {
 
     console.log(`[CRON] Encontradas ${citasPorEnviar.length} citas que inician pronto en el rango de 0-75 min.`);
 
-    const resultados = [];
+    let enviados = 0;
 
     // 6. Enviar mensajes y registrar en la BD
     for (const item of citasPorEnviar) {
@@ -113,7 +114,6 @@ async function handleCron(req: NextRequest) {
 
       const url = process.env.WHATSAPP_API_URL;
       const token = process.env.WHATSAPP_API_TOKEN;
-      let statusEnvio = 'LOGGED_TO_CONSOLE';
       const isWhatsAppDisabled = process.env.DISABLE_WHATSAPP === 'true' || process.env.DISABLE_NOTIFICATIONS === 'true';
 
       // Si las variables están configuradas y hay teléfono, enviar de verdad
@@ -138,14 +138,10 @@ async function handleCron(req: NextRequest) {
             })
           });
 
-          if (res.ok) {
-            statusEnvio = 'SENT_HTTP';
-          } else {
-            statusEnvio = `ERROR_HTTP_${res.status}`;
+          if (!res.ok) {
             console.error(`[CRON] Error HTTP al enviar recordatorio para Cita ${cita.id}:`, await res.text());
           }
         } catch (fetchErr) {
-          statusEnvio = 'ERROR_FETCH';
           console.error(`[CRON] Fallo de red al enviar recordatorio para Cita ${cita.id}:`, fetchErr);
         }
       } else {
@@ -167,23 +163,16 @@ async function handleCron(req: NextRequest) {
         }
       });
 
-      resultados.push({
-        cita_id: cita.id,
-        cliente: cita.cliente_nombre,
-        hora: cita.hora,
-        minutos_faltantes: Math.round(diffMinutes),
-        estado: statusEnvio
-      });
+      enviados++;
     }
 
     return NextResponse.json({
       mensaje: `Procesamiento de recordatorios finalizado.`,
-      enviados: resultados.length,
-      detalles: resultados
+      enviados
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('[CRON] Error crítico en el handler de recordatorios:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno al procesar recordatorios' }, { status: 500 });
   }
 }

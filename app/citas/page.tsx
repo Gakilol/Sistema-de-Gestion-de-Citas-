@@ -17,6 +17,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
 import { CitaResumenModal } from '@/components/citas/CitaResumenModal';
 import { CitaDetalleBottomSheet } from '@/components/citas/CitaDetalleBottomSheet';
+import { CitaCreadaConfirmacion } from '@/components/citas/CitaCreadaConfirmacion';
 
 const getEmptyForm = () => ({
   cliente_id: '',
@@ -155,6 +156,7 @@ function CitasContent() {
   const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
   const [isDeleting, setIsDeleting] = useState(false);
   const [citaResumen, setCitaResumen] = useState<any>(null);
+  const [citaCreada, setCitaCreada] = useState<any>(null);
   // Overrides optimistas para posición visual de citas siendo movidas/redimensionadas
   const [localCitaOverrides, setLocalCitaOverrides] = useState<Record<string, { fecha?: string; hora?: string; duracion?: number; empleado_id?: string }>>({});
 
@@ -432,6 +434,7 @@ function CitasContent() {
 
   const handleSubmit = async (e?: React.FormEvent, bypassOverlap = false) => {
     if (e) e.preventDefault();
+    if (saving) return;
     if (!form.servicio_ids || form.servicio_ids.length === 0) {
       toast.error('Selecciona al menos un servicio');
       return;
@@ -490,6 +493,7 @@ function CitasContent() {
       setShowModal(false);
       setShowOverlapModal(false);
       setForzar(false);
+      if (!editingId && d.cita) setCitaCreada(d.cita);
       fetchCitas();
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar');
@@ -1377,7 +1381,7 @@ function CitasContent() {
             if (e.target === e.currentTarget) setShowModal(false);
           }}
         >
-          <Card className="w-full max-w-lg p-0 relative max-h-[92vh] sm:max-h-[90vh] flex flex-col border-border/50 shadow-2xl rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl overflow-hidden bg-card">
+          <Card className="w-full max-w-lg p-0 relative max-h-[90dvh] sm:max-h-[90vh] flex flex-col border-border/50 shadow-2xl rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl overflow-hidden bg-card">
             
             {/* Tirador táctil superior para móvil */}
             <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-0 sm:hidden shrink-0" />
@@ -1388,7 +1392,7 @@ function CitasContent() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                className="h-11 w-11 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
                 aria-label="Cerrar modal"
               >
                 <X className="w-5 h-5" />
@@ -1396,7 +1400,7 @@ function CitasContent() {
             </div>
 
             {/* Formulario */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
+            <form id="cita-form" onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 custom-scrollbar">
               <div className="grid grid-cols-1 gap-3.5">
 
                 {/* ─── Selector Inteligente de Cliente ──────────────────── */}
@@ -1438,7 +1442,7 @@ function CitasContent() {
                         setForm((prev: any) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
                         setClienteBusqueda('');
                       }}
-                      className="text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-md px-2 py-1 transition-colors shrink-0"
+                      className="min-h-11 text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-md px-3 py-1 transition-colors shrink-0"
                     >
                       Cambiar
                     </button>
@@ -1559,7 +1563,7 @@ function CitasContent() {
                         };
                       });
                     }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      className="min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
                     <option value="">+ Agregar servicio...</option>
                     {servicios
@@ -1626,7 +1630,7 @@ function CitasContent() {
                                       };
                                     });
                                   }}
-                                  className="p-1 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
+                                  className="size-11 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
                                 >
                                   <Minus className="w-3 h-3" />
                                 </button>
@@ -1646,7 +1650,7 @@ function CitasContent() {
                                       };
                                     });
                                   }}
-                                  className="w-12 h-7 text-xs text-center bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary font-bold text-foreground"
+                                  className="h-11 w-14 text-xs text-center bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary font-bold text-foreground"
                                 />
                                 <button
                                   type="button"
@@ -1661,7 +1665,7 @@ function CitasContent() {
                                       };
                                     });
                                   }}
-                                  className="p-1 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
+                                  className="size-11 rounded bg-secondary/50 border border-border/50 hover:bg-secondary text-foreground active:scale-95 transition-all"
                                 >
                                   <Plus className="w-3 h-3" />
                                 </button>
@@ -1720,7 +1724,7 @@ function CitasContent() {
                   onChange={e => setForm({ ...form, empleado_id: e.target.value, hora: '' })}
                   required
                   disabled={user?.rol === 'EMPLEADO'}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-80 disabled:cursor-not-allowed"
+                  className="min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-80 disabled:cursor-not-allowed"
                 >
                   <option value="">Seleccionar empleado...</option>
                   {/* Permitimos el empleado actual si estamos editando, e incluimos solo empleados ACTIVOS y no Soporte Técnico para nuevas citas */}
@@ -1738,6 +1742,7 @@ function CitasContent() {
                   value={form.fecha}
                   onChange={e => setForm({ ...form, fecha: e.target.value, hora: '' })}
                   required
+                  className="min-h-11"
                 />
               </div>
               {form.fecha && form.empleado_id && (
@@ -1767,12 +1772,12 @@ function CitasContent() {
               )}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Notas / Comentarios</label>
-                <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones o peticiones especiales..." />
+                <Input className="min-h-11" value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones o peticiones especiales..." />
               </div>
             </form>
 
             {/* Sticky Bottom Actions Bar */}
-            <div className="shrink-0 border-t border-border/40 p-4 sm:p-5 bg-card pb-safe flex items-center justify-between gap-3 z-30">
+              <div className="shrink-0 border-t border-border/40 p-4 sm:p-5 bg-card pb-[max(1rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 z-30">
               <div>
                 {editingId && (() => {
                   const currentCita = citas.find(c => c.id === editingId);
@@ -1798,10 +1803,7 @@ function CitasContent() {
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="h-11 px-4 text-sm font-semibold cursor-pointer">
                   Cancelar
                 </Button>
-                <Button type="button" onClick={(e) => {
-                  const formEl = (e.currentTarget.closest('form') || document.querySelector('form')) as HTMLFormElement;
-                  if (formEl) formEl.requestSubmit();
-                }} disabled={saving} className="glow-gold h-11 px-5 text-sm font-bold cursor-pointer">
+                <Button type="submit" form="cita-form" disabled={saving} className="glow-gold h-11 px-5 text-sm font-bold cursor-pointer">
                   {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
                 </Button>
               </div>
@@ -1819,7 +1821,7 @@ function CitasContent() {
       {/* ─── Modal inline: Crear Nuevo Cliente ──────────────────────────────── */}
       {showCrearCliente && (
         <div className="fixed inset-0 bg-black/75 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="w-full max-w-md bg-card border border-border/50 rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl flex flex-col max-h-[92vh] pb-safe overflow-hidden">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[90vh] pb-safe overflow-hidden">
             
             {/* Tirador táctil superior para móvil */}
             <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-0 sm:hidden shrink-0" />
@@ -1843,7 +1845,7 @@ function CitasContent() {
             </div>
 
             {/* Formulario */}
-            <form onSubmit={handleCrearCliente} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+            <form onSubmit={handleCrearCliente} className="min-h-0 p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1 custom-scrollbar">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
                   Nombre completo *
@@ -1918,7 +1920,7 @@ function CitasContent() {
       {/* ─── Modal: Confirmación de Traslape Controlado ────────────────────────── */}
       {showOverlapModal && (
         <div className="fixed inset-0 bg-black/75 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] pb-safe">
+          <div className="w-full max-w-lg bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[90vh] pb-safe">
             {/* Header */}
             <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 bg-amber-500/5 shrink-0">
               <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 border border-amber-500/20">
@@ -1938,7 +1940,7 @@ function CitasContent() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-y-auto custom-scrollbar">
+            <div className="min-h-0 flex-1 p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain custom-scrollbar">
               <div className="text-sm space-y-2.5">
                 <p className="text-muted-foreground leading-relaxed">
                   Este horario se cruza con la siguiente cita del mismo profesional:
@@ -2030,7 +2032,7 @@ function CitasContent() {
       {/* ─── Modal: Confirmación de Eliminación de Cita ────────────────────────── */}
       {showDeleteModal && citaToDelete && (
         <div className="fixed inset-0 bg-black/75 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] pb-safe">
+          <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[90vh] pb-safe">
             {/* Header */}
             <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 bg-destructive/5 shrink-0">
               <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center text-destructive shrink-0">
@@ -2043,7 +2045,7 @@ function CitasContent() {
             </div>
 
             {/* Content */}
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="min-h-0 p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1 custom-scrollbar">
               <p className="text-sm text-foreground font-medium">
                 ¿Seguro que deseas eliminar esta cita?
               </p>
@@ -2115,6 +2117,16 @@ function CitasContent() {
         user={user}
         onEdit={(cita) => {
           setCitaResumen(null);
+          openEdit(cita);
+        }}
+      />
+
+      <CitaCreadaConfirmacion
+        cita={citaCreada}
+        open={!!citaCreada}
+        onClose={() => setCitaCreada(null)}
+        onEdit={(cita) => {
+          setCitaCreada(null);
           openEdit(cita);
         }}
       />

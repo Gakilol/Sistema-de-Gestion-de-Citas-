@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import crypto from 'crypto';
+import { getJwtRefreshSecret, getJwtSecret } from './security-secrets';
 
 export interface CustomJWTPayload extends JWTPayload {
   id: string;
@@ -7,113 +8,77 @@ export interface CustomJWTPayload extends JWTPayload {
   rol: string;
 }
 
-// ─── Obtener secretos obligatorios independientes ──────────────────────────────
-function getRequiredSecret(envVar: string, fallbackForDev: string): string {
-  const secret = process.env[envVar]?.trim();
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error(`[SEGURIDAD CRÍTICA] La variable de entorno obligatoria ${envVar} no está configurada.`);
-    }
-    return process.env[envVar] || fallbackForDev;
-  }
+function requireSecret(secret: string | null, name: string): string {
+  if (!secret) throw new Error(`${name}_NOT_CONFIGURED`);
   return secret;
 }
 
-function getJwtSecret(): string {
-  return getRequiredSecret('JWT_SECRET', 'dev-only-secret-jwt-change-me-in-production');
-}
-
-function getJwtRefreshSecret(): string {
-  if (process.env.JWT_REFRESH_SECRET) {
-    return process.env.JWT_REFRESH_SECRET;
-  }
-  const mainSecret = process.env.JWT_SECRET;
-  if (mainSecret) {
-    return `${mainSecret}_refresh`;
-  }
-  return getRequiredSecret('JWT_REFRESH_SECRET', 'dev-only-secret-refresh-change-me-in-production');
-}
-
-const getJwtSecretKey = (secret: string) => {
-  return new TextEncoder().encode(secret);
-};
+const getJwtSecretKey = (secret: string) => new TextEncoder().encode(secret);
 
 export const signToken = async (payload: CustomJWTPayload): Promise<string> => {
+  const secret = requireSecret(getJwtSecret(), 'JWT_SECRET');
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
-    .sign(getJwtSecretKey(getJwtSecret()));
+    .sign(getJwtSecretKey(secret));
 };
 
 export const signRefreshToken = async (payload: { id: string }): Promise<string> => {
+  const secret = requireSecret(getJwtRefreshSecret(), 'JWT_REFRESH_SECRET');
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(getJwtSecretKey(getJwtRefreshSecret()));
+    .sign(getJwtSecretKey(secret));
 };
 
 export const verifyToken = async (token: string): Promise<CustomJWTPayload | null> => {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecretKey(getJwtSecret()));
+    const secret = getJwtSecret();
+    if (!secret) return null;
+    const { payload } = await jwtVerify(token, getJwtSecretKey(secret));
     return payload as CustomJWTPayload;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
 
 export const verifyRefreshToken = async (token: string): Promise<{ id: string } | null> => {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecretKey(getJwtRefreshSecret()));
+    const secret = getJwtRefreshSecret();
+    if (!secret) return null;
+    const { payload } = await jwtVerify(token, getJwtSecretKey(secret));
     return payload as { id: string };
-  } catch (error) {
+  } catch {
     return null;
   }
 };
 
-/**
- * Verifica la firma de un JWT de forma síncrona usando HMAC-SHA256 nativo de Node.js.
- * SEGURO: Verifica criptográficamente la firma antes de usar el payload.
- * Uso: en contextos donde no se puede usar async/await (e.g., middleware Edge).
- *
- * @returns El payload decodificado si la firma es válida y el token no expiró, o null.
- */
+/** Synchronous JWT verification for route helpers that cannot await. */
 export function verifyJwtSync(token: string): CustomJWTPayload | null {
   try {
+    const secret = getJwtSecret();
+    if (!secret) return null;
+
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
     const [headerB64, payloadB64, signatureB64] = parts;
-
-    // 1. Verificar firma HMAC-SHA256
     const signingInput = `${headerB64}.${payloadB64}`;
     const expectedSignature = crypto
-      .createHmac('sha256', getJwtSecret())
+      .createHmac('sha256', secret)
       .update(signingInput)
       .digest('base64url');
 
-    // Comparación en tiempo constante para prevenir timing attacks
-    if (!crypto.timingSafeEqual(
-      Buffer.from(signatureB64, 'utf8'),
-      Buffer.from(expectedSignature, 'utf8')
-    )) {
-      return null;
-    }
+    const actual = Buffer.from(signatureB64, 'utf8');
+    const expected = Buffer.from(expectedSignature, 'utf8');
+    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
 
-    // 2. Decodificar payload
     const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
     const payload = JSON.parse(payloadJson) as CustomJWTPayload;
-
-    // 3. Verificar expiración
-    if (payload.exp && Date.now() / 1000 > payload.exp) {
-      return null;
-    }
-
-    // 4. Verificar que contiene los campos requeridos
-    if (!payload.id || !payload.email || !payload.rol) {
-      return null;
-    }
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    if (!payload.id || !payload.email || !payload.rol) return null;
 
     return payload;
   } catch {

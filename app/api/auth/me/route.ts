@@ -2,19 +2,23 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { prisma } from '@/lib/db';
-
-const JWT_SECRET = process.env.JWT_SECRET || '';
+import { getJwtSecret } from '@/lib/security-secrets';
 
 
 export async function GET(req: NextRequest) {
   try {
+    const jwtSecret = getJwtSecret();
+    if (!jwtSecret) {
+      return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
+    }
+
     const token = req.cookies.get('access_token')?.value;
 
     if (!token) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
 
     
     const empleado = await prisma.empleado.findUnique({

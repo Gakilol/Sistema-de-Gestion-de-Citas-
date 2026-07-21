@@ -366,7 +366,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ cita, mensaje: 'Cita creada exitosamente con sus servicios' }, { status: 201 });
+    const citaCreada = await prisma.cita.findUnique({
+      where: { id: cita.id },
+      include: {
+        empleado: { select: { id: true, nombre: true, correo: true, tituloCliente: true } },
+        servicio: { select: { id: true, nombre: true, duracion: true } },
+        citaServicios: {
+          include: { servicio: { select: { id: true, nombre: true, duracion: true } } },
+          orderBy: { orden: 'asc' },
+        },
+      },
+    });
+
+    return NextResponse.json({ cita: citaCreada ?? cita, mensaje: 'Cita creada exitosamente con sus servicios' }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

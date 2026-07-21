@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getCronSecret, isAuthorizedCronRequest } from '@/lib/security-secrets';
 
 export async function GET(req: NextRequest) {
   return handleCron(req);
@@ -11,13 +12,13 @@ export async function POST(req: NextRequest) {
 
 async function handleCron(req: NextRequest) {
   try {
-    // Proteger el endpoint en producción usando el secreto de Vercel Cron
-    const authHeader = req.headers.get('authorization');
-    if (process.env.NODE_ENV === 'production') {
-      const cronSecret = process.env.CRON_SECRET;
-      if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-      }
+    const authorization = req.headers.get('authorization');
+    if (!getCronSecret()) {
+      console.error('[SECURITY_CONFIGURATION] CRON_SECRET is not configured. Rejecting cron request.');
+      return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
+    }
+    if (!isAuthorizedCronRequest(authorization)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     console.log('[CRON_CLEANUP] Iniciando limpieza de dispositivos recordados vencidos o revocados...');

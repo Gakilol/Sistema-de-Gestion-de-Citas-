@@ -451,7 +451,7 @@ export function TimeSelector({
                     type="button"
                     onClick={() => handleSelectHour(h)}
                     className={cn(
-                      "h-10 rounded-xl text-xs font-black transition-all flex items-center justify-center cursor-pointer active:scale-95",
+                      "h-11 sm:h-10 rounded-xl text-xs font-black transition-all flex items-center justify-center cursor-pointer active:scale-95",
                       isSelected
                         ? parsedTime.isNormalRange
                           ? "bg-amber-500 text-black shadow-md shadow-amber-500/30 scale-105 ring-2 ring-amber-500/50"
@@ -481,7 +481,7 @@ export function TimeSelector({
                     type="button"
                     onClick={() => handleSelectMinute(m)}
                     className={cn(
-                      "h-10 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer active:scale-95",
+                      "h-11 sm:h-10 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer active:scale-95",
                       isSelected
                         ? "bg-primary text-primary-foreground shadow-md scale-105"
                         : "bg-card hover:bg-secondary/70 text-foreground border border-border/60"
@@ -504,7 +504,7 @@ export function TimeSelector({
                 type="button"
                 onClick={() => handleSelectPeriod('AM')}
                 className={cn(
-                  "px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer active:scale-95",
+                    "min-h-11 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer active:scale-95",
                   parsedTime.period === 'AM'
                     ? "bg-amber-500 text-black shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -516,7 +516,7 @@ export function TimeSelector({
                 type="button"
                 onClick={() => handleSelectPeriod('PM')}
                 className={cn(
-                  "px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer active:scale-95",
+                    "min-h-11 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer active:scale-95",
                   parsedTime.period === 'PM'
                     ? "bg-amber-500 text-black shadow-sm"
                     : "text-muted-foreground hover:text-foreground"

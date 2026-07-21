@@ -7,6 +7,9 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { verificarTokenCalendario } from '@/lib/calendar-token';
 import { generarICS } from '@/lib/ics';
+import { isValidTimeZone } from '@/lib/calendar-event';
+
+const DEFAULT_CALENDAR_TIMEZONE = 'America/Costa_Rica';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
@@ -73,12 +76,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
 
     // Obtener ubicación del negocio
     let ubicacion: string | undefined;
+    let zonaHoraria = DEFAULT_CALENDAR_TIMEZONE;
     try {
       const config = await prisma.configuracion.findUnique({ where: { id: 'default' } });
       if (config?.negocio && typeof config.negocio === 'object') {
         const negocio = config.negocio as any;
         if (negocio.direccion) {
           ubicacion = negocio.direccion;
+        }
+        if (isValidTimeZone(negocio.zona_horaria)) {
+          zonaHoraria = negocio.zona_horaria;
         }
       }
     } catch {
@@ -97,6 +104,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       profesional: cita.empleado?.nombre || 'Profesional',
       servicios: servicios.length > 0 ? servicios : undefined,
       ubicacion,
+      zonaHoraria,
     });
 
     return new NextResponse(icsContent, {

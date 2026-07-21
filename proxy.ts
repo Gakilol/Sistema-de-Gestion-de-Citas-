@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-jwt-change-me-in-production';
+import { getJwtSecret } from '@/lib/security-secrets';
 
 export async function proxy(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;
   const path = req.nextUrl.pathname;
+  const jwtSecret = getJwtSecret();
 
   // Rutas y APIs públicas excluidas de protección por token
   const isPublicPath =
@@ -26,9 +26,9 @@ export async function proxy(req: NextRequest) {
 
   if (isPublicPath) {
     // Si hay un token válido e intentan ingresar al /login, los enviamos directo al dashboard
-    if (token && path === '/login' && JWT_SECRET) {
+    if (token && path === '/login' && jwtSecret) {
       try {
-        await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+        await jwtVerify(token, new TextEncoder().encode(jwtSecret));
         return NextResponse.redirect(new URL('/dashboard', req.url));
       } catch {
         // Si el token es inválido, dejamos que continúe al login y limpiamos la cookie
@@ -41,8 +41,8 @@ export async function proxy(req: NextRequest) {
   }
 
   // Si el JWT_SECRET no está configurado en entorno, rechazar todo en rutas protegidas
-  if (!JWT_SECRET) {
-    console.error('[SEGURIDAD CRÍTICA] JWT_SECRET no está configurado. Rechazando todas las peticiones autenticadas.');
+  if (!jwtSecret) {
+    console.error('[SECURITY_CONFIGURATION] JWT_SECRET is not configured. Rejecting protected requests.');
     if (path.startsWith('/api/')) {
       return NextResponse.json({ error: 'Configuración de seguridad incorrecta' }, { status: 503 });
     }
@@ -62,7 +62,7 @@ export async function proxy(req: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
     const userRole = payload.rol as string;
 
     // Solo ADMIN, EMPLEADO o TECH_SUPPORT tienen acceso, si no, lo rechazamos

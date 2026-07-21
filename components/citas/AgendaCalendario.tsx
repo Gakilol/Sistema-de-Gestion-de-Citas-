@@ -1881,34 +1881,34 @@ export function AgendaCalendario({
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-130px)] sm:h-[750px] min-h-[520px] sm:max-h-[85vh] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative pb-safe">
+    <div className="flex flex-col h-[calc(100dvh-126px)] min-h-[380px] max-h-[640px] sm:h-[750px] sm:min-h-[520px] sm:max-h-[85vh] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative pb-safe">
       
       {/* CABECERA DEL CALENDARIO */}
       <div className="flex flex-col gap-1.5 p-2 sm:p-4 border-b border-border/50 bg-secondary/15 z-30 shrink-0 sticky top-0 backdrop-blur-md">
         <div className="flex items-center justify-between gap-1.5 flex-wrap sm:flex-nowrap">
           {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
           <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
-            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1 text-xs hover-lift cursor-pointer h-9 px-3 shrink-0">
+            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1 text-xs hover-lift cursor-pointer h-11 sm:h-9 px-3 shrink-0">
               <CalendarIcon className="w-3.5 h-3.5" /> Hoy
             </Button>
-            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-9">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
+            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-11 sm:h-9">
+              <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-xs sm:text-sm font-extrabold px-2 sm:px-3 border-x border-border py-1 text-foreground min-w-[95px] sm:min-w-[130px] text-center truncate">
                 {tituloCabecera}
               </span>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
+              <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
 
             {/* Control Discreto de Zoom Vertical (- 100% +) */}
-            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-9 p-0.5">
+            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-11 sm:h-9 p-0.5">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-7 cursor-pointer text-muted-foreground hover:text-foreground"
+                className="h-10 w-10 sm:h-8 sm:w-7 cursor-pointer text-muted-foreground hover:text-foreground"
                 onClick={() => updateHourHeight(hourHeight - 15)}
                 disabled={hourHeight <= MIN_HOUR_HEIGHT}
                 title="Reducir escala vertical (-)"
@@ -1926,7 +1926,7 @@ export function AgendaCalendario({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-7 cursor-pointer text-muted-foreground hover:text-foreground"
+                className="h-10 w-10 sm:h-8 sm:w-7 cursor-pointer text-muted-foreground hover:text-foreground"
                 onClick={() => updateHourHeight(hourHeight + 15)}
                 disabled={hourHeight >= MAX_HOUR_HEIGHT}
                 title="Aumentar escala vertical (+)"
@@ -1943,7 +1943,7 @@ export function AgendaCalendario({
           </div>
 
           {/* Toggles de Vista */}
-          <div className="flex bg-secondary/40 p-0.5 rounded-xl border border-border/50 shadow-inner h-9 items-center ml-auto sm:ml-0">
+          <div className="flex bg-secondary/40 p-0.5 rounded-xl border border-border/50 shadow-inner h-11 sm:h-9 items-center ml-auto sm:ml-0">
             {[
               { id: 'dia', label: 'Día' },
               { id: '3dias', label: '3 Días' },
@@ -1953,7 +1953,7 @@ export function AgendaCalendario({
                 key={tab.id}
                 onClick={() => setVista(tab.id as any)}
                 className={cn(
-                  "px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-7 flex items-center justify-center min-w-[42px]",
+                  "px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-10 sm:h-7 flex items-center justify-center min-w-[42px]",
                   vista === tab.id
                     ? "bg-primary text-primary-foreground shadow-xs scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -1972,7 +1972,7 @@ export function AgendaCalendario({
             <button
               onClick={() => setActiveMobileEmpId('all')}
               className={cn(
-                "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-8 flex items-center gap-1.5 border min-h-[34px]",
+                "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-11 sm:h-8 flex items-center gap-1.5 border",
                 activeMobileEmpId === 'all'
                   ? "bg-primary/15 text-primary border-primary/50 font-black shadow-xs"
                   : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
@@ -1987,7 +1987,7 @@ export function AgendaCalendario({
                   key={emp.id}
                   onClick={() => setActiveMobileEmpId(emp.id)}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-8 flex items-center gap-1.5 border min-h-[34px]",
+                    "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-11 sm:h-8 flex items-center gap-1.5 border",
                     isActive
                       ? "bg-primary text-primary-foreground border-primary font-black shadow-xs"
                       : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
@@ -2590,7 +2590,7 @@ export function AgendaCalendario({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); clearProvisionalSlot(); }}
-              className="h-9 px-3 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted/60 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
+              className="h-11 sm:h-9 px-3 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted/60 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
             >
               <X className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Cancelar</span>
@@ -2598,7 +2598,7 @@ export function AgendaCalendario({
             <Button
               type="button"
               onClick={(e) => { e.stopPropagation(); handleConfirmProvisional(); }}
-              className="h-9 px-4 text-xs font-black bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="h-11 sm:h-9 px-4 text-xs font-black bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl flex items-center gap-1.5 cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" /> Agendar
             </Button>

@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-
-const REMEMBER_DEVICE_SECRET = process.env.REMEMBER_DEVICE_SECRET || process.env.JWT_SECRET || '';
+import { getRememberDeviceSecret } from './security-secrets';
 
 export const REMEMBER_COOKIE_NAME = 'remember_token';
 export const REMEMBER_COOKIE_MAX_AGE = 60 * 24 * 60 * 60; // 60 días en segundos
@@ -16,8 +15,10 @@ export function generateRememberToken(): string {
  * Hashea un token usando SHA-256 y un secreto del servidor para fortalecerlo.
  */
 export function hashRememberToken(token: string): string {
+  const secret = getRememberDeviceSecret();
+  if (!secret) throw new Error('REMEMBER_DEVICE_SECRET_NOT_CONFIGURED');
   return crypto
-    .createHmac('sha256', REMEMBER_DEVICE_SECRET)
+    .createHmac('sha256', secret)
     .update(token)
     .digest('hex');
 }
