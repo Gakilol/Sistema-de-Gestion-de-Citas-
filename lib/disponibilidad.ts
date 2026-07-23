@@ -96,7 +96,6 @@ export function validarHoraExacta(
 
   // Validar conflictos con todos los intervalos ocupados (las colisiones de agenda se validan siempre)
   for (const int of intervalosOcupados) {
-    if (int.allowOverlap) continue;
     if (startMin < int.fin && endMin > int.inicio) {
       return {
         valida: false,
@@ -160,7 +159,16 @@ export async function calcularDisponibilidad(
   if (!empleado) throw new Error('Empleado no encontrado');
 
   let duracionServicio = 30;
-    if (empleado.vacaciones.length > 0) {
+  if (typeof duracionTotal === 'number' && duracionTotal > 0) {
+    duracionServicio = duracionTotal;
+  } else if (servicioId) {
+    const sDb = await dbClient.servicio.findUnique({ where: { id: servicioId } });
+    if (sDb && typeof sDb.duracion === 'number' && sDb.duracion > 0) {
+      duracionServicio = sDb.duracion;
+    }
+  }
+
+  if (empleado.vacaciones.length > 0) {
     if (!permitirHorarioExtendido) {
       return { disponible: false, motivo: 'De vacaciones', bloques: [], jornada: null, intervalosOcupados: [], turnosEmpleado: undefined };
     }

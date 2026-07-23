@@ -7,6 +7,7 @@ export interface UserContext {
   userRole: string | null;
   userEmail: string | null;
 }
+
 /**
  * Obtiene el contexto del usuario autenticado desde la solicitud.
  *
@@ -18,23 +19,17 @@ export interface UserContext {
  *    Las cabeceras son eliminadas del cliente en middleware antes de inyectar las propias.
  */
 export function getUserContext(req: NextRequest): UserContext {
-  // Las cabeceras x-user-* fueron inyectadas por el middleware DESPUÉS de verificar el JWT.
-  // El middleware también elimina cualquier cabecera x-user-* enviada por el cliente.
   const userId = req.headers.get('x-user-id');
   const userRole = req.headers.get('x-user-role');
   const userEmail = req.headers.get('x-user-email');
 
-  // Si el middleware inyectó los datos, los usamos directamente (ya fueron verificados)
   if (userId && userRole) {
     return { userId, userRole, userEmail };
   }
 
-  // Fallback SEGURO: Verificar el JWT criptográficamente desde la cookie.
-  // Esto aplica para rutas /api/auth/* que son públicas y el middleware no inyecta cabeceras,
-  // pero que aún necesitan leer el usuario si está autenticado (ej. /api/auth/me).
   const token = req.cookies.get('access_token')?.value;
   if (token) {
-    const payload = verifyJwtSync(token); // Verifica firma HMAC-SHA256 + expiración
+    const payload = verifyJwtSync(token);
     if (payload) {
       return {
         userId: payload.id,
@@ -50,7 +45,6 @@ export function getUserContext(req: NextRequest): UserContext {
     userEmail: null,
   };
 }
-
 
 export function canViewAllAppointments(role: string | null): boolean {
   return role === 'ADMIN' || role === 'TECH_SUPPORT';
@@ -70,14 +64,15 @@ export function getScopedAppointmentWhere(
     return { empleado_id: userId };
   }
 
-  // TECH_SUPPORT y consultas con scope='all'
-  if (role === 'TECH_SUPPORT' || scope === 'all') {
-    if (filterEmpleadoId && filterEmpleadoId !== '') {
-      return { empleado_id: filterEmpleadoId };
-    }
-    return {};
+  // Si se pide explícitamente ver sólo 'mine' (Mi agenda)
+  if (scope === 'mine') {
+    return { empleado_id: userId };
   }
 
-  // Default scope for ADMIN is 'mine'
-  return { empleado_id: userId };
+  // Para ADMIN y TECH_SUPPORT por defecto es agenda global ('all'), opcionalmente filtrada por empleado_id
+  if (filterEmpleadoId && filterEmpleadoId !== '') {
+    return { empleado_id: filterEmpleadoId };
+  }
+
+  return {};
 }

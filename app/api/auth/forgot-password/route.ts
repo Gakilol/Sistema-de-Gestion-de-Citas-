@@ -50,8 +50,8 @@ export async function POST(req: NextRequest) {
     // Obtener IP del cliente (si está disponible)
     const clientIp = req.headers.get('x-forwarded-for') || (req as any).ip || null;
 
-    // 3. Generar código de verificación de 6 dígitos
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // 3. Generar código de verificación de 6 dígitos criptográficamente seguro
+    const code = crypto.randomInt(100000, 1000000).toString();
     const tokenHash = crypto.createHash('sha256').update(code).digest('hex');
     const expiracion = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos de validez
 

@@ -211,8 +211,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
 
-    // 1. Eliminar citas asociadas (ya sean asignadas al empleado o creadas por él)
-    await prisma.cita.deleteMany({
+    // Verificar si el empleado tiene citas en su historial
+    const citasCount = await prisma.cita.count({
       where: {
         OR: [
           { empleado_id: id },
@@ -221,9 +221,51 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       }
     });
 
-    // 2. Eliminar físicamente al empleado (descansos, bloqueos y vacaciones se borran en cascada)
-    await prisma.empleado.delete({
-      where: { id }
+    if (citasCount > 0) {
+      // Si tiene historial, desactivar en lugar de eliminar datos históricos
+      const empleadoDesactivado = await prisma.empleado.update({
+        where: { id },
+        data: { activo: false, esAgendable: false }
+      });
+
+      // Revocar sesiones/dispositivos recordados
+      try {
+        await prisma.dispositivoRecordado.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      } catch {}
+
+      const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+      await logAudit({
+        action: 'USER_DEACTIVATED',
+        module: 'USUARIOS',
+        status: 'SUCCESS',
+        userId: userId || undefined,
+        userRole: userRole || undefined,
+        userEmail,
+        entityType: 'Empleado',
+        entityId: id,
+        entityName: empleado.nombre,
+        description: `Usuario ${empleado.nombre} desactivado automáticamente al intentar eliminarlo debido a su historial de citas.`,
+        beforeData: empleado,
+        afterData: empleadoDesactivado,
+        ipAddress: getClientIp(req.headers),
+        userAgent: req.headers.get('user-agent') || undefined
+      });
+
+      return NextResponse.json({
+        mensaje: 'El empleado tiene citas asociadas en el historial. Se ha desactivado y ocultado en la agenda para conservar el historial intacto.',
+        fueDesactivado: true,
+        empleado: empleadoDesactivado
+      }, { status: 200 });
+    }
+
+    // Si NO tiene citas asociadas, proceder con eliminación limpia en transacción
+    await prisma.$transaction(async (tx: any) => {
+      await tx.empleado.delete({
+        where: { id }
+      });
     });
 
     const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
@@ -245,6 +287,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     return NextResponse.json({ mensaje: 'Empleado eliminado exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Error interno del servidor' }, { status: 500 });
   }
 }

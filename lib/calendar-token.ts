@@ -5,7 +5,9 @@
 
 import crypto from 'crypto';
 
-const CALENDAR_LINK_SECRET = process.env.CALENDAR_LINK_SECRET || '';
+function getCalendarLinkSecret(): string {
+  return process.env.CALENDAR_LINK_SECRET || process.env.JWT_SECRET || '';
+}
 
 interface TokenPayload {
   citaId: string;
@@ -34,7 +36,8 @@ function fromBase64Url(str: string): Buffer {
  * Firma un payload con HMAC-SHA256.
  */
 function firmar(payloadB64: string): string {
-  const hmac = crypto.createHmac('sha256', CALENDAR_LINK_SECRET);
+  const secret = getCalendarLinkSecret();
+  const hmac = crypto.createHmac('sha256', secret);
   hmac.update(payloadB64);
   return toBase64Url(hmac.digest());
 }
@@ -54,7 +57,8 @@ export function generarTokenCalendario(cita: {
   fecha: Date | string;
   duracion: number;
 }): string {
-  if (!CALENDAR_LINK_SECRET) {
+  const secret = getCalendarLinkSecret();
+  if (!secret) {
     throw new Error('CALENDAR_LINK_SECRET no está configurado');
   }
 
@@ -91,7 +95,8 @@ export function generarTokenCalendario(cita: {
  * Retorna null si el token es inválido, alterado o expirado.
  */
 export function verificarTokenCalendario(token: string): TokenPayload | null {
-  if (!CALENDAR_LINK_SECRET || !token) return null;
+  const secret = getCalendarLinkSecret();
+  if (!secret || !token) return null;
 
   const parts = token.split('.');
   if (parts.length !== 2) return null;

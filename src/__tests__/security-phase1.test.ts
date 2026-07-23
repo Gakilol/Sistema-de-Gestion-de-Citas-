@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest';
 import { buildClientResponse } from '../../lib/client-privacy';
 import {
   getCronSecret,
@@ -5,12 +6,6 @@ import {
   getJwtSecret,
   isAuthorizedCronRequest,
 } from '../../lib/security-secrets';
-
-type TestCase = { description: string; run: () => void };
-
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(message);
-}
 
 const employeeId = '11111111-1111-1111-1111-111111111111';
 const otherEmployeeId = '22222222-2222-2222-2222-222222222222';
@@ -42,84 +37,59 @@ const employeeScopedClient = {
   historial: rawClient.citas.filter((cita) => cita.empleado_id === employeeId),
 };
 
-const tests: TestCase[] = [
-  {
-    description: 'producción sin JWT_SECRET no obtiene secreto de autenticación',
-    run: () => assert(getJwtSecret({ NODE_ENV: 'production' }) === null, 'JWT_SECRET ausente no fue rechazado'),
-  },
-  {
-    description: 'no existe fallback JWT ni refresh predecible',
-    run: () => {
-      assert(getJwtSecret({}) === null, 'JWT_SECRET tiene fallback');
-      assert(getJwtRefreshSecret({}) === null, 'JWT_REFRESH_SECRET tiene fallback');
-    },
-  },
-  {
-    description: 'cron sin CRON_SECRET queda no autorizado antes de ejecutar lógica',
-    run: () => {
-      assert(getCronSecret({}) === null, 'CRON_SECRET faltante fue aceptado');
-      assert(!isAuthorizedCronRequest(null, {}), 'cron anónimo fue autorizado');
-    },
-  },
-  {
-    description: 'cron con token incorrecto queda no autorizado',
-    run: () => assert(!isAuthorizedCronRequest('Bearer incorrecto', { CRON_SECRET: 'secreto-de-prueba' }), 'token incorrecto fue autorizado'),
-  },
-  {
-    description: 'cron con token correcto llega a la lógica protegida',
-    run: () => assert(isAuthorizedCronRequest('Bearer secreto-de-prueba', { CRON_SECRET: 'secreto-de-prueba' }), 'token correcto fue rechazado'),
-  },
-  {
-    description: 'ADMIN conserva cliente y citas completas',
-    run: () => {
-      const result = buildClientResponse(rawClient, 'ADMIN');
-      const citas = result.citas ?? [];
-      assert(citas.length === 2 && citas.some((c) => c.id === 'other'), 'ADMIN perdió acceso completo');
-    },
-  },
-  {
-    description: 'TECH_SUPPORT conserva cliente y citas completas',
-    run: () => {
-      const result = buildClientResponse(rawClient, 'TECH_SUPPORT');
-      assert((result.citas ?? []).length === 2 && result.telefono === rawClient.telefono, 'TECH_SUPPORT perdió acceso completo');
-    },
-  },
-  {
-    description: 'EMPLOYEE recibe el DTO permitido para un cliente accesible',
-    run: () => {
-      const result = buildClientResponse(employeeScopedClient, 'EMPLEADO');
-      assert(result.id === rawClient.id && result.nombre === rawClient.nombre, 'DTO de EMPLEADO perdió selección básica');
-      assert(result.telefono === rawClient.telefono, 'DTO de EMPLEADO perdió contacto necesario para su cliente');
-      assert(!('createdByUserId' in result), 'DTO de EMPLEADO expuso metadata de propiedad');
-    },
-  },
-  {
-    description: 'EMPLOYEE no recibe citas de otros profesionales',
-    run: () => {
-      const result = buildClientResponse(employeeScopedClient, 'EMPLEADO');
-      assert((result.citas ?? []).every((c) => c.empleado_id === employeeId), 'DTO de EMPLEADO expuso una cita ajena');
-      assert((result.historial ?? []).every((c) => c.empleado_id === employeeId), 'historial de EMPLEADO expuso una cita ajena');
-    },
-  },
-  {
-    description: 'DTO EMPLEADO conserva datos para buscar y seleccionar al cliente',
-    run: () => {
-      const result = buildClientResponse(employeeScopedClient, 'EMPLEADO');
-      assert(typeof result.nombre === 'string' && typeof result.telefono === 'string', 'búsqueda o selección de cliente se rompió');
-    },
-  },
-];
+describe('Pruebas de Seguridad - Fase 1', () => {
+  test('producción sin JWT_SECRET no obtiene secreto de autenticación', () => {
+    expect(getJwtSecret({ NODE_ENV: 'production' })).toBeNull();
+  });
 
-let failed = 0;
-for (const test of tests) {
-  try {
-    test.run();
-    console.log(`OK - ${test.description}`);
-  } catch (error) {
-    failed++;
-    console.error(`FAIL - ${test.description}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
+  test('no existe fallback JWT ni refresh predecible', () => {
+    expect(getJwtSecret({})).toBeNull();
+    expect(getJwtRefreshSecret({})).toBeNull();
+  });
 
-if (failed > 0) process.exit(1);
-console.log(`${tests.length} pruebas de seguridad superadas.`);
+  test('cron sin CRON_SECRET queda no autorizado antes de ejecutar lógica', () => {
+    expect(getCronSecret({})).toBeNull();
+    expect(isAuthorizedCronRequest(null, {})).toBe(false);
+  });
+
+  test('cron con token incorrecto queda no autorizado', () => {
+    expect(isAuthorizedCronRequest('Bearer incorrecto', { CRON_SECRET: 'secreto-de-prueba' })).toBe(false);
+  });
+
+  test('cron con token correcto llega a la lógica protegida', () => {
+    expect(isAuthorizedCronRequest('Bearer secreto-de-prueba', { CRON_SECRET: 'secreto-de-prueba' })).toBe(true);
+  });
+
+  test('ADMIN conserva cliente y citas completas', () => {
+    const result = buildClientResponse(rawClient, 'ADMIN');
+    const citas = result.citas ?? [];
+    expect(citas.length).toBe(2);
+    expect(citas.some((c) => c.id === 'other')).toBe(true);
+  });
+
+  test('TECH_SUPPORT conserva cliente y citas completas', () => {
+    const result = buildClientResponse(rawClient, 'TECH_SUPPORT');
+    expect((result.citas ?? []).length).toBe(2);
+    expect(result.telefono).toBe(rawClient.telefono);
+  });
+
+  test('EMPLOYEE recibe el DTO permitido para un cliente accesible', () => {
+    const result = buildClientResponse(employeeScopedClient, 'EMPLEADO');
+    expect(result.id).toBe(rawClient.id);
+    expect(result.nombre).toBe(rawClient.nombre);
+    expect(result.telefono).toBe(rawClient.telefono);
+    expect('createdByUserId' in result).toBe(false);
+  });
+
+  test('EMPLOYEE no recibe citas de otros profesionales', () => {
+    const result = buildClientResponse(employeeScopedClient, 'EMPLEADO');
+    expect((result.citas ?? []).every((c) => c.empleado_id === employeeId)).toBe(true);
+    expect((result.historial ?? []).every((c) => c.empleado_id === employeeId)).toBe(true);
+  });
+
+  test('DTO EMPLEADO conserva datos para buscar y seleccionar al cliente', () => {
+    const result = buildClientResponse(employeeScopedClient, 'EMPLEADO');
+    expect(typeof result.nombre).toBe('string');
+    expect(typeof result.telefono).toBe('string');
+  });
+});

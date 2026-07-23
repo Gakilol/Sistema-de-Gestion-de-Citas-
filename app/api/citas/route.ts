@@ -3,7 +3,6 @@ import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { syncCitaEstados } from '@/lib/automatizacion';
 import { parseLocalDateToUTC } from '@/lib/timezone';
-import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
 
 const ServicioSeleccionadoSchema = z.object({
@@ -19,21 +18,20 @@ const CreateCitaSchema = z.object({
   servicio_ids:            z.array(z.string().uuid()).nullish(),
   servicios_seleccionados: z.array(ServicioSeleccionadoSchema).nullish(),
   empleado_id:             z.string().uuid().nullish(),
-  fecha:                   z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Formato de fecha inválido'),
-  hora:                    z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Formato de hora inválido'),
+  fecha:                   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (debe ser YYYY-MM-DD)'),
+  hora:                    z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido (debe ser HH:MM)'),
   notas:                   z.string().max(2000).nullish(),
   forzar:                  z.boolean().nullish(),
+  overrideSchedule:        z.boolean().nullish(),
   allowOverlap:            z.boolean().nullish(),
   overlapReason:           z.string().max(500).nullish(),
 }).transform(data => {
-  // Normalizar null -> undefined para compatibilidad con el código existente
   const cleaned: any = {};
   for (const [key, value] of Object.entries(data)) {
     cleaned[key] = value === null ? undefined : value;
   }
   return cleaned;
 });
-
 
 export async function GET(req: NextRequest) {
   try {
@@ -46,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     const estado   = req.nextUrl.searchParams.get('estado') || '';
     const busqueda = req.nextUrl.searchParams.get('q') || '';
-    const scope    = req.nextUrl.searchParams.get('scope') || 'mine';
+    const scope    = req.nextUrl.searchParams.get('scope') || (userRole === 'ADMIN' ? 'all' : 'mine');
     const filterEmp = req.nextUrl.searchParams.get('empleado_id') || '';
 
     const scopeWhere = getScopedAppointmentWhere(userId, userRole, scope, filterEmp);
@@ -79,7 +77,9 @@ export async function GET(req: NextRequest) {
         }
       },
       orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
-    });    const filtradas = busqueda
+    });
+
+    const filtradas = busqueda
       ? citas.filter((c: any) =>
           c.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
           (c.cliente_telefono && c.cliente_telefono.includes(busqueda)) ||
@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
       hora,
       notas,
       forzar,
+      overrideSchedule,
       allowOverlap,
       overlapReason,
     } = body;
@@ -133,7 +134,6 @@ export async function POST(req: NextRequest) {
       finalEmpleadoId = userId;
     }
 
-    // Validar que el empleado sea agendable
     if (!finalEmpleadoId) {
       return NextResponse.json({ error: 'Debe especificar el empleado para la cita' }, { status: 400 });
     }
@@ -194,7 +194,8 @@ export async function POST(req: NextRequest) {
 
     const duracionCalculada = serviciosParaCita.reduce((sum, s) => sum + s.duracion, 0);
     const primerServicioId  = serviciosParaCita[0].id;
-    const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
+    // Excepción de horario: Todos los roles autenticados (ADMIN, TECH_SUPPORT, EMPLEADO)
+    const permitirHorarioExtendido = Boolean(overrideSchedule || forzar || userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT');
     const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
@@ -214,8 +215,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── TRANSACCIÓN ATÓMICA: Validación + Guardar cita ─────────────────────
+    // ─── TRANSACCIÓN ATÓMICA: Validación + Lock + Guardar cita ─────────────
     const result = await prisma.$transaction(async (tx: any) => {
+      // Bloqueo asesor de PostgreSQL para evitar carreras concurrentes en la misma fecha y estilista
+      try {
+        const lockStr = `${finalEmpleadoId}_${fecha.split('T')[0]}`;
+        let hash = BigInt(0);
+        for (let i = 0; i < lockStr.length; i++) {
+          hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
+        }
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hash})`;
+      } catch {}
+
       const disponibilidad = await calcularDisponibilidad(
         finalEmpleadoId,
         fecha.split('T')[0],
@@ -339,7 +350,7 @@ export async function POST(req: NextRequest) {
       afterData: cita,
       ipAddress: getClientIp(req.headers),
       userAgent: req.headers.get('user-agent') || undefined,
-      metadata: { allowOverlap: cita.allowOverlap }
+      metadata: { allowOverlap: cita.allowOverlap, overrideSchedule: Boolean(overrideSchedule || forzar) }
     });
 
     if (cita.allowOverlap) {

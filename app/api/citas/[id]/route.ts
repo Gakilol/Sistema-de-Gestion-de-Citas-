@@ -350,6 +350,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
     const cita = await prisma.$transaction(async (tx: any) => {
+      try {
+        const targetEmp = dataToUpdate.empleado_id || citaOriginal.empleado_id;
+        const targetDate = dataToUpdate.fecha
+          ? new Date(dataToUpdate.fecha).toISOString().split('T')[0]
+          : new Date(citaOriginal.fecha).toISOString().split('T')[0];
+        const lockStr = `${targetEmp}_${targetDate}`;
+        let hash = BigInt(0);
+        for (let i = 0; i < lockStr.length; i++) {
+          hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
+        }
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hash})`;
+      } catch {}
       let serviciosParaActualizar: { id: string; duracion: number }[] = [];
       let flagActualizarServicios = false;
 

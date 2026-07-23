@@ -19,6 +19,7 @@ const CreateClienteSchema = z.object({
 // ─── GET /api/clientes
 // Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas.
 // Soporta búsqueda por nombre, teléfono y correo electrónico.
+// Directorio compartido para todo el personal autenticado.
 export async function GET(req: NextRequest) {
   try {
     const { userId, userRole } = getUserContext(req);
@@ -36,18 +37,9 @@ export async function GET(req: NextRequest) {
           ],
         }
       : {};
-    const employeeAccessWhere = {
-      OR: [
-        { createdByUserId: userId },
-        { citas: { some: { empleado_id: userId } } },
-      ],
-    };
-    const whereClause = userRole === 'EMPLEADO'
-      ? { AND: [employeeAccessWhere, searchWhere] }
-      : searchWhere;
 
     const clientesData = await prisma.cliente.findMany({
-      where: whereClause,
+      where: searchWhere,
       include: {
         citas: {
           ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
@@ -203,8 +195,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ cliente: nuevoCliente, mensaje: 'Cliente registrado exitosamente' }, { status: 201 });
   } catch (err: any) {
+    if (err?.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Ya existe un cliente registrado con ese número de teléfono o correo electrónico.' },
+        { status: 409 }
+      );
+    }
     console.error('[CLIENT_CREATE_ERROR] Error al crear cliente:', err);
     return NextResponse.json({ error: 'No se pudo crear el cliente. Por favor intente nuevamente.' }, { status: 500 });
   }
 }
-

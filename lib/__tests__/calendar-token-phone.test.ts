@@ -49,7 +49,7 @@ describe('Pruebas Unitarias - Sistema de Calendario y WhatsApp', () => {
       id: 'cita-uuid-123',
       hora: '10:00',
       updated_at: new Date('2026-07-14T10:00:00Z'),
-      fecha: new Date('2026-07-20T00:00:00Z'),
+      fecha: new Date('2026-12-20T00:00:00Z'),
       duracion: 60,
     };
 

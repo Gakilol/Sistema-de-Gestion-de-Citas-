@@ -91,12 +91,49 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 });
     }
 
-    // 1. Eliminar citas asociadas a este servicio
-    await prisma.cita.deleteMany({
-      where: { servicio_id: id }
+    // Verificar si existen citas históricas o CitaServicio vinculados a este servicio
+    const citasCount = await prisma.cita.count({
+      where: {
+        OR: [
+          { servicio_id: id },
+          { citaServicios: { some: { servicio_id: id } } }
+        ]
+      }
     });
 
-    // 2. Eliminar físicamente el servicio
+    if (citasCount > 0) {
+      // Si tiene citas históricas, desactivar el servicio en lugar de borrar datos
+      const servicioDesactivado = await prisma.servicio.update({
+        where: { id },
+        data: { activo: false }
+      });
+
+      const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
+      await logAudit({
+        action: 'SERVICE_DEACTIVATED',
+        module: 'SERVICIOS',
+        status: 'SUCCESS',
+        userId: userId || undefined,
+        userRole: userRole || undefined,
+        userEmail,
+        entityType: 'Servicio',
+        entityId: id,
+        entityName: servicio.nombre,
+        description: `Servicio ${servicio.nombre} desactivado automáticamente al intentar eliminarlo debido a su historial de citas.`,
+        beforeData: servicio,
+        afterData: servicioDesactivado,
+        ipAddress: getClientIp(req.headers),
+        userAgent: req.headers.get('user-agent') || undefined
+      });
+
+      return NextResponse.json({
+        mensaje: 'El servicio tiene citas asociadas en el historial. Se ha desactivado del catálogo para preservar los registros.',
+        fueDesactivado: true,
+        servicio: servicioDesactivado
+      }, { status: 200 });
+    }
+
+    // Si NO tiene citas asociadas, eliminar físicamente
     await prisma.servicio.delete({
       where: { id }
     });
