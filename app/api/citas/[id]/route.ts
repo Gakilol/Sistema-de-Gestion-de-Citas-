@@ -49,7 +49,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ cita }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[CITA_GET_BY_ID_ERROR]', error);
+    return NextResponse.json({ error: 'Error al consultar la cita' }, { status: 500 });
   }
 }
 
@@ -318,7 +319,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         where: {
           empleado_id: empleadoFinal,
           fecha: parseLocalDateToUTC(originalDate),
-          estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] },
+          estado: { notIn: ['CANCELADA', 'REPROGRAMADA', 'COMPLETADA'] },
           id: { not: id }
         }
       });
@@ -524,7 +525,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       warning: hasOrphanedIntercalada ? 'Esta cita tiene una cita intercalada dentro del horario anterior. Revise si desea mantenerla, moverla o editarla.' : null
     }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[CITA_PATCH_ERROR]', error);
+    return NextResponse.json({ error: error.message || 'Error al actualizar la cita' }, { status: 400 });
   }
 }
 
@@ -605,6 +607,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     return NextResponse.json({ mensaje: 'Cita eliminada exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[CITA_DELETE_ERROR]', error);
+    return NextResponse.json({ error: 'Error al eliminar la cita' }, { status: 500 });
   }
 }

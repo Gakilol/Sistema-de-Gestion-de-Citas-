@@ -18,6 +18,15 @@ import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
 import { CitaResumenModal } from '@/components/citas/CitaResumenModal';
 import { CitaDetalleBottomSheet } from '@/components/citas/CitaDetalleBottomSheet';
 import { CitaCreadaConfirmacion } from '@/components/citas/CitaCreadaConfirmacion';
+import { formatHora12h } from '@/lib/time-utils';
+
+function fmtDate(d: string | Date) {
+  return formatDBDate(d);
+}
+
+function to12h(timeStr: string): string {
+  return formatHora12h(timeStr);
+}
 
 const getEmptyForm = () => ({
   cliente_id: '',
@@ -25,7 +34,7 @@ const getEmptyForm = () => ({
   cliente_telefono: '',
   servicio_id: '',
   servicio_ids: [] as string[],
-  servicio_duraciones: [] as number[], // custom durations parallel to servicio_ids
+  servicio_duraciones: [] as number[],
   empleado_id: '',
   fecha: '',
   hora: '',
@@ -52,23 +61,12 @@ const ESTADO_BADGE: Record<string, string> = {
   REPROGRAMADA: 'badge-reprogramada',
 };
 
-function fmtDate(d: string | Date) {
-  return formatDBDate(d);
-}
-
 function getBusinessTomorrowString(): string {
   const todayStr = getBusinessTodayString();
   const [year, month, day] = todayStr.split('-').map(Number);
   const d = new Date(Date.UTC(year, month - 1, day));
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().split('T')[0];
-}
-
-import { formatHora12h } from '@/lib/time-utils';
-
-// Helper local para convertir "HH:MM" a formato 12 horas AM/PM
-function to12h(timeStr: string): string {
-  return formatHora12h(timeStr);
 }
 
 function isSameBusinessWeek(dateStr: string): boolean {
@@ -111,7 +109,6 @@ function isWithinBusinessQuincena(dateStr: string): boolean {
   
   return targetTime >= fifteenDaysAgo.getTime() && targetTime <= todayDate.getTime();
 }
-
 
 function sortCitas(citasList: any[], ascending: boolean) {
   return [...citasList].sort((a, b) => {

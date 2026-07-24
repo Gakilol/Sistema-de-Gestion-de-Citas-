@@ -4,13 +4,19 @@ import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { id } = await params;
     const descansos = await prisma.descansoEmpleado.findMany({
       where: { empleado_id: id }
     });
     return NextResponse.json({ descansos }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[DESCANSOS_GET_ERROR]', error);
+    return NextResponse.json({ error: 'Error al consultar descansos' }, { status: 500 });
   }
 }
 
@@ -43,6 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ descansos: updatedDescansos, mensaje: 'Descansos actualizados exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[DESCANSOS_PUT_ERROR]', error);
+    return NextResponse.json({ error: 'Error al actualizar descansos' }, { status: 500 });
   }
 }

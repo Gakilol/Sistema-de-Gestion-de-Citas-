@@ -9,6 +9,11 @@ function parseYYYYMMDD(fechaYYYYMMDD: string): Date {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { id } = await params;
     const vacaciones = await prisma.vacacionesEmpleado.findMany({
       where: { empleado_id: id }
@@ -22,7 +27,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ vacaciones: formattedVacaciones }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[VACACIONES_GET_ERROR]', error);
+    return NextResponse.json({ error: 'Error al consultar vacaciones' }, { status: 500 });
   }
 }
 
@@ -61,6 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ vacaciones: formattedVacaciones, mensaje: 'Vacaciones actualizadas exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[VACACIONES_PUT_ERROR]', error);
+    return NextResponse.json({ error: 'Error al actualizar vacaciones' }, { status: 500 });
   }
 }

@@ -70,7 +70,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json({ servicio, mensaje: 'Servicio actualizado' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[SERVICIO_PATCH_ERROR]', error);
+    return NextResponse.json({ error: 'Error al actualizar el servicio' }, { status: 500 });
   }
 }
 
@@ -157,6 +158,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     return NextResponse.json({ mensaje: 'Servicio eliminado exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[SERVICIO_DELETE_ERROR]', error);
+    return NextResponse.json({ error: 'Error al eliminar el servicio' }, { status: 500 });
   }
 }

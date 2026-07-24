@@ -287,6 +287,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     return NextResponse.json({ mensaje: 'Empleado eliminado exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Error interno del servidor' }, { status: 500 });
+    console.error('[EMPLEADO_DELETE_ERROR]', error);
+    return NextResponse.json({ error: 'Error al procesar la eliminación del empleado' }, { status: 500 });
   }
 }

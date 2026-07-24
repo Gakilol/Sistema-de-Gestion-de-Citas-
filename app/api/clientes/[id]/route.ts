@@ -181,6 +181,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ success: true, mensaje: 'Cliente eliminado exitosamente' }, { status: 200 });
   } catch (error: any) {
     console.error('Error al eliminar cliente:', error);
-    return NextResponse.json({ error: error.message || 'Error interno al procesar eliminación' }, { status: 400 });
+    return NextResponse.json({ error: 'Error interno al procesar la eliminación del cliente' }, { status: 500 });
   }
 }

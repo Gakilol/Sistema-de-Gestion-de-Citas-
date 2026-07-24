@@ -83,6 +83,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[/api/gestion/clientes-inactivos/recordatorio]', error);
-    return NextResponse.json({ error: 'Error al registrar el recordatorio: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al registrar el recordatorio' }, { status: 500 });
   }
 }

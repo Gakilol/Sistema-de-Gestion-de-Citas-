@@ -53,7 +53,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json({ categoria, mensaje: 'Categoría actualizada exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[CATEGORIA_PATCH_ERROR]', error);
+    return NextResponse.json({ error: 'Error al actualizar la categoría' }, { status: 500 });
   }
 }
 
@@ -83,6 +84,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     return NextResponse.json({ mensaje: 'Categoría eliminada exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[CATEGORIA_DELETE_ERROR]', error);
+    return NextResponse.json({ error: 'Error al eliminar la categoría' }, { status: 500 });
   }
 }

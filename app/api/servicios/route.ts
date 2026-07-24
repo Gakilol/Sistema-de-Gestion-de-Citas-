@@ -1,7 +1,16 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { z } from 'zod';
 import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
+
+const CreateServicioSchema = z.object({
+  nombre: z.string().min(1, 'El nombre es obligatorio').max(150).trim(),
+  descripcion: z.string().max(1000).optional().nullable(),
+  duracion: z.number().int('La duración debe ser en minutos enteros').min(1).max(1440),
+  categoria_id: z.string().uuid().optional().nullable(),
+  categoria: z.string().max(100).optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +30,8 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ servicios }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[SERVICIOS_GET_ERROR]', error);
+    return NextResponse.json({ error: 'Error interno al consultar servicios' }, { status: 500 });
   }
 }
 
@@ -32,10 +42,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden crear servicios' }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { nombre, descripcion, duracion, categoria_id } = body;
+    const rawBody = await req.json();
+    const parseResult = CreateServicioSchema.safeParse({
+      ...rawBody,
+      duracion: rawBody.duracion !== undefined ? Number(rawBody.duracion) : undefined,
+    });
 
-    let legacyCategoria = body.categoria || null;
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Datos de servicio inválidos', detalles: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const { nombre, descripcion, duracion, categoria_id, categoria: catName } = parseResult.data;
+
+    let legacyCategoria = catName || null;
     if (categoria_id) {
       const cat = await prisma.categoria.findUnique({ where: { id: categoria_id } });
       if (cat) {
@@ -46,8 +68,8 @@ export async function POST(req: NextRequest) {
     const servicio = await prisma.servicio.create({
       data: {
         nombre,
-        descripcion,
-        duracion: Number(duracion),
+        descripcion: descripcion || null,
+        duracion,
         categoria: legacyCategoria,
         categoria_id: categoria_id || null,
       },
@@ -72,6 +94,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ servicio, mensaje: 'Servicio creado exitosamente' }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[SERVICIOS_POST_ERROR]', error);
+    return NextResponse.json({ error: 'No se pudo crear el servicio' }, { status: 500 });
   }
 }

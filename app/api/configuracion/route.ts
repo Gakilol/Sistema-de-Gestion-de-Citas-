@@ -4,12 +4,18 @@ import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
 
 // ─── GET /api/configuracion
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const config = await prisma.configuracion.findUnique({ where: { id: 'default' } });
     return NextResponse.json({ config: config || {} });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[CONFIG_GET_ERROR]', err);
+    return NextResponse.json({ error: 'Error interno al consultar la configuración' }, { status: 500 });
   }
 }
 
@@ -76,6 +82,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ config: updated, mensaje: 'Configuración guardada exitosamente' });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[CONFIG_PATCH_ERROR]', err);
+    return NextResponse.json({ error: 'Error interno al actualizar la configuración' }, { status: 500 });
   }
 }

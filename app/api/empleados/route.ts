@@ -9,7 +9,7 @@ const CreateEmpleadoSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
   correo: z.string().email('Correo electrónico no válido').max(254),
   telefono: z.string().max(30).optional().nullable(),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').max(128).optional(),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').max(128),
   especialidad: z.string().max(100).optional().nullable(),
   tituloCliente: z.string().max(100).optional().nullable(),
   horario: z.record(z.any()).optional(),
@@ -19,6 +19,11 @@ const CreateEmpleadoSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
+    const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'Usuario no autorizado' }, { status: 401 });
+    }
+
     const busqueda = req.nextUrl.searchParams.get('q') || '';
     const schedulable = req.nextUrl.searchParams.get('schedulable') === 'true';
 
@@ -65,7 +70,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ empleados }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[EMPLEADOS_GET_ERROR]', error);
+    return NextResponse.json({ error: 'Error al consultar empleados' }, { status: 500 });
   }
 }
 
@@ -93,7 +99,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El correo ya está en uso' }, { status: 400 });
     }
 
-    const passwordHash = await bcrypt.hash(password || 'Temporal123!', 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const defaultHorario = {
       lunes: [{ inicio: '08:00', fin: '17:00' }],
@@ -138,6 +144,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ empleado, mensaje: 'Empleado creado exitosamente' }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[EMPLEADOS_POST_ERROR]', error);
+    return NextResponse.json({ error: 'No se pudo crear el empleado' }, { status: 500 });
   }
 }

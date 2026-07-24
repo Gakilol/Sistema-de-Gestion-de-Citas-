@@ -284,6 +284,6 @@ export async function GET(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[/api/gestion/clientes-inactivos]', error);
-    return NextResponse.json({ error: 'Error interno del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor al consultar clientes inactivos' }, { status: 500 });
   }
 }

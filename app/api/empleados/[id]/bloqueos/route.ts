@@ -9,6 +9,11 @@ function parseYYYYMMDD(fechaYYYYMMDD: string): Date {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId, userRole } = getUserContext(req);
+    if (!userId || !userRole) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { id } = await params;
     const bloqueos = await prisma.bloqueoHorario.findMany({
       where: { empleado_id: id }
@@ -22,7 +27,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ bloqueos: formattedBloqueos }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[BLOQUEOS_GET_ERROR]', error);
+    return NextResponse.json({ error: 'Error al consultar bloqueos' }, { status: 500 });
   }
 }
 
@@ -61,6 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ bloqueos: formattedBloqueos, mensaje: 'Bloqueos actualizados exitosamente' }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[BLOQUEOS_PUT_ERROR]', error);
+    return NextResponse.json({ error: 'Error al actualizar bloqueos' }, { status: 500 });
   }
 }

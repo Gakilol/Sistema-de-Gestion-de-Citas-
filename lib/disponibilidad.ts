@@ -260,7 +260,7 @@ export async function calcularDisponibilidad(
   const citasWhere: any = {
     empleado_id: empleadoId,
     fecha: fechaDate,
-    estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] }
+    estado: { notIn: ['CANCELADA', 'REPROGRAMADA', 'COMPLETADA'] }
   };
   if (excludeCitaId) {
     citasWhere.id = { not: excludeCitaId };
@@ -387,7 +387,7 @@ export async function detectarConflictos(
   const citasWhere: any = {
     empleado_id: empleadoId,
     fecha: fechaDate,
-    estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] }
+    estado: { notIn: ['CANCELADA', 'REPROGRAMADA', 'COMPLETADA'] }
   };
   if (excludeCitaId) {
     citasWhere.id = { not: excludeCitaId };
