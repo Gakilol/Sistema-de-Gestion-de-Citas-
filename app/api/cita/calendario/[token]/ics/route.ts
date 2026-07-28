@@ -115,7 +115,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
-  } catch (error: any) {
+  } catch {
     console.error('[cita/calendario/ics] Error generando archivo ICS');
     return new NextResponse('Error interno del servidor', {
       status: 500,

@@ -141,26 +141,26 @@ export default function Servicios() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+        <div className="app-page space-y-5 page-enter">
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Catálogo de Servicios</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Catálogo de Servicios</h1>
               <p className="text-sm text-muted-foreground">{servicios.filter(s => s.activo).length} activos de {servicios.length}</p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4" /> Nuevo Servicio
+            <Button onClick={openCreate} className="gap-2 glow-gold shrink-0 px-3.5 sm:px-4">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuevo servicio</span><span className="sm:hidden">Nuevo</span>
             </Button>
           </div>
 
           {/* Tabs por categoría */}
-          <div className="flex gap-1.5 flex-wrap">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
             {cats.map(c => (
               <button
                 key={c}
                 onClick={() => setTabCat(c)}
                 className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium transition-all border',
+                  'shrink-0 min-h-10 px-3 py-1.5 rounded-full text-xs font-medium transition-all border',
                   tabCat === c ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:text-foreground'
                 )}
               >
@@ -171,7 +171,7 @@ export default function Servicios() {
 
           {/* Grid de tarjetas */}
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
                   <div className="skeleton h-5 w-3/4" />
@@ -181,14 +181,14 @@ export default function Servicios() {
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="py-20 text-center text-muted-foreground">
+            <div className="empty-state surface-panel text-muted-foreground">
               <Scissors className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p>No hay servicios en esta categoría</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filtered.map(serv => (
-                <div key={serv.id} className={cn('rounded-xl border border-border/50 bg-card p-5 hover-lift transition-all flex flex-col justify-between', !serv.activo && 'opacity-60')}>
+                <div key={serv.id} className={cn('surface-panel p-4 sm:p-5 hover-lift transition-all flex flex-col justify-between', !serv.activo && 'opacity-60')}>
                   <div>
                     <div className="flex items-start justify-between mb-3">
                       <div>

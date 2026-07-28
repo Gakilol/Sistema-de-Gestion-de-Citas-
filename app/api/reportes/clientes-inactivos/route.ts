@@ -8,8 +8,6 @@ export async function GET(req: NextRequest) {
 
   const parsed = parseReportFilters(req);
   if ('error' in parsed) return parsed.error;
-  const { filters } = parsed;
-
   const sp = req.nextUrl.searchParams;
   // Inactivity threshold in days
   const diasInactividad = Math.min(Math.max(parseInt(sp.get('dias') || '90'), 1), 730);
@@ -61,8 +59,8 @@ export async function GET(req: NextRequest) {
 
     // Enrich with most used service per client
     const clienteIds = paginated.map((r: any) => r.id);
-    let servicioFavMap: Record<string, string> = {};
-    let empleadoFavMap: Record<string, string> = {};
+    const servicioFavMap: Record<string, string> = {};
+    const empleadoFavMap: Record<string, string> = {};
 
     if (clienteIds.length > 0) {
       const servicioFavRaw = await prisma.cita.groupBy({

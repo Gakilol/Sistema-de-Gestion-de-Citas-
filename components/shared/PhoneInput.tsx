@@ -79,7 +79,7 @@ export function PhoneInput({ value, onChange, disabled = false, className, place
   const handlePhoneChange = (val: string) => {
     const cleanAll = val.replace(/\D/g, '');
     let activeCountry = countryCode;
-    let cleanDigits = cleanAll;
+    let cleanDigits: string;
 
     // Si el usuario pega un número completo con prefijo (ej: 50586757959 o +505 8675-7959)
     const matched = COUNTRIES.find(c => cleanAll.length >= 11 && cleanAll.startsWith(c.code));

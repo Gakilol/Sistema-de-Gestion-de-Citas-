@@ -1,10 +1,8 @@
 import { describe, test, expect } from 'vitest';
 import { buildClientResponse } from '../../lib/client-privacy';
 import {
-  getCronSecret,
   getJwtRefreshSecret,
   getJwtSecret,
-  isAuthorizedCronRequest,
 } from '../../lib/security-secrets';
 
 const employeeId = '11111111-1111-1111-1111-111111111111';
@@ -45,19 +43,6 @@ describe('Pruebas de Seguridad - Fase 1', () => {
   test('no existe fallback JWT ni refresh predecible', () => {
     expect(getJwtSecret({})).toBeNull();
     expect(getJwtRefreshSecret({})).toBeNull();
-  });
-
-  test('cron sin CRON_SECRET queda no autorizado antes de ejecutar lógica', () => {
-    expect(getCronSecret({})).toBeNull();
-    expect(isAuthorizedCronRequest(null, {})).toBe(false);
-  });
-
-  test('cron con token incorrecto queda no autorizado', () => {
-    expect(isAuthorizedCronRequest('Bearer incorrecto', { CRON_SECRET: 'secreto-de-prueba' })).toBe(false);
-  });
-
-  test('cron con token correcto llega a la lógica protegida', () => {
-    expect(isAuthorizedCronRequest('Bearer secreto-de-prueba', { CRON_SECRET: 'secreto-de-prueba' })).toBe(true);
   });
 
   test('ADMIN conserva cliente y citas completas', () => {

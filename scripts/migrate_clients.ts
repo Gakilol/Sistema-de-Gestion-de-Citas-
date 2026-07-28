@@ -37,7 +37,7 @@ async function main() {
   let clientesCreados = 0;
   let citasActualizadas = 0;
 
-  for (const [clave, data] of clientesMap.entries()) {
+  for (const data of clientesMap.values()) {
     // Buscar si ya existe un cliente (por si el script se corre varias veces)
     // Para simplificar, insertamos todos los del map, asumiendo que es la primera vez que se crea la tabla Cliente
     const nuevoCliente = await prisma.cliente.create({

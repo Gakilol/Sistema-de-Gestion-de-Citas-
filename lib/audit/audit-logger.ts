@@ -26,7 +26,7 @@ export interface AuditLogOptions {
  * Extracts and sanitizes user IP address from headers
  */
 export function getClientIp(headers: any): string {
-  let ip = '';
+  let ip: string;
   
   if (typeof headers.get === 'function') {
     // Headers object (like NextRequest headers)
@@ -198,7 +198,7 @@ export function mapLegacyAuditLog(log: any, employeesMap?: Map<string, any>): an
     else if (entName === 'Servicio') label = 'servicio';
     else if (entName === 'Configuracion') label = 'configuración';
 
-    let desc = '';
+    let desc: string;
     if (accName === 'crear') desc = `Creación de ${label}`;
     else if (accName === 'actualizar') desc = `Actualización de ${label}`;
     else if (accName === 'eliminar') desc = `Eliminación de ${label}`;

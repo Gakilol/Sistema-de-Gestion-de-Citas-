@@ -16,7 +16,6 @@ import {
   Check,
   Loader2,
   WifiOff,
-  Share2,
 } from 'lucide-react';
 import {
   Drawer,
@@ -127,7 +126,7 @@ export function CitaDetalleBottomSheet({
         const waUrl = telClean ? `https://wa.me/${telClean}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
         window.open(waUrl, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
+    } catch {
       toast.error('Error al conectar con el servidor');
     } finally {
       setEnviando(false);
@@ -182,6 +181,9 @@ export function CitaDetalleBottomSheet({
                 <DrawerTitle className="text-sm font-bold text-foreground">
                   Detalle de la Cita
                 </DrawerTitle>
+                <DrawerDescription className="sr-only">
+                  Información de la cita seleccionada y acciones disponibles.
+                </DrawerDescription>
                 <span
                   className={cn(
                     'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider inline-block mt-0.5',

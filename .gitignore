@@ -66,6 +66,8 @@ skills-lock.json
 # Local Markdown documentation
 *.md
 **/*.md
+!README.md
+tasks/
 
 # Test artifacts
 playwright-report/

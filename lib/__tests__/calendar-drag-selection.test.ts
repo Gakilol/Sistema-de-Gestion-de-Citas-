@@ -10,9 +10,6 @@ import {
   minutesToLabel,
   snapToStep,
   checkOverlap,
-  HORA_INICIO,
-  HORA_FIN,
-  HOUR_HEIGHT,
 } from '../calendar-drag-utils';
 import { getBusinessTodayString } from '../timezone';
 

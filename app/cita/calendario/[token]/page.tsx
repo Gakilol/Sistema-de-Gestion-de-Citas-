@@ -4,7 +4,6 @@
 // Nunca muestra: teléfono, IDs, notas internas, precios, botón editar/cancelar.
 
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { verificarTokenCalendario } from '@/lib/calendar-token';
 import { prisma } from '@/lib/db';
 import { formatDBDateLong } from '@/lib/timezone';

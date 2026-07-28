@@ -7,6 +7,7 @@ export interface ClientResponseSource {
   id: string;
   nombre: string;
   telefono: string | null;
+  cedula?: string | null;
   correo: string | null;
   notas: string | null;
   citas?: ClientAppointmentDto[];
@@ -36,6 +37,7 @@ export function buildClientResponse(
     id: client.id,
     nombre: client.nombre,
     telefono: client.telefono,
+    cedula: client.cedula ?? null,
     correo: client.correo,
     notas: client.notas,
     citas: client.citas ?? [],

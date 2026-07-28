@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { getUserContext } from '@/lib/auth-helpers';
 import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
+import { ActualizarClienteSchema } from '@/src/validadores';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,8 +14,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { nombre, telefono, correo, notas } = body;
+    const parseResult = ActualizarClienteSchema.safeParse(await req.json());
+    if (!parseResult.success) {
+      return NextResponse.json({ error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors }, { status: 400 });
+    }
+    const { nombre, telefono, cedula, correo, notas } = parseResult.data;
 
     if (!nombre || nombre.trim().length < 2) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
@@ -53,6 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Sanitizar correo y notas vacíos a null
     const correoNormalizado = correo && String(correo).trim() !== '' ? String(correo).trim().toLowerCase() : null;
+    const cedulaNormalizada = cedula && String(cedula).trim() !== '' ? String(cedula).trim() : null;
     const notasNormalizadas = notas && String(notas).trim() !== '' ? String(notas).trim() : null;
 
     // Validar teléfono duplicado (solo si se provee uno)
@@ -89,8 +94,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Construcción explícita del objeto data con campos válidos de Prisma
     const data = {
-      nombre: nombre.trim(),
+      nombre: nombre.trim().replace(/\s+/g, ' '),
       telefono: telefonoNormalizado,
+      cedula: cedulaNormalizada,
       correo: correoNormalizado,
       notas: notasNormalizadas,
     };

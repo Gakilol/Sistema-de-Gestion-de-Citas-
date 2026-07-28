@@ -17,14 +17,12 @@ import {
   Moon,
   Monitor,
   ChevronRight,
-  Clock,
   Menu,
   X,
   Tag,
   UserX,
   ShieldCheck,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
 import { cn } from '@/lib/utils';
 
@@ -144,7 +142,7 @@ const menuGroups: MenuGroup[] = [
     label: 'Gestión',
     items: [
       {
-        title: 'Citas',
+        title: 'Agenda',
         href: '/citas',
         icon: Calendar,
         roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'],
@@ -340,7 +338,7 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
   const pathname = usePathname();
   const pageNames: Record<string, string> = {
     '/dashboard':          'Dashboard',
-    '/citas':              'Citas',
+    '/citas':              'Agenda',
     '/clientes':           'Clientes',
     '/clientes-inactivos': 'Clientes Inactivos',
     '/servicios':          'Servicios',
@@ -353,25 +351,80 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';
 
   return (
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar))] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-4 pt-safe">
+    <header className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar)/0.96)] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-3 sm:px-4 pt-safe backdrop-blur-xl">
       <button
         onClick={onOpen}
         aria-label="Abrir menú de navegación"
-        className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-[hsl(var(--sidebar-foreground)/0.75)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] active:bg-[hsl(var(--sidebar-accent))] transition-all"
+        className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-xl text-[hsl(var(--sidebar-foreground)/0.75)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] active:scale-95 transition-all"
       >
         <Menu className="w-5 h-5" />
       </button>
-      <div className="flex items-center gap-2">
-        <div className="w-5.5 h-5.5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md flex items-center justify-center shadow-sm">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="w-7 h-7 flex-shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center shadow-sm">
           <Scissors className="w-3.5 h-3.5 text-white" />
         </div>
-        <span className="text-[hsl(var(--sidebar-foreground))] font-bold text-sm tracking-tight">{currentPage}</span>
+        <span className="truncate text-[hsl(var(--sidebar-foreground))] font-bold text-sm tracking-tight">{currentPage}</span>
       </div>
-    </div>
+    </header>
   );
 }
 
 // ─── Export Principal ──────────────────────────────────────────────────────
+function MobileBottomNav({ onOpen }: { onOpen: () => void }) {
+  const pathname = usePathname();
+  const items = [
+    { title: 'Inicio', href: '/dashboard', icon: LayoutDashboard },
+    { title: 'Agenda', href: '/citas', icon: Calendar },
+    { title: 'Clientes', href: '/clientes', icon: Users },
+  ];
+
+  return (
+    <nav
+      data-mobile-bottom-nav
+      aria-label="Navegación principal"
+      className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/0.97)] px-2 pb-safe shadow-[0_-10px_30px_hsl(var(--foreground)/0.08)] backdrop-blur-xl"
+    >
+      <div className="grid h-[4.25rem] grid-cols-4 items-stretch">
+        {items.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`));
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={isActive ? 'page' : undefined}
+              className={cn(
+                'relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors',
+                isActive
+                  ? 'text-[hsl(var(--sidebar-primary))]'
+                  : 'text-[hsl(var(--sidebar-foreground)/0.58)] active:bg-[hsl(var(--sidebar-accent))]'
+              )}
+            >
+              {isActive && (
+                <span className="absolute top-1 h-0.5 w-7 rounded-full bg-[hsl(var(--sidebar-primary))]" />
+              )}
+              <item.icon className="h-5 w-5" />
+              <span className="truncate">{item.title}</span>
+            </Link>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label="Abrir todos los módulos"
+          className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-[hsl(var(--sidebar-foreground)/0.58)] active:bg-[hsl(var(--sidebar-accent))]"
+        >
+          <Menu className="h-5 w-5" />
+          <span>Más</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 export function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -389,12 +442,13 @@ export function AdminSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-56 flex-shrink-0 h-screen sticky top-0 overflow-hidden border-r border-[hsl(var(--sidebar-border))]">
+      <aside className="hidden lg:flex w-60 xl:w-64 flex-shrink-0 h-screen sticky top-0 overflow-hidden border-r border-[hsl(var(--sidebar-border))]">
         <SidebarContent />
       </aside>
 
       {/* Mobile header */}
       <MobileHeader onOpen={() => setMobileOpen(true)} />
+      <MobileBottomNav onOpen={() => setMobileOpen(true)} />
 
       {/* Mobile drawer overlay */}
       {mobileOpen && (

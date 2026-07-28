@@ -5,7 +5,7 @@ import { getUserContext } from '@/lib/auth-helpers';
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { userId, userRole } = getUserContext(req);
+    const { userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar categorías' }, { status: 403 });
     }
@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { userId, userRole } = getUserContext(req);
+    const { userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden eliminar categorías' }, { status: 403 });
     }

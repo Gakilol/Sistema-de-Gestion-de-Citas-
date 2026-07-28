@@ -28,16 +28,3 @@ export function getJwtRefreshSecret(env: Environment = process.env): string | nu
 export function getRememberDeviceSecret(env: Environment = process.env): string | null {
   return readSecret('REMEMBER_DEVICE_SECRET', env) ?? getJwtSecret(env);
 }
-
-export function getCronSecret(env: Environment = process.env): string | null {
-  return readSecret('CRON_SECRET', env);
-}
-
-/** Supports the Authorization header format used by Vercel Cron. */
-export function isAuthorizedCronRequest(
-  authorization: string | null,
-  env: Environment = process.env
-): boolean {
-  const secret = getCronSecret(env);
-  return secret !== null && authorization === `Bearer ${secret}`;
-}

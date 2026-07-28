@@ -4,7 +4,7 @@ import { AuthServicio } from '@/src/servicios/auth.servicio';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { checkLoginRateLimit } from '@/lib/audit/rate-limiter';
 import { prisma } from '@/lib/db';
-import { generateRememberToken, hashRememberToken, parseUserAgent } from '@/lib/remember-device';
+import { cleanupRememberedDevicesForUser, generateRememberToken, hashRememberToken, parseUserAgent } from '@/lib/remember-device';
 
 // ─── Schema de validación Zod ────────────────────────────────────────────────
 const LoginInputSchema = z.object({
@@ -79,6 +79,8 @@ export async function POST(req: NextRequest) {
       { mensaje: 'Login exitoso', usuario: result.usuario },
       { status: 200 }
     );
+
+    await cleanupRememberedDevicesForUser(result.usuario.id);
 
     // Configurar cookies httpOnly seguras
     // Sesión normal dura 24 horas por requisito del usuario

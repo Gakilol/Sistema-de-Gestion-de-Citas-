@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserContext } from '@/lib/auth-helpers';
-import { parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId, userRole, userEmail } = getUserContext(req);
+    const { userId, userRole } = getUserContext(req);
     if (!userId || !userRole) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -85,7 +84,7 @@ export async function GET(req: NextRequest) {
     // 2. Fetch latest completed appointments for these clients to enrich with last service/professional
     const allRawIds = clientesInactivosRaw.map((r: any) => r.id);
     let enrichedClients: any[] = [];
-    let stats = {
+    const stats = {
       totalInactivos: 0,
       sinRecordatorio: 0,
       enviadosEsteMes: 0,

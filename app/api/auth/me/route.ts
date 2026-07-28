@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         especialidad: empleado.especialidad,
       }
     }, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
   }
 }

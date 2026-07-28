@@ -16,16 +16,6 @@ export const prisma = prismaRaw.$extends({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }: any) {
-        const writeOperations = [
-          'create',
-          'createMany',
-          'update',
-          'updateMany',
-          'upsert',
-          'delete',
-          'deleteMany',
-        ];
-
         // Validar permisos de escritura en la base de datos (bloqueos artificiales desactivados)
 
         // Auto-etiquetado con TEST_RUN_ID si existe en las variables de entorno

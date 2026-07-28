@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { userId, userRole } = getUserContext(req);
+    const { userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden editar horarios y vacaciones' }, { status: 403 });
     }

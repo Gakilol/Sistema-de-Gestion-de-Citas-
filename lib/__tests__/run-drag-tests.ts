@@ -2,8 +2,6 @@
 import {
   yToMinutes,
   minutesToY,
-  minutesToTimeStr,
-  timeStrToMinutes,
   formatTime12h,
   minutesToLabel,
   snapToStep,

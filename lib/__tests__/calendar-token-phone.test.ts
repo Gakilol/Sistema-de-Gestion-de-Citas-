@@ -66,7 +66,7 @@ describe('Pruebas Unitarias - Sistema de Calendario y WhatsApp', () => {
 
     test('Rechaza token alterado', () => {
       const token = generarTokenCalendario(citaEjemplo);
-      const [payload, sig] = token.split('.');
+      const [payload] = token.split('.');
       const tokenAlterado = `${payload}.firmaFalsa12345`;
 
       expect(verificarTokenCalendario(tokenAlterado)).toBeNull();

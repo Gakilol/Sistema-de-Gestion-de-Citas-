@@ -7,8 +7,6 @@ import {
   HORA_INICIO,
   HORA_FIN,
   TOTAL_HORAS,
-  HOUR_HEIGHT,
-  SLOT_HEIGHT,
   MIN_HEIGHT,
   MIN_HOUR_HEIGHT,
   DEFAULT_HOUR_HEIGHT,
@@ -19,7 +17,6 @@ import {
   CITA_MOVE_LONG_PRESS_MS,
   CITA_MOVE_MOUSE_THRESHOLD,
   MIN_APPOINTMENT_MINUTES,
-  RESIZE_HANDLE_PX,
   yToMinutes,
   minutesToY,
   minutesToTimeStr,
@@ -65,19 +62,6 @@ const MESES = [
 ];
 
 // ─── Estado de drag de CREACIÓN (ref mutable sin re-renders excesivos) ────────
-interface DragStateRef {
-  active: boolean;
-  dayStr: string;
-  empleadoId: string;
-  startMinutes: number;
-  currentMinutes: number;
-  pointerId: number;
-  startX: number;
-  startY: number;
-  pointerType: string;
-  targetCol: HTMLElement | null;
-}
-
 // ─── Estado visual y de interacción del bloque PROVISIONAL de creación ────────
 interface ProvisionalSlot {
   dayStr: string;
@@ -400,7 +384,7 @@ export function AgendaCalendario({
   const [activeMobileEmpId, setActiveMobileEmpId] = useState<string>('all');
 
   // ─── Permisos de edición ─────────────────────────────────────────────────────
-  const canMoveToOtherEmployee = useCallback((cita: any): boolean => {
+  const canMoveToOtherEmployee = useCallback((): boolean => {
     if (!user) return false;
     if (user.rol === 'ADMIN' || user.rol === 'TECH_SUPPORT') return true;
     // EMPLEADO solo puede mover sus propias citas pero NO reasignar a otro
@@ -532,15 +516,6 @@ export function AgendaCalendario({
 
     return mapa;
   }, [citasConOverrides, diasAMostrar, getCitaDateStr]);
-
-  // Contar citas visibles en el periodo
-  const totalCitasVisibles = useMemo(() => {
-    let count = 0;
-    Object.values(citasPorDia).forEach((lista) => {
-      count += lista.length;
-    });
-    return count;
-  }, [citasPorDia]);
 
   // Algoritmo de posicionamiento de bloques superpuestos (Google Calendar)
   const procesarCitasDia = useCallback((citasDia: any[]) => {
@@ -1317,7 +1292,7 @@ export function AgendaCalendario({
       const colInfo = findColumnAt(e.clientX, e.clientY);
       if (colInfo) {
         if (colInfo.empleadoId !== pDrag.originalEmpleadoId) {
-          if (canMoveToOtherEmployee(null)) {
+          if (canMoveToOtherEmployee()) {
             targetEmpleadoId = colInfo.empleadoId;
           }
         } else {
@@ -1358,9 +1333,7 @@ export function AgendaCalendario({
     handleAutoScrollAndPosition(e.clientY);
   }, [findColumnAt, canMoveToOtherEmployee, citasPorDia, handleAutoScrollAndPosition, hourHeight]);
 
-  const handleProvisionalBodyPointerUp = useCallback((
-    e: React.PointerEvent<HTMLDivElement>
-  ) => {
+  const handleProvisionalBodyPointerUp = useCallback(() => {
     const pDrag = provisionalDragRef.current;
     if (pDrag.mode !== 'move') return;
 
@@ -1457,9 +1430,7 @@ export function AgendaCalendario({
     handleAutoScrollAndPosition(e.clientY);
   }, [provisionalSlot, citasPorDia, handleAutoScrollAndPosition]);
 
-  const handleProvisionalResizePointerUp = useCallback((
-    e: React.PointerEvent<HTMLDivElement>
-  ) => {
+  const handleProvisionalResizePointerUp = useCallback(() => {
     const pDrag = provisionalDragRef.current;
     if (pDrag.mode !== 'resize-top' && pDrag.mode !== 'resize-bottom') return;
 
@@ -1470,7 +1441,7 @@ export function AgendaCalendario({
     pDrag.active = false;
   }, [stopAutoScroll]);
 
-  const handleMouseLeave = useCallback((dayStr: string, empleadoId: string) => {
+  const handleMouseLeave = useCallback(() => {
     if (!provisionalDragRef.current.active && !longPressPendingRef.current && !mousePendingRef.current) {
       setHoveredSlot(null);
     }
@@ -1601,7 +1572,7 @@ export function AgendaCalendario({
     if (colInfo) {
       // Verificar si puede cambiar de profesional
       if (colInfo.empleadoId !== mv.originalEmpleadoId) {
-        if (canMoveToOtherEmployee(mv.cita)) {
+        if (canMoveToOtherEmployee()) {
           targetEmpleadoId = colInfo.empleadoId;
         }
         // Si no puede cambiar de profesional, solo permitir cambio vertical en la columna original
@@ -1881,21 +1852,21 @@ export function AgendaCalendario({
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-126px)] min-h-[380px] max-h-[640px] sm:h-[750px] sm:min-h-[520px] sm:max-h-[85vh] border border-border/50 rounded-2xl bg-card overflow-hidden shadow-lg select-none relative pb-safe">
+    <div className="surface-panel flex flex-col h-[calc(100dvh-17.5rem)] min-h-[32rem] max-h-[52rem] sm:h-[calc(100dvh-13.5rem)] lg:h-[calc(100dvh-10rem)] overflow-hidden select-none relative">
       
       {/* CABECERA DEL CALENDARIO */}
-      <div className="flex flex-col gap-1.5 p-2 sm:p-4 border-b border-border/50 bg-secondary/15 z-30 shrink-0 sticky top-0 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-1.5 flex-wrap sm:flex-nowrap">
+      <div className="flex flex-col gap-2 p-2.5 sm:p-4 border-b border-border/50 bg-card/95 z-30 shrink-0 sticky top-0 backdrop-blur-xl">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
-          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
-            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1 text-xs hover-lift cursor-pointer h-11 sm:h-9 px-3 shrink-0">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1.5 text-xs cursor-pointer h-11 sm:h-9 px-3 shrink-0">
               <CalendarIcon className="w-3.5 h-3.5" /> Hoy
             </Button>
-            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-11 sm:h-9">
+            <div className="flex flex-1 sm:flex-none items-center border border-border rounded-xl bg-background shadow-xs h-11 sm:h-9 min-w-0">
               <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-xs sm:text-sm font-extrabold px-2 sm:px-3 border-x border-border py-1 text-foreground min-w-[95px] sm:min-w-[130px] text-center truncate">
+              <span className="flex-1 text-xs sm:text-sm font-extrabold px-2 sm:px-3 border-x border-border py-1 text-foreground min-w-0 sm:min-w-[130px] text-center truncate">
                 {tituloCabecera}
               </span>
               <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
@@ -1904,7 +1875,7 @@ export function AgendaCalendario({
             </div>
 
             {/* Control Discreto de Zoom Vertical (- 100% +) */}
-            <div className="flex items-center border border-border rounded-lg bg-background shadow-xs h-11 sm:h-9 p-0.5">
+            <div className="hidden sm:flex items-center border border-border rounded-lg bg-background shadow-xs h-9 p-0.5">
               <Button
                 variant="ghost"
                 size="icon"
@@ -1943,7 +1914,7 @@ export function AgendaCalendario({
           </div>
 
           {/* Toggles de Vista */}
-          <div className="flex bg-secondary/40 p-0.5 rounded-xl border border-border/50 shadow-inner h-11 sm:h-9 items-center ml-auto sm:ml-0">
+          <div className="flex w-full sm:w-auto bg-secondary/40 p-0.5 rounded-xl border border-border/50 shadow-inner h-11 sm:h-9 items-center">
             {[
               { id: 'dia', label: 'Día' },
               { id: '3dias', label: '3 Días' },
@@ -1953,7 +1924,7 @@ export function AgendaCalendario({
                 key={tab.id}
                 onClick={() => setVista(tab.id as any)}
                 className={cn(
-                  "px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-10 sm:h-7 flex items-center justify-center min-w-[42px]",
+                  "flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-10 sm:h-7 flex items-center justify-center min-w-[42px]",
                   vista === tab.id
                     ? "bg-primary text-primary-foreground shadow-xs scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -1967,7 +1938,7 @@ export function AgendaCalendario({
 
         {/* SELECTOR MÓVIL DE PROFESIONAL (Pestañas horizontales amplias) */}
         {empleadosBase.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-border/20 touch-pan-x">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar pt-2 border-t border-border/30 touch-pan-x">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">Estilista:</span>
             <button
               onClick={() => setActiveMobileEmpId('all')}
@@ -2002,7 +1973,7 @@ export function AgendaCalendario({
       </div>
 
       {/* CONTENEDOR DE GRID Y HORAS (SCROLL) */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto relative custom-scrollbar bg-background/5">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto relative custom-scrollbar bg-background/40 overscroll-contain">
         
         {/* Envoltorio con Ancho Mínimo */}
         <div
@@ -2149,7 +2120,7 @@ export function AgendaCalendario({
                           onPointerMove={(e) => handlePointerMove(e, diaStr, emp.id)}
                           onPointerUp={(e) => handlePointerUp(e, diaStr, emp.id)}
                           onPointerCancel={handlePointerCancel}
-                          onMouseLeave={() => handleMouseLeave(diaStr, emp.id)}
+                          onMouseLeave={handleMouseLeave}
                         >
                           {/* ── ÚNICO Bloque PROVISIONAL de creación / ajuste ── */}
                           {isProvisionalHere && provisionalSlot && (
@@ -2344,11 +2315,11 @@ export function AgendaCalendario({
                                 key={cita.id}
                                 title={tooltipText}
                                 className={cn(
-                                  "booking-card absolute rounded-xl border text-left transition-shadow duration-150 overflow-hidden flex flex-col group select-none",
+                                  "booking-card absolute rounded-xl border text-left transition-all duration-150 overflow-hidden flex flex-col group select-none shadow-sm",
                                   isBeingMoved || isBeingResized
                                     ? "opacity-35 shadow-none"
-                                    : "hover:shadow-lg hover:z-30",
-                                  isSelected && editable && "ring-2 ring-primary ring-offset-1 ring-offset-card z-20",
+                                    : "hover:shadow-xl hover:-translate-y-px hover:z-30",
+                                  isSelected && editable && "ring-2 ring-primary ring-offset-2 ring-offset-card z-20 shadow-xl",
                                   editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                                 )}
                                 style={{

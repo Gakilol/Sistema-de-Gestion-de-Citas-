@@ -20,7 +20,7 @@ export async function registrarAuditoria({
   detalles,
   realizadoPor,
 }: RegistrarAuditoriaParams): Promise<void> {
-  let mappedAction = 'SYSTEM_ACTION';
+  let mappedAction: string;
   if (accion === 'CREAR') mappedAction = `${entidad.toUpperCase()}_CREATED`;
   else if (accion === 'ACTUALIZAR') mappedAction = `${entidad.toUpperCase()}_UPDATED`;
   else if (accion === 'ELIMINAR') mappedAction = `${entidad.toUpperCase()}_DELETED`;

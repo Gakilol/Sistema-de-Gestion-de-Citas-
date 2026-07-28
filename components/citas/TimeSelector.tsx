@@ -175,7 +175,6 @@ export function TimeSelector({
     };
 
     fetchDisponibilidad();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empleadoId, fecha, servicioId, duracionTotal, excludeCitaId]);
 
   // ─── Derived state ──────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ interface Cliente {
   id: string;
   nombre: string;
   telefono: string | null;
+  cedula: string | null;
   correo: string | null;
   notas: string | null;
   totalCitas: number;
@@ -68,7 +69,7 @@ function Avatar({ nombre, size = 'md' }: { nombre: string; size?: 'sm' | 'md' | 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function Skeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
           <div className="flex gap-3">
@@ -89,20 +90,25 @@ function Skeleton() {
 }
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
-function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { cliente: any; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: any) => void; isAdmin: boolean }) {
+function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: any; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: any) => void }) {
   const { user } = useAuth();
   const canEdit = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
   const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col pb-safe">
+    <div
+      className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="historial-cliente-title"
+    >
+      <div className="w-full max-w-lg bg-card border border-border/50 rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl max-h-[94dvh] sm:max-h-[88vh] flex flex-col pb-safe overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50 shrink-0">
           <Avatar nombre={cliente.nombre} size="lg" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-foreground truncate">{cliente.nombre}</h2>
+              <h2 id="historial-cliente-title" className="font-bold text-foreground truncate">{cliente.nombre}</h2>
               {cliente.esRecurrente && (
                 <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">
                   <Star className="w-2.5 h-2.5" /> VIP
@@ -117,8 +123,10 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Cerrar historial"
+            className="w-11 h-11 rounded-xl hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -229,8 +237,10 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, isAdmin }: { clien
 // ─── Cliente Card ─────────────────────────────────────────────────────────────
 function ClienteCard({ cliente, onSelect }: { cliente: any; onSelect: () => void }) {
   return (
-    <div
-      className="rounded-xl border border-border/50 bg-card p-5 hover-lift cursor-pointer group"
+    <button
+      type="button"
+      aria-label={`Ver historial de ${cliente.nombre}`}
+      className="surface-panel w-full p-4 sm:p-5 hover-lift cursor-pointer group text-left focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
       onClick={onSelect}
     >
       <div className="flex items-start gap-3 mb-4">
@@ -255,7 +265,7 @@ function ClienteCard({ cliente, onSelect }: { cliente: any; onSelect: () => void
             </p>
           )}
         </div>
-        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
       </div>
 
       {/* Stats */}
@@ -283,29 +293,39 @@ function ClienteCard({ cliente, onSelect }: { cliente: any; onSelect: () => void
           <span>Última visita: {fmtDate(cliente.ultimaCita)}</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
 // ─── Modal Agregar Cliente ─────────────────────────────────────────────────
 function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ nombre: '', telefono: '', correo: '', notas: '' });
+  const [form, setForm] = useState({ nombre: '', telefono: '', cedula: '', correo: '', notas: '' });
   const [phoneValid, setPhoneValid] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (form.nombre.trim().length < 2) { toast.error('El nombre debe tener al menos 2 caracteres'); return; }
     if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
     try {
-      const res = await fetch('/api/clientes', {
+      let res = await fetch('/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
+      let data = await res.json();
+      if (!res.ok && data.requiresConfirmation) {
+        const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
+        if (!continuar) return;
+        res = await fetch('/api/clientes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form, confirmarDuplicadoNombre: true }),
+        });
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error);
       toast.success('Cliente registrado exitosamente');
       onCreated();
@@ -316,15 +336,20 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl p-4 sm:p-6 pb-safe max-h-[92vh] flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="agregar-cliente-title"
+    >
+      <div className="w-full max-w-md bg-card border border-border/50 rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl p-4 sm:p-6 pb-safe max-h-[94dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40 shrink-0">
-          <h2 className="text-lg font-bold text-foreground">Agregar Cliente</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+          <h2 id="agregar-cliente-title" className="text-lg font-bold text-foreground">Agregar Cliente</h2>
+          <button type="button" onClick={onClose} aria-label="Cerrar formulario" className="w-11 h-11 rounded-xl hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <form onSubmit={handleSubmit} className="min-h-0 space-y-4 overflow-y-auto flex-1 custom-scrollbar pr-0.5">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
             <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
@@ -341,6 +366,10 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
             />
           </div>
           <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Cédula (opcional)</label>
+            <Input value={form.cedula} onChange={e => setForm({ ...form, cedula: e.target.value })} placeholder="Identificación" />
+          </div>
+          <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Correo electrónico (opcional)</label>
             <Input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="juan.perez@ejemplo.com" />
           </div>
@@ -351,15 +380,15 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
               onChange={e => setForm({ ...form, notas: e.target.value })}
               placeholder="Alergias, preferencias, observaciones..."
               rows={2}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
+              className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
             />
           </div>
           <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
             El cliente quedará registrado y podrá programarle una cita desde el panel correspondiente.
           </p>
-          <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-            <Button type="submit" disabled={saving} className="glow-gold">
+          <div className="sticky bottom-0 flex justify-end gap-2 pt-3 pb-1 border-t border-border/50 bg-card shrink-0">
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Cancelar</Button>
+            <Button type="submit" disabled={saving} className="glow-gold flex-1 sm:flex-none">
               {saving ? 'Guardando...' : 'Registrar Cliente'}
             </Button>
           </div>
@@ -370,10 +399,11 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
 }
 
 // ─── Modal Editar Cliente ───────────────────────────────────────────────────
-function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente; onClose: () => void; onUpdated: (data: { nombre: string; telefono: string | null; correo: string | null; notas: string | null }) => void }) {
+function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente; onClose: () => void; onUpdated: (data: { nombre: string; telefono: string | null; cedula: string | null; correo: string | null; notas: string | null }) => void }) {
   const [form, setForm] = useState({
     nombre: cliente.nombre || '',
     telefono: cliente.telefono || '',
+    cedula: cliente.cedula || '',
     correo: cliente.correo || '',
     notas: cliente.notas || '',
   });
@@ -383,7 +413,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (form.nombre.trim().length < 2) { toast.error('El nombre debe tener al menos 2 caracteres'); return; }
     if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
     try {
@@ -398,6 +428,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
       onUpdated({
         nombre: form.nombre.trim(),
         telefono: data.cliente?.telefono ?? (form.telefono?.trim() || null),
+        cedula: data.cliente?.cedula ?? (form.cedula?.trim() || null),
         correo: data.cliente?.correo ?? (form.correo?.trim().toLowerCase() || null),
         notas: data.cliente?.notas ?? (form.notas?.trim() || null),
       });
@@ -408,15 +439,20 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl p-4 sm:p-6 pb-safe max-h-[92vh] flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editar-cliente-title"
+    >
+      <div className="w-full max-w-md bg-card border border-border/50 rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl shadow-2xl p-4 sm:p-6 pb-safe max-h-[94dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40 shrink-0">
-          <h2 className="text-lg font-bold text-foreground">Editar Cliente</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+          <h2 id="editar-cliente-title" className="text-lg font-bold text-foreground">Editar Cliente</h2>
+          <button type="button" onClick={onClose} aria-label="Cerrar formulario" className="w-11 h-11 rounded-xl hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <form onSubmit={handleSubmit} className="min-h-0 space-y-4 overflow-y-auto flex-1 custom-scrollbar pr-0.5">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre completo *</label>
             <Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required placeholder="Juan Pérez" />
@@ -433,6 +469,10 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
             />
           </div>
           <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Cédula (opcional)</label>
+            <Input value={form.cedula} onChange={e => setForm({ ...form, cedula: e.target.value })} placeholder="Identificación" />
+          </div>
+          <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Correo electrónico (opcional)</label>
             <Input type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="juan.perez@ejemplo.com" />
           </div>
@@ -443,12 +483,12 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
               onChange={e => setForm({ ...form, notas: e.target.value })}
               placeholder="Alergias, preferencias, observaciones..."
               rows={2}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
+              className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground/50"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-            <Button type="submit" disabled={saving} className="glow-gold">
+          <div className="sticky bottom-0 flex justify-end gap-2 pt-3 pb-1 border-t border-border/50 bg-card shrink-0">
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Cancelar</Button>
+            <Button type="submit" disabled={saving} className="glow-gold flex-1 sm:flex-none">
               {saving ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
@@ -461,7 +501,6 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
 
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function Clientes() {
-  const { user } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
@@ -516,52 +555,53 @@ export default function Clientes() {
       <AdminSidebar />
 
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 page-enter">
+        <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
           {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Historial y estadísticas de tus clientes</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Clientes</h1>
+              <p className="page-description truncate sm:whitespace-normal">Historial y estadísticas de tus clientes</p>
             </div>
-            <div className="flex gap-2 self-start sm:self-auto">
-              <Button variant="outline" size="sm" onClick={() => fetchClientes(busqueda)} className="gap-1.5">
-                <RefreshCcw className="w-3.5 h-3.5" /> Actualizar
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" size="icon" onClick={() => fetchClientes(busqueda)} aria-label="Actualizar clientes" title="Actualizar clientes">
+                <RefreshCcw className="w-4 h-4" />
               </Button>
-              <Button size="sm" onClick={() => setShowAgregar(true)} className="gap-1.5 glow-gold">
-                <UserPlus className="w-3.5 h-3.5" /> Registrar Cliente
+              <Button onClick={() => setShowAgregar(true)} className="gap-2 glow-gold px-3.5 sm:px-4">
+                <UserPlus className="w-4 h-4" /> <span className="hidden sm:inline">Registrar cliente</span><span className="sm:hidden">Registrar</span>
               </Button>
             </div>
           </div>
 
 
           {/* ── KPI mini ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-3">
-            <Card className="p-4 border-border/50 text-center">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <Card className="surface-panel p-2.5 sm:p-4 text-center">
               <p className="text-xl font-bold text-foreground">{clientes.length}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Clientes únicos</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Clientes únicos</p>
             </Card>
-            <Card className="p-4 border-border/50 text-center">
+            <Card className="surface-panel p-2.5 sm:p-4 text-center">
               <p className="text-xl font-bold text-amber-500">{recurrentes}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Recurrentes</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Recurrentes</p>
             </Card>
-            <Card className="p-4 border-border/50 text-center">
+            <Card className="surface-panel p-2.5 sm:p-4 text-center">
               <p className="text-xl font-bold text-emerald-500">{totalCitasCompletadas}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Servicios prestados</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Completadas</p>
             </Card>
           </div>
 
           {/* ── Búsqueda ─────────────────────────────────────────── */}
-          <div className="relative">
+          <div className="sticky top-14 lg:top-0 z-20 -mx-1 px-1 py-2 bg-background/90 backdrop-blur-xl">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre o teléfono..."
+              placeholder="Buscar por nombre, teléfono o cédula..."
               value={busqueda}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 bg-card border-border/60"
+              aria-label="Buscar clientes"
+              className="pl-10 pr-11 bg-card border-border/60 shadow-sm"
             />
             {busqueda && (
-              <button onClick={() => handleSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={() => handleSearch('')} aria-label="Limpiar búsqueda" className="absolute right-1.5 top-1/2 -translate-y-1/2 size-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -571,7 +611,7 @@ export default function Clientes() {
           {isLoading ? (
             <Skeleton />
           ) : clientes.length === 0 ? (
-            <div className="py-20 text-center text-muted-foreground">
+            <div className="empty-state surface-panel text-muted-foreground">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p className="font-medium">
                 {busqueda ? `Sin resultados para "${busqueda}"` : 'No hay clientes registrados'}
@@ -584,7 +624,7 @@ export default function Clientes() {
                 Mostrando <strong>{clientes.length}</strong> cliente{clientes.length !== 1 ? 's' : ''}
                 {busqueda && ` para "${busqueda}"`}
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {clientes.map((c) => (
                   <ClienteCard key={c.id} cliente={c} onSelect={() => setClienteSeleccionado(c)} />
                 ))}
@@ -601,7 +641,6 @@ export default function Clientes() {
           onClose={() => setClienteSeleccionado(null)}
           onDelete={handleEliminarCliente}
           onEdit={(c) => setClienteAEditar(c)}
-          isAdmin={user?.rol === 'ADMIN'}
         />
       )}
 

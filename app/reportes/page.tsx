@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -9,13 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
+  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import {
   BarChart3, Users, Calendar, TrendingUp, TrendingDown, Minus,
   Download, Loader2, AlertCircle, Clock, ArrowLeft, ArrowRight,
-  UserX, Star, Briefcase, Activity, Filter, RefreshCw, ChevronDown,
+  UserX, Star, Briefcase, Activity, RefreshCw, ChevronDown,
   CheckCircle, XCircle, AlertTriangle, Info,
 } from 'lucide-react';
 
@@ -33,7 +33,6 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
 ];
 
 const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316', '#ef4444', '#06b6d4'];
-const AREA_COLORS = { primary: '#d4a017', secondary: '#10b981', accent: '#3b82f6' };
 
 // ─── Date Presets ─────────────────────────────────────────────────────────────
 function getPreset(key: string): [string, string] {
@@ -190,8 +189,6 @@ function NivelBadge({ nivel }: { nivel: 'excelente' | 'aceptable' | 'riesgo' | s
 // ─── Main Page ────────────────────────────────────────────────────────────────
 function ReportesContent() {
   const router     = useRouter();
-  const pathname   = usePathname();
-  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
 
   // ── Filters
@@ -348,7 +345,7 @@ function ReportesContent() {
 
   const renderDemanda = () => {
     if (!data) return null;
-    const { porDiaSemana, porHora, porServicio, heatmap, insights } = data;
+    const { porDiaSemana, porHora, porServicio, insights } = data;
     return (
       <div className="space-y-5">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -421,7 +418,7 @@ function ReportesContent() {
 
   const renderAsistencia = () => {
     if (!data) return null;
-    const { resumen, tendencia, porEmpleado, porServicio, deltas } = data;
+    const { resumen, tendencia, porEmpleado, deltas } = data;
     return (
       <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -484,7 +481,7 @@ function ReportesContent() {
 
   const renderCancelaciones = () => {
     if (!data) return null;
-    const { resumen, tendencia, porDia, porEmpleado, porServicio, clientesConMasCancelaciones, deltas } = data;
+    const { resumen, tendencia, porDia, clientesConMasCancelaciones, deltas } = data;
     return (
       <div className="space-y-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -673,7 +670,7 @@ function ReportesContent() {
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={freqData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} paddingAngle={4}
-                    label={({ name, value }) => value > 0 ? `${value}` : ''} labelLine={false}>
+                    label={({ value }) => value > 0 ? `${value}` : ''} labelLine={false}>
                     {freqData.map((d, i) => <Cell key={i} fill={d.color} />)}
                   </Pie>
                   <Tooltip content={<ChartTip />} />
@@ -866,12 +863,12 @@ function ReportesContent() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+        <div className="app-page space-y-5 page-enter">
 
           {/* ─── Header ─────────────────────────────────────────────────── */}
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Reportes y Analítica</h1>
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Reportes y Analítica</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Período: {desde} → {hasta}
                 {(empleadoId || servicioId) && (
@@ -880,12 +877,12 @@ function ReportesContent() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button variant="outline" size="sm" onClick={() => fetchData(tab)} className="gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+              <Button variant="outline" size="icon" onClick={() => fetchData(tab)} aria-label="Actualizar reportes" title="Actualizar">
+                <RefreshCw className="w-4 h-4" />
               </Button>
               <div className="relative">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowFilters(f => !f)}>
-                  <Download className="w-3.5 h-3.5" /> Exportar <ChevronDown className="w-3 h-3" />
+                <Button variant="outline" className="gap-1.5 px-3" onClick={() => setShowFilters(f => !f)}>
+                  <Download className="w-4 h-4" /> <span className="hidden sm:inline">Exportar</span><ChevronDown className="w-3 h-3" />
                 </Button>
                 {showFilters && (
                   <div className="absolute right-0 top-full mt-1 z-20 bg-card border border-border/50 rounded-xl shadow-xl py-1 min-w-[150px]">
@@ -902,9 +899,9 @@ function ReportesContent() {
           </div>
 
           {/* ─── Filter Bar ──────────────────────────────────────────────── */}
-          <Card className="p-4 border-border/50 space-y-3">
+          <Card className="surface-panel p-4 space-y-3">
             {/* Presets */}
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex overflow-x-auto no-scrollbar gap-1.5 pb-1">
               {[
                 { k: 'hoy',     l: 'Hoy' },
                 { k: 'ayer',    l: 'Ayer' },
@@ -920,7 +917,7 @@ function ReportesContent() {
                 <button
                   key={p.k}
                   onClick={() => applyPreset(p.k)}
-                  className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  className={cn('shrink-0 min-h-10 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
                     preset === p.k ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'
                   )}
                 >
@@ -930,25 +927,25 @@ function ReportesContent() {
             </div>
 
             {/* Date inputs + advanced filters */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-end gap-3">
+              <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:w-auto items-center gap-2">
                 <Input
                   type="date" value={desde}
                   onChange={e => { setDesde(e.target.value); setPreset(''); }}
-                  className="h-8 text-xs w-36"
+                  className="h-11 text-xs w-full sm:w-36"
                 />
                 <span className="text-muted-foreground text-xs">—</span>
                 <Input
                   type="date" value={hasta}
                   onChange={e => { setHasta(e.target.value); setPreset(''); }}
-                  className="h-8 text-xs w-36"
+                  className="h-11 text-xs w-full sm:w-36"
                 />
               </div>
 
               <select
                 value={empleadoId}
                 onChange={e => setEmpleadoId(e.target.value)}
-                className="h-8 rounded-lg border border-border bg-card px-2 py-0 text-xs min-w-[150px] outline-none focus:ring-1 focus:ring-primary text-foreground"
+                className="h-11 w-full sm:w-auto rounded-lg border border-border bg-card px-3 py-0 text-xs min-w-[150px] outline-none focus:ring-1 focus:ring-primary text-foreground"
               >
                 <option value="">Todos los profesionales</option>
                 {empleados.map((e: any) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
@@ -957,13 +954,13 @@ function ReportesContent() {
               <select
                 value={servicioId}
                 onChange={e => setServicioId(e.target.value)}
-                className="h-8 rounded-lg border border-border bg-card px-2 py-0 text-xs min-w-[150px] outline-none focus:ring-1 focus:ring-primary text-foreground"
+                className="h-11 w-full sm:w-auto rounded-lg border border-border bg-card px-3 py-0 text-xs min-w-[150px] outline-none focus:ring-1 focus:ring-primary text-foreground"
               >
                 <option value="">Todos los servicios</option>
                 {servicios.map((s: any) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex min-h-11 items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={compare}

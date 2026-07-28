@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
   Clock, Users, Calendar, Download, Loader2, AlertCircle, ArrowLeft, ArrowRight,
-  Info, RefreshCw, CheckCircle, XCircle, ShieldAlert, Key, Database, Settings,
-  Eye, Copy, Check, Filter, Layers, ListFilter
+  RefreshCw, CheckCircle, XCircle, ShieldAlert, Key, Settings,
+  Eye, Copy, Check, Layers
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,7 +37,7 @@ export default function AuditoriaPage() {
   const [tab, setTab] = useState<AuditTab>('resumen');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [limit, setLimit] = useState(20);
+  const limit = 20;
   const [desde, setDesde] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -71,7 +71,7 @@ export default function AuditoriaPage() {
       if (!res.ok) throw new Error('Error al cargar resumen');
       const data = await res.json();
       setSummaryData(data);
-    } catch (e: any) {
+    } catch {
       toast.error('No se pudo cargar el resumen de KPIs.');
     }
   }, []);
@@ -83,7 +83,7 @@ export default function AuditoriaPage() {
       if (!res.ok) throw new Error('Error al cargar seguridad');
       const data = await res.json();
       setSecurityData(data);
-    } catch (e: any) {
+    } catch {
       toast.error('No se pudo cargar la auditoría de seguridad.');
     }
   }, []);
@@ -125,7 +125,7 @@ export default function AuditoriaPage() {
         return;
       }
       setLogsData(json);
-    } catch (e: any) {
+    } catch {
       setError('Error de conexión con el servidor.');
     } finally {
       setLoading(false);
@@ -223,7 +223,7 @@ export default function AuditoriaPage() {
         window.location.href = `/api/auditoria/exportar?${params}`;
         toast.success('Descarga iniciada con éxito.');
       }
-    } catch (e: any) {
+    } catch {
       toast.error('No se pudo generar la exportación.');
     } finally {
       setExportLoading(false);
@@ -335,13 +335,13 @@ export default function AuditoriaPage() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <AdminSidebar />
-      <main className="flex-1 p-4 pt-20 lg:pt-6 space-y-6 overflow-hidden">
+      <main className="flex-1 min-w-0 px-4 sm:px-6 xl:px-8 pt-20 pb-8 lg:pt-6 space-y-5 sm:space-y-6 overflow-x-hidden overflow-y-auto">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/40 pb-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Auditoría del Sistema</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
+          <div className="min-w-0">
+            <h1 className="page-heading">Auditoría del Sistema</h1>
+            <p className="page-description">
               Historial completo de acciones administrativas, inicios de sesión y modificaciones de datos.
             </p>
           </div>
@@ -352,7 +352,7 @@ export default function AuditoriaPage() {
                 size="sm"
                 onClick={() => fetchLogs()}
                 disabled={loading}
-                className="gap-1.5 text-xs h-9"
+                className="gap-1.5 text-xs h-11 sm:h-9"
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
                 Actualizar Logs
@@ -368,7 +368,7 @@ export default function AuditoriaPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border border-transparent',
+                'flex items-center gap-2 min-h-10 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border border-transparent',
                 tab === t.id
                   ? 'bg-primary/10 text-primary border-primary/20 shadow-xs'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
@@ -554,7 +554,7 @@ export default function AuditoriaPage() {
         {/* Export / Historial Tab */}
         {tab === 'exportar' && (
           <div className="max-w-2xl mx-auto space-y-6">
-            <Card className="p-6 border-border/50 bg-card space-y-4 shadow-lg">
+            <Card className="surface-panel p-4 sm:p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Download className="w-5 h-5 text-primary" /> Descargar Historial Completo
               </h2>
@@ -562,7 +562,7 @@ export default function AuditoriaPage() {
                 Configure los filtros en el sidebar y el rango de fechas en la parte superior para generar la exportación de auditoría. Respete los límites máximos por descarga:
               </p>
               
-              <div className="grid grid-cols-3 gap-3 pt-2 text-center text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-center text-xs">
                 <div className="p-3 bg-secondary/40 border border-border/50 rounded-xl space-y-1">
                   <span className="font-bold text-foreground">CSV</span>
                   <p className="text-muted-foreground text-[10px]">Máx. 5,000 logs</p>
@@ -581,11 +581,11 @@ export default function AuditoriaPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground">Desde</label>
-                    <Input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="h-9 text-xs" />
+                    <Input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="h-11 sm:h-9 text-xs" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground">Hasta</label>
-                    <Input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="h-9 text-xs" />
+                    <Input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="h-11 sm:h-9 text-xs" />
                   </div>
                 </div>
 

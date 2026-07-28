@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit, X, Tag, Trash2, Layers, Search, ArrowUpDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
@@ -211,18 +211,18 @@ export default function Categorias() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+        <div className="app-page space-y-5 page-enter">
           
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Categorías de Servicios</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Categorías de Servicios</h1>
               <p className="text-sm text-muted-foreground">
                 {categorias.filter(c => c.activo).length} activas de {categorias.length} en total
               </p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4" /> Nueva Categoría
+            <Button onClick={openCreate} className="gap-2 glow-gold shrink-0 px-3.5 sm:px-4">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva categoría</span><span className="sm:hidden">Nueva</span>
             </Button>
           </div>
 
@@ -240,7 +240,7 @@ export default function Categorias() {
             <select
               value={filtroEstado}
               onChange={e => setFiltroEstado(e.target.value)}
-              className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] outline-none focus:ring-1 focus:ring-primary"
+              className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="todos">Todos los estados</option>
               <option value="activos">Sólo Activos</option>
@@ -250,7 +250,7 @@ export default function Categorias() {
 
           {/* Grid o Lista */}
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="rounded-xl border border-border/50 bg-card p-5 space-y-4">
                   <div className="flex items-center gap-3">
@@ -263,13 +263,13 @@ export default function Categorias() {
               ))}
             </div>
           ) : filteredCategorias.length === 0 ? (
-            <div className="py-20 text-center text-muted-foreground border border-dashed border-border rounded-xl bg-card/20">
+            <div className="empty-state surface-panel text-muted-foreground">
               <Layers className="w-10 h-10 mx-auto mb-3 opacity-20 animate-bounce" />
               <p className="font-medium text-sm">No se encontraron categorías</p>
               <p className="text-xs text-muted-foreground mt-1">Intenta ajustando el filtro de búsqueda o crea una nueva.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredCategorias.map(cat => {
                 const glassStyle = {
                   backgroundColor: cat.color ? `${cat.color}12` : '#6366f112',

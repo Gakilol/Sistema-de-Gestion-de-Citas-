@@ -9,12 +9,18 @@ import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
 const CreateClienteSchema = z.object({
   nombre: z.string().min(2, 'El nombre es obligatorio (mínimo 2 caracteres)').max(150).trim(),
   telefono: z.string().max(30).trim().optional().nullable(),
+  cedula: z.string().max(50).trim().optional().nullable(),
   correo: z.preprocess(
     (val) => (val === '' ? null : val),
     z.string().email('Correo inválido').max(254).trim().optional().nullable()
   ),
   notas: z.string().max(1000).trim().optional().nullable(),
+  confirmarDuplicadoNombre: z.boolean().optional(),
 });
+
+function normalizarNombre(nombre: string): string {
+  return nombre.trim().replace(/\s+/g, ' ');
+}
 
 // ─── GET /api/clientes
 // Obtiene los clientes de la tabla Cliente e incluye sus métricas basadas en citas.
@@ -26,13 +32,14 @@ export async function GET(req: NextRequest) {
     if (!userId || !userRole) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    const busqueda = req.nextUrl.searchParams.get('q') ?? '';
+    const busqueda = normalizarNombre(req.nextUrl.searchParams.get('q') ?? '');
 
     const searchWhere = busqueda
       ? {
           OR: [
             { nombre: { contains: busqueda, mode: 'insensitive' as const } },
             { telefono: { contains: busqueda, mode: 'insensitive' as const } },
+            { cedula: { contains: busqueda, mode: 'insensitive' as const } },
             { correo: { contains: busqueda, mode: 'insensitive' as const } },
           ],
         }
@@ -84,6 +91,7 @@ export async function GET(req: NextRequest) {
         id: c.id,
         nombre: c.nombre,
         telefono: c.telefono,
+        cedula: c.cedula,
         correo: c.correo,
         notas: c.notas,
         createdByUserId: c.createdByUserId,
@@ -127,9 +135,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const { nombre, telefono, correo, notas } = parseResult.data;
+    const { nombre, telefono, cedula, correo, notas, confirmarDuplicadoNombre } = parseResult.data;
+    const nombreNormalizado = normalizarNombre(nombre);
 
-    if (!nombre || nombre.trim().length < 2) {
+    if (!nombreNormalizado) {
       return NextResponse.json({ error: 'El nombre es obligatorio (mínimo 2 caracteres)' }, { status: 400 });
     }
 
@@ -147,7 +156,23 @@ export async function POST(req: NextRequest) {
     }
 
     const correoNormalizado = correo && String(correo).trim() !== '' ? String(correo).trim().toLowerCase() : null;
+    const cedulaNormalizada = cedula && String(cedula).trim() !== '' ? String(cedula).trim() : null;
     const notasNormalizadas = notas && String(notas).trim() !== '' ? String(notas).trim() : null;
+
+    if (!telefonoNormalizado && !confirmarDuplicadoNombre) {
+      const posiblesDuplicados = await prisma.cliente.findMany({
+        where: { nombre: { equals: nombreNormalizado, mode: 'insensitive' } },
+        select: { id: true, nombre: true, telefono: true },
+        take: 5,
+      });
+      if (posiblesDuplicados.length > 0) {
+        return NextResponse.json({
+          error: 'Ya existe un cliente con el mismo nombre. Confirma si deseas registrarlo de todos modos.',
+          requiresConfirmation: true,
+          posiblesDuplicados,
+        }, { status: 409 });
+      }
+    }
 
     // Validar teléfono duplicado (solo si se provee uno)
     if (telefonoNormalizado) {
@@ -177,8 +202,9 @@ export async function POST(req: NextRequest) {
 
     const nuevoCliente = await prisma.cliente.create({
       data: {
-        nombre: nombre.trim(),
+        nombre: nombreNormalizado,
         telefono: telefonoNormalizado,
+        cedula: cedulaNormalizada,
         correo: correoNormalizado,
         notas: notasNormalizadas,
         createdByUserId: userId,

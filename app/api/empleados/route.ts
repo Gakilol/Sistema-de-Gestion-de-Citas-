@@ -2,7 +2,6 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
 
 const CreateEmpleadoSchema = z.object({
@@ -27,7 +26,7 @@ export async function GET(req: NextRequest) {
     const busqueda = req.nextUrl.searchParams.get('q') || '';
     const schedulable = req.nextUrl.searchParams.get('schedulable') === 'true';
 
-    let whereClause: any = {};
+    const whereClause: any = {};
     if (busqueda) {
       whereClause.OR = [
         { nombre: { contains: busqueda, mode: 'insensitive' } },
@@ -77,7 +76,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, userRole } = getUserContext(req);
+    const { userRole } = getUserContext(req);
     if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT') {
       return NextResponse.json({ error: 'Solo los administradores y soporte técnico pueden agregar empleados' }, { status: 403 });
     }

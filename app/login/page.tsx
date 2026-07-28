@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Lock, Mail, ArrowRight, Scissors, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +11,6 @@ import Link from 'next/link';
 
 
 export default function Login() {
-  const router    = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPass, setShowPass]   = useState(false);
   const [shake,    setShake]      = useState(false);
@@ -39,7 +37,7 @@ export default function Login() {
           (window as any).__autoLoginChecked = false; // Permitir reintento
           setIsCheckingAutoLogin(false);
         }
-      } catch (err) {
+      } catch {
         (window as any).__autoLoginChecked = false;
         setIsCheckingAutoLogin(false);
       }
@@ -153,12 +151,13 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+              <label htmlFor="login-email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
                 Correo electrónico
               </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
                 <Input
+                  id="login-email"
                   type="email"
                   placeholder="admin@hairstyle.com"
                   className="pl-10 h-11 bg-card border-border/60 focus:border-primary"
@@ -172,12 +171,13 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+              <label htmlFor="login-password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
                 Contraseña
               </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
                 <Input
+                  id="login-password"
                   type={showPass ? 'text' : 'password'}
                   placeholder="••••••••"
                   className="pl-10 pr-10 h-11 bg-card border-border/60 focus:border-primary"
@@ -189,7 +189,8 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPass(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  className="absolute right-0 top-1/2 size-11 -translate-y-1/2 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 >
                   {showPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
                 </button>

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, TrendingUp, Users, CheckCircle2,
-  Clock, ArrowUpRight, ArrowDownRight, RefreshCcw, Loader2,
-  Scissors, ChevronRight, Activity, Coins
+  Clock, ArrowUpRight, ArrowDownRight, RefreshCcw,
+  Scissors, ChevronRight, Activity
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -68,7 +68,7 @@ function fmtDate(d: string | Date) {
 // ─── Skeleton ───────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
+    <div className="surface-panel p-4 sm:p-5 space-y-3">
       <div className="flex justify-between items-start">
         <div className="space-y-2">
           <div className="skeleton h-3 w-24" />
@@ -101,16 +101,16 @@ function KpiCard({ title, value, sub, icon: Icon, accent, trend }: KpiCardProps)
 
   return (
     <div className={cn(
-      'rounded-xl border border-border/50 bg-card p-5 hover-lift transition-all',
+      'surface-panel p-3 sm:p-5 hover-lift transition-all min-w-0',
       accentClass.card
     )}>
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{title}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
+      <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 leading-tight">{title}</p>
+          <p className="text-xl sm:text-2xl font-bold text-foreground">{value}</p>
         </div>
-        <div className={cn('p-2.5 rounded-xl', accentClass.icon)}>
-          <Icon className={cn('w-5 h-5', accentClass.text)} />
+        <div className={cn('p-2 sm:p-2.5 rounded-xl shrink-0', accentClass.icon)}>
+          <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5', accentClass.text)} />
         </div>
       </div>
       <div className="flex items-center gap-1.5">
@@ -120,7 +120,7 @@ function KpiCard({ title, value, sub, icon: Icon, accent, trend }: KpiCardProps)
             : <ArrowDownRight className="w-3.5 h-3.5 trend-down" />
         )}
         {sub && (
-          <p className="text-xs text-muted-foreground">{sub}</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight line-clamp-2">{sub}</p>
         )}
       </div>
     </div>
@@ -177,8 +177,8 @@ export default function Dashboard() {
     return (
       <div className="flex min-h-screen bg-background">
         <AdminSidebar />
-        <main className="flex-1 p-6 pt-20 lg:pt-6 overflow-y-auto">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 pt-14 lg:pt-0 overflow-y-auto">
+          <div className="app-page space-y-6">
             <div className="skeleton h-8 w-48 mb-2" />
             <div className="skeleton h-4 w-64" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
@@ -207,27 +207,28 @@ export default function Dashboard() {
       <AdminSidebar />
 
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 page-enter">
+        <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
           {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">
                 Bienvenido, <span className="text-gold-gradient">{user?.nombre?.split(' ')[0]}</span> 👋
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="page-description capitalize">
                 {new Date().toLocaleDateString('es-CR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => load(true)}
               disabled={refreshing}
-              className="hidden sm:flex items-center gap-1.5 text-xs"
+              aria-label="Actualizar dashboard"
+              title="Actualizar dashboard"
+              className="flex shrink-0"
             >
               <RefreshCcw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
-              Actualizar
             </Button>
           </div>
 
@@ -301,7 +302,7 @@ export default function Dashboard() {
           {/* ── Gráficas ────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Área: citas 7 días */}
-            <Card className="lg:col-span-2 p-5 border-border/50">
+            <Card className="surface-panel lg:col-span-2 p-4 sm:p-5 min-w-0">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">
@@ -334,7 +335,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Pie: servicios populares */}
-            <Card className="p-5 border-border/50">
+            <Card className="surface-panel p-4 sm:p-5 min-w-0">
               <div className="mb-4">
                 <h2 className="text-sm font-semibold text-foreground">
                   {isAdmin ? 'Servicios Populares' : 'Mis Servicios Populares'}
@@ -386,7 +387,7 @@ export default function Dashboard() {
 
           {/* ── Segunda fila de gráficas ─────────────────────────── */}
           {isAdmin && productividad.length > 0 && (
-            <Card className="p-5 border-border/50">
+            <Card className="surface-panel p-4 sm:p-5 min-w-0">
               <div className="mb-4">
                 <h2 className="text-sm font-semibold text-foreground">Productividad por Empleado — Este mes</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Citas atendidas en el mes actual</p>
@@ -407,7 +408,7 @@ export default function Dashboard() {
           {/* ── Citas de hoy + Próximas ──────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Citas hoy */}
-            <Card className="p-5 border-border/50">
+            <Card className="surface-panel p-4 sm:p-5 min-w-0">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">Agenda de Hoy</h2>
@@ -452,7 +453,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Próximas citas */}
-            <Card className="p-5 border-border/50">
+            <Card className="surface-panel p-4 sm:p-5 min-w-0">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">Próximas Citas</h2>
@@ -493,7 +494,7 @@ export default function Dashboard() {
           </div>
 
           {/* ── Actividad Reciente ───────────────────────────────── */}
-          <Card className="p-5 border-border/50">
+          <Card className="surface-panel p-4 sm:p-5 min-w-0">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Actividad Reciente</h2>
@@ -502,7 +503,7 @@ export default function Dashboard() {
             </div>
             {actividad.length > 0 ? (
               <div className="divide-y divide-border/50">
-                {actividad.slice(0, 6).map((item: any, i: number) => (
+                {actividad.slice(0, 6).map((item: any) => (
                   <div key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-primary">
                       {item.cliente_nombre.charAt(0).toUpperCase()}

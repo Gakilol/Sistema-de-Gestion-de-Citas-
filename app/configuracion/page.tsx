@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Store, Clock, Bell, Palette, Save, CheckCircle2,
-  Phone, MapPin, MessageCircle, Globe, RefreshCcw,
-  Laptop, Smartphone, Trash2, LogOut, Settings,
+  Store, Clock, Palette, Save, CheckCircle2,
+  Phone, MapPin, MessageCircle, Globe,
+  Laptop, Smartphone, Trash2, LogOut,
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
@@ -97,8 +97,6 @@ export default function Configuracion() {
     branding: true,
   });
 
-  const [loading, setLoading] = useState(true);
-
   // ── Dispositivos Recordados ─────────────────────────────────────────────
   const [dispositivos, setDispositivos] = useState<any[]>([]);
   const [loadingDispositivos, setLoadingDispositivos] = useState(false);
@@ -132,7 +130,7 @@ export default function Configuracion() {
       } else {
         toast.error('No se pudo revocar el dispositivo');
       }
-    } catch (err) {
+    } catch {
       toast.error('Error al revocar el dispositivo');
     }
   };
@@ -147,7 +145,7 @@ export default function Configuracion() {
       } else {
         toast.error('No se pudieron revocar los dispositivos');
       }
-    } catch (err) {
+    } catch {
       toast.error('Error al revocar los dispositivos');
     }
   };
@@ -178,7 +176,7 @@ export default function Configuracion() {
           if (d.config.apariencia && Object.keys(d.config.apariencia).length > 0) setApariencia(d.config.apariencia);
         }
       })
-      .finally(() => setLoading(false));
+      .catch(() => toast.error('No se pudo cargar la configuración'));
   }, []);
 
   const handleSave = async () => {
@@ -253,12 +251,12 @@ export default function Configuracion() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+        <div className="app-page !max-w-3xl space-y-5 page-enter">
 
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{headerInfo.title}</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">{headerInfo.title}</h1>
               <p className="text-sm text-muted-foreground">{headerInfo.desc}</p>
             </div>
             {tab !== 'dispositivos' && (
@@ -302,13 +300,13 @@ export default function Configuracion() {
 
           {/* ── Tab: Negocio ─────────────────────────────────── */}
           {tab === 'negocio' && (
-            <Card className="p-6 border-border/50">
+            <Card className="surface-panel p-4 sm:p-6">
               <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
                 <div className="flex items-center gap-2 mb-2">
                   <Store className="w-4 h-4 text-primary"/>
                   <h2 className="font-semibold text-foreground">Información del Negocio</h2>
                 </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Nombre del negocio</label>
                   <Input value={negocio.nombre} onChange={e => setNegocio({ ...negocio, nombre: e.target.value })} placeholder="HAIR STYLE"/>
@@ -318,7 +316,7 @@ export default function Configuracion() {
                   <Input value={negocio.subtitulo} onChange={e => setNegocio({ ...negocio, subtitulo: e.target.value })} placeholder="Salón & Barber"/>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
                     <Phone className="w-3 h-3 inline mr-1"/>Teléfono
@@ -359,7 +357,7 @@ export default function Configuracion() {
 
           {/* ── Tab: Horarios ────────────────────────────────── */}
           {tab === 'horarios' && (
-            <Card className="p-6 border-border/50">
+            <Card className="surface-panel p-4 sm:p-6">
               <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
                 <div className="flex items-center gap-2 mb-5">
                   <Clock className="w-4 h-4 text-primary"/>
@@ -387,7 +385,7 @@ export default function Configuracion() {
                           <select
                             value={h.inicio}
                             onChange={e => updateHorario(key, 'inicio', e.target.value)}
-                            className="h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            className="h-11 sm:h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
                           >
                             {TIME_OPTIONS.map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -397,7 +395,7 @@ export default function Configuracion() {
                           <select
                             value={h.fin}
                             onChange={e => updateHorario(key, 'fin', e.target.value)}
-                            className="h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            className="h-11 sm:h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
                           >
                             {TIME_OPTIONS.map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -427,7 +425,7 @@ export default function Configuracion() {
 
           {/* ── Tab: WhatsApp ──────────────────────────────────── */}
           {tab === 'whatsapp' && (
-            <Card className="p-6 border-border/50">
+            <Card className="surface-panel p-4 sm:p-6">
               <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
                 <div className="flex items-center gap-2 mb-2">
                   <MessageCircle className="w-4 h-4 text-[#25D366]"/>
@@ -480,7 +478,7 @@ export default function Configuracion() {
 
           {/* ── Tab: Apariencia ──────────────────────────────── */}
           {tab === 'apariencia' && (
-            <Card className="p-6 border-border/50">
+            <Card className="surface-panel p-4 sm:p-6">
               <fieldset disabled={isTechSupport} className="space-y-5 disabled:opacity-90">
                 <div className="flex items-center gap-2 mb-2">
                   <Palette className="w-4 h-4 text-primary"/>
@@ -488,7 +486,7 @@ export default function Configuracion() {
                 </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Modo de color</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { val: 'light',  label: 'Claro',   preview: 'bg-white border-2', text: 'text-gray-800' },
                     { val: 'dark',   label: 'Oscuro',  preview: 'bg-gray-900 border-2', text: 'text-gray-100' },
@@ -521,7 +519,7 @@ export default function Configuracion() {
 
           {/* ── Tab: Dispositivos Recordados ─────────────────── */}
           {tab === 'dispositivos' && (
-            <Card className="p-6 border-border/50">
+            <Card className="surface-panel p-4 sm:p-6">
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-2">

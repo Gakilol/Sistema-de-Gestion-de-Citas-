@@ -8,7 +8,6 @@
 import { useState } from 'react';
 import {
   X,
-  CalendarPlus,
   Edit,
   User,
   Clock,
@@ -17,7 +16,6 @@ import {
   MessageCircle,
   Copy,
   Check,
-  ExternalLink,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -112,7 +110,7 @@ export function CitaResumenModal({ cita, user, onClose, onEdit }: CitaResumenMod
       if (targetUrl) {
         window.open(targetUrl, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
+    } catch {
       toast.error('Error al conectar con el servidor');
     } finally {
       setEnviando(false);

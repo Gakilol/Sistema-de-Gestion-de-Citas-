@@ -14,7 +14,6 @@ export async function proxy(req: NextRequest) {
     path === '/olvide-contrasena' ||
     path === '/restablecer-contrasena' ||
     path.startsWith('/api/auth') ||
-    path.startsWith('/api/cron') || // Permitir Crons (ej. Vercel Cron) con firma propia
     path.startsWith('/cita/calendario/') || // Página pública de calendario (protegida por HMAC)
     path.startsWith('/api/cita/calendario/') || // API pública de calendario (protegida por HMAC)
     path.startsWith('/_next') ||

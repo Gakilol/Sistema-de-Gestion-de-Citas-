@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Tipo no válido' }, { status: 400 });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

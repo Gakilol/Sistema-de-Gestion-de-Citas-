@@ -5,7 +5,7 @@ import { syncCitaEstados } from '@/lib/automatizacion';
 
 export class AdminServicio {
   // ─── Dashboard completo con soporte opcional de empleadoId ─────────────
-  static async getDashboardStats(periodo: 'hoy' | 'semana' | 'mes' = 'mes', empleadoId?: string) {
+  static async getDashboardStats(_periodo: 'hoy' | 'semana' | 'mes' = 'mes', empleadoId?: string) {
     // Sincronizar estados de citas de forma automática y JIT antes de computar métricas
     await syncCitaEstados();
 

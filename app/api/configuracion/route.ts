@@ -1,6 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
 
 // ─── GET /api/configuracion

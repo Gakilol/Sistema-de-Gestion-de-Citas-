@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getRememberDeviceSecret } from './security-secrets';
+import { prisma } from './db';
 
 export const REMEMBER_COOKIE_NAME = 'remember_token';
 export const REMEMBER_COOKIE_MAX_AGE = 60 * 24 * 60 * 60; // 60 días en segundos
@@ -47,4 +48,24 @@ export function parseUserAgent(ua: string | null): string {
   else if (ua.includes('OPR/') || ua.includes('Opera/')) browser = 'Opera';
 
   return `${browser} - ${os}`;
+}
+
+/** Removes obsolete records for the active user without a scheduled job. */
+export async function cleanupRememberedDevicesForUser(userId: string): Promise<void> {
+  const now = new Date();
+  const revokedBefore = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  try {
+    await prisma.dispositivoRecordado.deleteMany({
+      where: {
+        userId,
+        OR: [
+          { expiresAt: { lt: now } },
+          { revokedAt: { lt: revokedBefore } },
+        ],
+      },
+    });
+  } catch (error) {
+    console.error('[REMEMBER_DEVICE_CLEANUP_ERROR]', error);
+  }
 }

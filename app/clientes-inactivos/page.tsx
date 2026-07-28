@@ -11,9 +11,9 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { urlWhatsAppReactivacion } from '@/lib/whatsapp';
 import {
-  Users, UserX, Phone, Calendar, RefreshCcw, Loader2, AlertCircle,
-  MessageSquare, Star, Search, Filter, ShieldAlert, CheckCircle,
-  XCircle, Clock, Plus, HelpCircle
+  UserX, Phone, Calendar, RefreshCcw, Loader2,
+  MessageSquare, Star, Search, ShieldAlert, CheckCircle,
+  XCircle, HelpCircle
 } from 'lucide-react';
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
@@ -222,47 +222,47 @@ export default function ClientesInactivos() {
       <AdminSidebar />
 
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 page-enter">
+        <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
           {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Clientes Inactivos</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Clientes Inactivos</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Identifica y reactiva clientes que llevan tiempo sin visitar la peluquería
               </p>
             </div>
-            <div className="flex gap-2 self-start sm:self-auto">
+            <div className="flex w-full sm:w-auto gap-2 self-start sm:self-auto">
               {canSeeAll && (
-                <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50 shadow-inner">
+                <div className="flex flex-1 sm:flex-none bg-secondary/30 p-1 rounded-xl border border-border/50 shadow-inner">
                   <button
                     type="button"
                     onClick={() => { setScope('mine'); setEmpleadoId(''); setPage(1); }}
                     className={cn(
-                      "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                      "flex-1 sm:flex-none min-h-10 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all",
                       scope === 'mine'
                         ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                     )}
                   >
-                    Mis Clientes
+                    Míos
                   </button>
                   <button
                     type="button"
                     onClick={() => { setScope('all'); setPage(1); }}
                     className={cn(
-                      "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                      "flex-1 sm:flex-none min-h-10 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all",
                       scope === 'all'
                         ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                     )}
                   >
-                    Ver todos los clientes
+                    Todos
                   </button>
                 </div>
               )}
-              <Button variant="outline" size="sm" onClick={fetchClientesInactivos} className="gap-1.5">
-                <RefreshCcw className="w-3.5 h-3.5" /> Actualizar
+              <Button variant="outline" size="icon" onClick={fetchClientesInactivos} aria-label="Actualizar clientes inactivos" title="Actualizar">
+                <RefreshCcw className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -270,7 +270,7 @@ export default function ClientesInactivos() {
 
           {/* ── Resumen Cards ───────────────────────────────────── */}
           {!loading && stats.totalInactivos > 0 && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
               <StatCard
                 title="Inactivos"
                 value={stats.totalInactivos}
@@ -303,7 +303,7 @@ export default function ClientesInactivos() {
           )}
 
           {/* ── Filtros ─────────────────────────────────────────── */}
-          <Card className="p-5 border-border/50 space-y-4">
+          <Card className="surface-panel p-4 sm:p-5 space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Inactividad de:
@@ -332,7 +332,7 @@ export default function ClientesInactivos() {
                   placeholder="Días"
                   value={customDays}
                   onChange={handleCustomDaysChange}
-                  className="w-20 h-8 text-xs bg-secondary/30"
+                  className="w-24 h-11 sm:h-9 text-xs bg-secondary/30"
                   min="1"
                 />
               </div>
@@ -346,7 +346,7 @@ export default function ClientesInactivos() {
                   placeholder="Buscar por nombre..."
                   value={busqueda}
                   onChange={e => { setBusqueda(e.target.value); setPage(1); }}
-                  className="pl-9 h-9 text-xs bg-card"
+                  className="pl-9 h-11 text-xs bg-card"
                 />
               </div>
 
@@ -357,7 +357,7 @@ export default function ClientesInactivos() {
                   placeholder="Buscar por teléfono..."
                   value={telefono}
                   onChange={e => { setTelefono(e.target.value); setPage(1); }}
-                  className="pl-9 h-9 text-xs bg-card"
+                  className="pl-9 h-11 text-xs bg-card"
                 />
               </div>
 
@@ -365,7 +365,7 @@ export default function ClientesInactivos() {
               <select
                 value={servicioFiltro}
                 onChange={e => { setServicioFiltro(e.target.value); setPage(1); }}
-                className="rounded-lg border border-border bg-card px-3 h-9 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                className="rounded-lg border border-border bg-card px-3 h-11 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">Todos los servicios</option>
                 {servicios.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
@@ -375,7 +375,7 @@ export default function ClientesInactivos() {
               <select
                 value={estadoRecordatorio}
                 onChange={e => { setEstadoRecordatorio(e.target.value); setPage(1); }}
-                className="rounded-lg border border-border bg-card px-3 h-9 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                className="rounded-lg border border-border bg-card px-3 h-11 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">Todos los estados</option>
                 <option value="none">Sin recordatorio</option>
@@ -392,7 +392,7 @@ export default function ClientesInactivos() {
                 <select
                   value={empleadoId}
                   onChange={e => { setEmpleadoId(e.target.value); setPage(1); }}
-                  className="rounded-lg border border-border bg-card px-3 h-8 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="rounded-lg border border-border bg-card px-3 h-11 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="">Todos los profesionales</option>
                   {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}

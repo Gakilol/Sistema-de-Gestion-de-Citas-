@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { prisma } from '@/lib/db';
-import { hashRememberToken } from '@/lib/remember-device';
+import { cleanupRememberedDevicesForUser, hashRememberToken } from '@/lib/remember-device';
 
 export async function POST(req: NextRequest) {
   const response = NextResponse.json({ mensaje: 'Sesión cerrada exitosamente' });
@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
     } catch (dbError) {
       console.error('[LOGOUT_DB_ERROR] Error al revocar dispositivo recordado:', dbError);
     }
+  }
+
+  if (userId) {
+    await cleanupRememberedDevicesForUser(userId);
   }
 
   if (userId && userEmail) {

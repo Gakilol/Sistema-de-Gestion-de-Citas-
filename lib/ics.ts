@@ -68,7 +68,6 @@ export interface ICSParams {
 export function generarICS(params: ICSParams): string {
   const {
     citaId,
-    clienteNombre,
     fecha,
     hora,
     duracion,

@@ -99,7 +99,7 @@ export function parseReportFilters(req: NextRequest): { filters: ReportFilters }
 
 /** Strip non-UUID characters to prevent injection */
 function sanitizeId(id: string): string {
-  return id.replace(/[^a-zA-Z0-9\-]/g, '').slice(0, 36);
+  return id.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 36);
 }
 
 /** Allow only known status values */

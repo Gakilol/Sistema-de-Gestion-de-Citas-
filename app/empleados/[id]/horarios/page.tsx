@@ -216,45 +216,45 @@ export default function HorariosEmpleado() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+        <div className="app-page !max-w-3xl space-y-5 page-enter">
 
           {/* Header */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/empleados')} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/empleados')} className="shrink-0" aria-label="Volver a personal">
               <ArrowLeft className="w-4 h-4"/>
             </Button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-foreground">Horarios — {empleado?.nombre}</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="page-heading text-foreground">Horarios — {empleado?.nombre}</h1>
               <p className="text-sm text-muted-foreground">{empleado?.especialidad || 'General'}</p>
             </div>
             {tab === 'horario' && (
               <Button onClick={saveHorario} disabled={saving} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
                 {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                {saved ? 'Guardado' : 'Guardar'}
+                <span className="hidden sm:inline">{saved ? 'Guardado' : 'Guardar'}</span>
               </Button>
             )}
             {tab === 'descansos' && (
               <Button onClick={saveDescansos} disabled={saving} className={cn('gap-1.5', savedDescansos ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
                 {savedDescansos ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                {savedDescansos ? 'Guardado' : 'Guardar'}
+                <span className="hidden sm:inline">{savedDescansos ? 'Guardado' : 'Guardar'}</span>
               </Button>
             )}
             {tab === 'bloqueos' && (
               <Button onClick={saveBloqueos} disabled={saving} className={cn('gap-1.5', savedBloqueos ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
                 {savedBloqueos ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                {savedBloqueos ? 'Guardado' : 'Guardar'}
+                <span className="hidden sm:inline">{savedBloqueos ? 'Guardado' : 'Guardar'}</span>
               </Button>
             )}
             {tab === 'vacaciones' && (
               <Button onClick={saveVacaciones} disabled={saving} className={cn('gap-1.5', savedVacaciones ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
                 {savedVacaciones ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                {savedVacaciones ? 'Guardado' : 'Guardar'}
+                <span className="hidden sm:inline">{savedVacaciones ? 'Guardado' : 'Guardar'}</span>
               </Button>
             )}
           </div>
 
           {/* Sub-tabs */}
-          <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl w-fit flex-wrap">
+          <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl w-full sm:w-fit overflow-x-auto no-scrollbar">
             {[
               { id: 'horario',    label: 'Horario semanal', icon: Clock },
               { id: 'descansos',  label: 'Descansos',       icon: Clock },
@@ -262,7 +262,7 @@ export default function HorariosEmpleado() {
               { id: 'vacaciones', label: 'Vacaciones',      icon: Calendar },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id as any)}
-                className={cn('flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                className={cn('flex shrink-0 items-center gap-1.5 min-h-10 px-3 py-2 rounded-lg text-xs font-medium transition-all',
                   tab === t.id ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
                 <t.icon className="w-3 h-3"/>{t.label}
               </button>
@@ -271,7 +271,7 @@ export default function HorariosEmpleado() {
 
           {/* ── Horario semanal ─────────────────────────────── */}
           {tab === 'horario' && (
-            <Card className="p-5 border-border/50 space-y-3">
+            <Card className="surface-panel p-4 sm:p-5 space-y-3">
               <p className="text-xs text-muted-foreground">
                 Configura los turnos de trabajo por día. Puedes agregar múltiples turnos (ej: mañana y tarde).
                 Deja vacío el día para marcarlo como <strong>día libre</strong>.
@@ -298,11 +298,11 @@ export default function HorariosEmpleado() {
                     {turnos.length > 0 && (
                       <div className="space-y-2">
                         {turnos.map((t, i) => (
-                          <div key={i} className="flex items-center gap-2">
+                          <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2">
                             <select
                               value={(t.inicio || '08:00').substring(0, 5)}
                               onChange={e => updateTurno(key, i, 'inicio', e.target.value)}
-                              className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                              className="h-11 sm:h-8 w-full text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
                             >
                               {getOptions(t.inicio).map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -312,13 +312,13 @@ export default function HorariosEmpleado() {
                             <select
                               value={(t.fin || '17:00').substring(0, 5)}
                               onChange={e => updateTurno(key, i, 'fin', e.target.value)}
-                              className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                              className="h-11 sm:h-8 w-full text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
                             >
                               {getOptions(t.fin).map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>
-                            <button onClick={() => removeTurno(key, i)} className="text-muted-foreground hover:text-destructive transition-colors ml-1">
+                            <button onClick={() => removeTurno(key, i)} aria-label={`Eliminar turno de ${labelFull}`} className="size-11 sm:size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </button>
                           </div>
@@ -333,7 +333,7 @@ export default function HorariosEmpleado() {
 
           {/* ── Descansos ───────────────────────────────────── */}
           {tab === 'descansos' && (
-            <Card className="p-5 border-border/50 space-y-4">
+            <Card className="surface-panel p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Breaks recurrentes por día (ej: almuerzo todos los lunes de 13:00–14:00)</p>
                 <Button size="sm" onClick={() => setDescansos(d => [...d, { dia_semana: 1, hora_inicio: '13:00', hora_fin: '14:00' }])}
@@ -344,16 +344,16 @@ export default function HorariosEmpleado() {
               {descansos.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-6">No hay descansos configurados</p>
               ) : descansos.map((d, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-secondary/20">
+                <div key={i} className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 p-3 rounded-xl border border-border/50 bg-secondary/20">
                   <select value={d.dia_semana}
                     onChange={e => setDescansos(ds => ds.map((x,j)=>j===i?{...x,dia_semana:Number(e.target.value)}:x))}
-                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
+                    className="h-11 sm:h-9 w-full sm:w-auto rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
                     {DIAS.map((dia) => <option key={dia.key} value={dia.val}>{dia.labelFull}</option>)}
                   </select>
                   <select
                     value={(d.hora_inicio || '13:00').substring(0, 5)}
                     onChange={e => setDescansos(ds => ds.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))}
-                    className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                    className="h-11 sm:h-8 flex-1 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-32"
                   >
                     {getOptions(d.hora_inicio).map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -363,7 +363,7 @@ export default function HorariosEmpleado() {
                   <select
                     value={(d.hora_fin || '14:00').substring(0, 5)}
                     onChange={e => setDescansos(ds => ds.map((x,j)=>j===i?{...x,hora_fin:e.target.value}:x))}
-                    className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32"
+                    className="h-11 sm:h-8 flex-1 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-32"
                   >
                     {getOptions(d.hora_fin).map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -378,7 +378,7 @@ export default function HorariosEmpleado() {
 
           {/* ── Bloqueos ────────────────────────────────────── */}
           {tab === 'bloqueos' && (
-            <Card className="p-5 border-border/50 space-y-4">
+            <Card className="surface-panel p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Bloqueos en fechas específicas (reuniones, eventos, etc.)</p>
                 <Button size="sm" onClick={() => setBloqueos(b=>[...b,{fecha:new Date().toISOString().split('T')[0],hora_inicio:'09:00',hora_fin:'10:00',motivo:''}])}
@@ -388,12 +388,12 @@ export default function HorariosEmpleado() {
                 <p className="text-muted-foreground text-sm text-center py-6">No hay bloqueos configurados</p>
               ) : bloqueos.map((b, i) => (
                 <div key={i} className="grid grid-cols-2 gap-2 p-3 rounded-xl border border-border/50 bg-secondary/20">
-                  <div className="col-span-2 flex items-center gap-2">
-                    <Input type="date" value={b.fecha} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,fecha:e.target.value}:x))} className="h-8 text-sm"/>
+                  <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2">
+                    <Input type="date" value={b.fecha} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,fecha:e.target.value}:x))} className="col-span-4 h-11 sm:h-9 text-sm"/>
                     <select
                       value={(b.hora_inicio || '09:00').substring(0, 5)}
                       onChange={e => setBloqueos(bs => bs.map((x,j)=>j===i?{...x,hora_inicio:e.target.value}:x))}
-                      className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32 animate-none"
+                      className="h-11 sm:h-8 w-full text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 animate-none"
                     >
                       {getOptions(b.hora_inicio).map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -403,7 +403,7 @@ export default function HorariosEmpleado() {
                     <select
                       value={(b.hora_fin || '10:00').substring(0, 5)}
                       onChange={e => setBloqueos(bs => bs.map((x,j)=>j===i?{...x,hora_fin:e.target.value}:x))}
-                      className="h-8 text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 w-32 animate-none"
+                      className="h-11 sm:h-8 w-full text-xs font-semibold rounded-lg border border-border bg-card px-2.5 py-1 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 animate-none"
                     >
                       {getOptions(b.hora_fin).map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -412,7 +412,7 @@ export default function HorariosEmpleado() {
                     <button onClick={()=>setBloqueos(bs=>bs.filter((_,j)=>j!==i))} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5"/></button>
                   </div>
                   <div className="col-span-2">
-                    <Input value={b.motivo} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,motivo:e.target.value}:x))} placeholder="Motivo del bloqueo..." className="h-8 text-sm"/>
+                    <Input value={b.motivo} onChange={e=>setBloqueos(bs=>bs.map((x,j)=>j===i?{...x,motivo:e.target.value}:x))} placeholder="Motivo del bloqueo..." className="h-11 sm:h-9 text-sm"/>
                   </div>
                 </div>
               ))}
@@ -421,7 +421,7 @@ export default function HorariosEmpleado() {
 
           {/* ── Vacaciones ──────────────────────────────────── */}
           {tab === 'vacaciones' && (
-            <Card className="p-5 border-border/50 space-y-4">
+            <Card className="surface-panel p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Períodos de vacaciones o ausencia</p>
                 <Button size="sm" onClick={()=>setVacaciones(v=>[...v,{fecha_inicio:new Date().toISOString().split('T')[0],fecha_fin:new Date().toISOString().split('T')[0],estado:'APROBADO'}])}
@@ -430,19 +430,19 @@ export default function HorariosEmpleado() {
               {vacaciones.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-6">No hay vacaciones registradas</p>
               ) : vacaciones.map((v, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-secondary/20">
+                <div key={i} className="flex flex-col sm:flex-row sm:items-end gap-3 p-3 rounded-xl border border-border/50 bg-secondary/20">
                   <div className="flex-1 grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] text-muted-foreground mb-1 block">Desde</label>
-                      <Input type="date" value={v.fecha_inicio} onChange={e=>setVacaciones(vs=>vs.map((x,j)=>j===i?{...x,fecha_inicio:e.target.value}:x))} className="h-8 text-sm"/>
+                      <Input type="date" value={v.fecha_inicio} onChange={e=>setVacaciones(vs=>vs.map((x,j)=>j===i?{...x,fecha_inicio:e.target.value}:x))} className="h-11 sm:h-9 text-sm"/>
                     </div>
                     <div>
                       <label className="text-[10px] text-muted-foreground mb-1 block">Hasta</label>
-                      <Input type="date" value={v.fecha_fin} onChange={e=>setVacaciones(vs=>vs.map((x,j)=>j===i?{...x,fecha_fin:e.target.value}:x))} className="h-8 text-sm"/>
+                      <Input type="date" value={v.fecha_fin} onChange={e=>setVacaciones(vs=>vs.map((x,j)=>j===i?{...x,fecha_fin:e.target.value}:x))} className="h-11 sm:h-9 text-sm"/>
                     </div>
                   </div>
                   <select value={v.estado} onChange={e=>setVacaciones(vs=>vs.map((x,j)=>j===i?{...x,estado:e.target.value}:x))}
-                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs">
+                    className="h-11 sm:h-9 w-full sm:w-auto rounded-lg border border-border bg-background px-2 py-1.5 text-xs">
                     <option value="APROBADO">Aprobado</option>
                     <option value="PENDIENTE">Pendiente</option>
                   </select>

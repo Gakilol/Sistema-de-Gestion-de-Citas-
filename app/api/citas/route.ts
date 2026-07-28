@@ -12,7 +12,7 @@ const ServicioSeleccionadoSchema = z.object({
 
 const CreateCitaSchema = z.object({
   cliente_id:              z.string().uuid().nullish(),
-  cliente_nombre:          z.string().min(1).max(150).trim(),
+  cliente_nombre:          z.string().min(2).max(150).trim(),
   cliente_telefono:        z.string().max(30).trim().nullish(),
   servicio_id:             z.string().uuid().nullish(),
   servicio_ids:            z.array(z.string().uuid()).nullish(),
@@ -293,6 +293,23 @@ export async function POST(req: NextRequest) {
 
       if (!validacion.valida) {
         return { error: 'Hora no disponible: ' + validacion.motivo, status: 400 };
+      }
+
+      // API callers that submit only a name still receive an official, editable client.
+      if (!idClienteFinal) {
+        const clienteExistente = await tx.cliente.findFirst({
+          where: { nombre: { equals: finalClienteNombre, mode: 'insensitive' } },
+        });
+        const cliente = clienteExistente ?? await tx.cliente.create({
+          data: {
+            nombre: finalClienteNombre,
+            telefono: finalClienteTelefono,
+            createdByUserId: userId,
+          },
+        });
+        idClienteFinal = cliente.id;
+        finalClienteNombre = cliente.nombre;
+        finalClienteTelefono = cliente.telefono;
       }
 
       const hasConflict = conflictosBloqueantes.length > 0;

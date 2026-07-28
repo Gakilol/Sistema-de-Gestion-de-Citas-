@@ -110,7 +110,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       ubicacion,
       estado: cita.estado,
     });
-  } catch (error: any) {
+  } catch {
     console.error('[cita/calendario] Error verificando token');
     return NextResponse.json(
       { error: 'Error interno del servidor' },

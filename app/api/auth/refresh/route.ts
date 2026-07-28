@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { verifyRefreshToken, signToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
+import { cleanupRememberedDevicesForUser } from '@/lib/remember-device';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no encontrado o inactivo' }, { status: 401 });
     }
 
+    await cleanupRememberedDevicesForUser(empleado.id);
+
     const newAccessToken = await signToken({
       id: empleado.id,
       email: empleado.correo,
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Error al renovar token' }, { status: 500 });
   }
 }

@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { parseLocalDateToUTC } from '@/lib/timezone';
-import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

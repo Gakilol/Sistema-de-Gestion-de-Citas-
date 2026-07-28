@@ -39,7 +39,6 @@ export function validarYNormalizarTelefono(
   // Caso 1: Tiene 11 dígitos y empieza con 505 o 506 (prefijo de 3 dígitos + 8 locales)
   if (digitsOnly.length === 11) {
     const prefix = digitsOnly.slice(0, 3);
-    const localPart = digitsOnly.slice(3);
 
     if (prefix === '505' || prefix === '506') {
       return { normalized: digitsOnly, isValid: true };
@@ -101,4 +100,3 @@ export function esTelefonoValido(
 ): boolean {
   return validarYNormalizarTelefono(telefono, defaultCountryCode).isValid;
 }
-

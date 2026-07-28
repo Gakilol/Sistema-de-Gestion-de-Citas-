@@ -90,7 +90,7 @@ export function parse24hToNormal(time24: string): ParsedTime12 {
   const totalMin = hour24 * 60 + minute;
   const isNormalRange = totalMin >= 8 * 60 && totalMin <= 18 * 60; // 08:00 (480m) a 18:00 (1080m) inclusive
 
-  let period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
+  const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
   let hour12 = hour24 % 12;
   if (hour12 === 0) hour12 = 12;
 
@@ -154,4 +154,3 @@ export function validateNormalBusinessTime(time24: string): { valid: boolean; er
 
   return { valid: true };
 }
-

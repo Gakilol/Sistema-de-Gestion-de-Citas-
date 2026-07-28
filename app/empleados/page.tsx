@@ -112,15 +112,15 @@ export default function Empleados() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar/>
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5 page-enter">
+        <div className="app-page space-y-5 page-enter">
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Gestión de Personal</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Gestión de Personal</h1>
               <p className="text-sm text-muted-foreground">{activos} activo{activos!==1?'s':''} de {empleados.length}</p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold">
-              <Plus className="w-4 h-4"/> Nuevo Empleado
+            <Button onClick={openCreate} className="gap-2 glow-gold shrink-0 px-3.5 sm:px-4">
+              <Plus className="w-4 h-4"/> <span className="hidden sm:inline">Nuevo empleado</span><span className="sm:hidden">Nuevo</span>
             </Button>
           </div>
 
@@ -136,7 +136,7 @@ export default function Empleados() {
                 No hay empleados registrados
               </Card>
             ) : empleados.map(emp => (
-              <Card key={emp.id} className={cn('p-4 border-border/50 space-y-3 shadow-sm', !emp.activo && 'opacity-60')}>
+              <Card key={emp.id} className={cn('surface-panel p-4 space-y-3', !emp.activo && 'opacity-60')}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar nombre={emp.nombre}/>

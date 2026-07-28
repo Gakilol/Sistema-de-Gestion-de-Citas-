@@ -53,7 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     return NextResponse.json({ empleado }, { status: 200 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
@@ -176,7 +176,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
 
     return NextResponse.json({ empleado, mensaje: 'Empleado actualizado exitosamente' }, { status: 200 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

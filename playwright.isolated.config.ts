@@ -2,18 +2,19 @@ import { defineConfig, devices } from '@playwright/test';
 import { configureIsolatedE2EEnvironment } from './tests/e2e/environment';
 
 const environment = configureIsolatedE2EEnvironment();
+console.log(
+  `Suite aislada configurada para ${environment.database.host}/${environment.database.database}.`
+);
 
 export default defineConfig({
   testDir: './tests',
-  testIgnore: '**/isolated-persistence.spec.ts',
+  testMatch: '**/isolated-persistence.spec.ts',
   globalSetup: './tests/e2e/global-setup.ts',
-  timeout: 30 * 1000,
-  expect: {
-    timeout: 5000,
-  },
-  fullyParallel: true,
+  timeout: 60_000,
+  expect: { timeout: 8_000 },
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
@@ -24,34 +25,15 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'Desktop 1440',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
-    },
-    {
-      name: 'Laptop 1280',
+      name: 'E2E aislado',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
-    },
-    {
-      name: 'Tablet 768',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 768, height: 1024 },
-        hasTouch: true,
-      },
-    },
-    {
-      name: 'Mobile 390',
-      use: {
-        ...devices['Pixel 5'],
-        viewport: { width: 390, height: 844 },
-      },
     },
   ],
   webServer: {
     command: `npm run dev -- --hostname 127.0.0.1 --port ${environment.port}`,
     url: environment.baseURL,
     reuseExistingServer: false,
-    timeout: 120 * 1000,
+    timeout: 120_000,
     env: environment.webServerEnv,
   },
 });

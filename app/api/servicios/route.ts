@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { registrarAuditoria } from '@/lib/auditoria';
 import { getUserContext } from '@/lib/auth-helpers';
 
 const CreateServicioSchema = z.object({

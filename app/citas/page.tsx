@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon, Clock as ClockIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -10,12 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { cn, formatTo12h } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
 import { formatDBDate, getBusinessTodayString, getDefaultBookingDate, getDefaultAgendaDate } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
-import { CitaResumenModal } from '@/components/citas/CitaResumenModal';
 import { CitaDetalleBottomSheet } from '@/components/citas/CitaDetalleBottomSheet';
 import { CitaCreadaConfirmacion } from '@/components/citas/CitaCreadaConfirmacion';
 import { formatHora12h } from '@/lib/time-utils';
@@ -130,6 +129,7 @@ function CitasContent() {
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [clientesList, setClientesList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [catalogosLoading, setCatalogosLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm]           = useState<any>(getEmptyForm());
@@ -281,18 +281,29 @@ function CitasContent() {
 
 
   const fetchCatalogos = async () => {
-    const [sR, eR, cR] = await Promise.all([
-      fetch('/api/servicios'),
-      fetch('/api/empleados?schedulable=true'),
-      fetch('/api/clientes')
-    ]);
-    const sD = await sR.json();
-    const eD = await eR.json();
-    const cD = await cR.json();
-    
-    setServicios(sD.servicios || []);
-    setEmpleados(eD.empleados || []);
-    setClientesList(cD.clientes || []);
+    setCatalogosLoading(true);
+    try {
+      const [sR, eR, cR] = await Promise.all([
+        fetch('/api/servicios'),
+        fetch('/api/empleados?schedulable=true'),
+        fetch('/api/clientes')
+      ]);
+      const sD = await sR.json();
+      const eD = await eR.json();
+      const cD = await cR.json();
+
+      if (!sR.ok || !eR.ok || !cR.ok) {
+        throw new Error('No se pudieron cargar los datos necesarios para crear una cita');
+      }
+
+      setServicios(sD.servicios || []);
+      setEmpleados(eD.empleados || []);
+      setClientesList(cD.clientes || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al cargar los catálogos');
+    } finally {
+      setCatalogosLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -317,6 +328,11 @@ function CitasContent() {
   };
 
   const openCreate = () => {
+    if (catalogosLoading) {
+      toast.info('Cargando datos para la nueva cita');
+      return;
+    }
+
     const activeServs = servicios.filter(s => s.activo);
     if (!activeServs.length || !empleados.length) {
       toast.error('Crea al menos un servicio y un empleado activos primero');
@@ -378,12 +394,22 @@ function CitasContent() {
     }
     setSavingCliente(true);
     try {
-      const res = await fetch('/api/clientes', {
+      let res = await fetch('/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formNuevoCliente),
       });
-      const data = await res.json();
+      let data = await res.json();
+      if (!res.ok && data.requiresConfirmation) {
+        const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
+        if (!continuar) return;
+        res = await fetch('/api/clientes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...formNuevoCliente, confirmarDuplicadoNombre: true }),
+        });
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error);
 
       const nuevoCliente = data.cliente;
@@ -401,6 +427,51 @@ function CitasContent() {
       setFormNuevoCliente({ nombre: '', telefono: '', correo: '', notas: '' });
       setPhoneValidCliente(true);
       setShowCrearCliente(false);
+      toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al crear cliente');
+    } finally {
+      setSavingCliente(false);
+    }
+  };
+
+  const handleCrearClienteMinimo = async () => {
+    const nombre = clienteBusqueda.trim();
+    if (nombre.length < 2) {
+      toast.error('El nombre debe tener al menos 2 caracteres');
+      return;
+    }
+
+    setSavingCliente(true);
+    try {
+      let res = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre }),
+      });
+      let data = await res.json();
+      if (!res.ok && data.requiresConfirmation) {
+        const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
+        if (!continuar) return;
+        res = await fetch('/api/clientes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, confirmarDuplicadoNombre: true }),
+        });
+        data = await res.json();
+      }
+      if (!res.ok) throw new Error(data.error);
+
+      const nuevoCliente = data.cliente;
+      setClientesList((prev: any[]) => [nuevoCliente, ...prev]);
+      setForm((prev: any) => ({
+        ...prev,
+        cliente_id: nuevoCliente.id,
+        cliente_nombre: nuevoCliente.nombre,
+        cliente_telefono: nuevoCliente.telefono || '',
+      }));
+      setClienteBusqueda(nuevoCliente.nombre);
+      setClienteDropdownOpen(false);
       toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
     } catch (err: any) {
       toast.error(err.message || 'Error al crear cliente');
@@ -769,19 +840,24 @@ function CitasContent() {
     <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6 space-y-3 sm:space-y-5 page-enter overflow-x-hidden">
+        <div className="app-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
 
           {/* Header */}
-          <div className="flex flex-row items-center justify-between gap-2">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Gestión de Citas</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="page-heading text-foreground">Agenda y citas</h1>
+              <p className="page-description truncate sm:whitespace-normal">
                 {vistaModo === 'lista' && `${filteredAndSortedCitas.length} de `}
                 {citas.length} cita{citas.length !== 1 ? 's' : ''} en total
               </p>
             </div>
-            <Button onClick={openCreate} className="gap-1.5 glow-gold h-9 px-3 text-xs sm:text-sm shrink-0 min-h-[38px]">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva Cita</span><span className="sm:hidden">Nueva</span>
+            <Button
+              onClick={openCreate}
+              disabled={catalogosLoading}
+              aria-busy={catalogosLoading}
+              className="gap-2 glow-gold h-11 px-3.5 sm:px-4 text-sm shrink-0"
+            >
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva cita</span><span className="sm:hidden">Nueva</span>
             </Button>
           </div>
 
@@ -793,7 +869,7 @@ function CitasContent() {
                 type="button"
                 onClick={() => setVistaModo('lista')}
                 className={cn(
-                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px]",
+                  "flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
                   vistaModo === 'lista'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -805,7 +881,7 @@ function CitasContent() {
                 type="button"
                 onClick={() => setVistaModo('agenda')}
                 className={cn(
-                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px]",
+                  "flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
                   vistaModo === 'agenda'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -825,7 +901,7 @@ function CitasContent() {
                     setFiltroEmpleado('');
                   }}
                   className={cn(
-                    "px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px] whitespace-nowrap",
+                    "px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
                     scope === 'mine'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -837,7 +913,7 @@ function CitasContent() {
                   type="button"
                   onClick={() => setScope('all')}
                   className={cn(
-                    "px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer min-h-[32px] sm:min-h-[34px] whitespace-nowrap",
+                    "px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
                     scope === 'all'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -854,7 +930,7 @@ function CitasContent() {
             <div className="space-y-5">
               {/* Filtros Inteligentes (Tabs) */}
               <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-1.5 p-1 bg-secondary/30 rounded-xl border border-border/50 w-full md:w-auto self-start">
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar p-1 bg-secondary/30 rounded-xl border border-border/50 w-full md:w-auto self-start">
                   {[
                     { id: 'activas', label: 'Activas' },
                     { id: 'hoy', label: 'Hoy' },
@@ -876,7 +952,7 @@ function CitasContent() {
                           setPage(1);
                         }}
                         className={cn(
-                          "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                            "shrink-0 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-10",
                           isActive
                             ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                             : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -938,7 +1014,7 @@ function CitasContent() {
                       setFiltroSmart('todas');
                       setPage(1);
                     }}
-                    className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
+                    className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
                   >
                     <option value="">Filtrar por estado</option>
                     {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
@@ -952,7 +1028,7 @@ function CitasContent() {
                         setFiltroEmpleado(e.target.value);
                         setPage(1);
                       }}
-                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
+                      className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
                     >
                       <option value="">Todos los empleados</option>
                       {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
@@ -1202,7 +1278,7 @@ function CitasContent() {
                             : null;
                       const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
                       return (
-                        <Card key={cita.id} className="p-4 border-border/45 bg-card/60 hover:bg-secondary/15 transition-colors space-y-3">
+                        <Card key={cita.id} className="surface-panel p-4 bg-card/80 hover:bg-secondary/15 transition-colors space-y-3">
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="font-semibold text-foreground text-sm">{cita.cliente_nombre}</p>
@@ -1211,7 +1287,8 @@ function CitasContent() {
                             <select
                               value={cita.estado}
                               onChange={e => changeEstado(cita.id, e.target.value)}
-                              className={cn('text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
+                              aria-label={`Estado de la cita de ${cita.cliente_nombre}`}
+                              className={cn('min-h-10 text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
                             >
                               {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
                             </select>
@@ -1281,14 +1358,14 @@ function CitasContent() {
                               <span className="text-muted-foreground">· {to12h(cita.hora)}</span>
                             </div>
                             <div className="flex gap-1.5 flex-wrap justify-end">
-                              <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
+                              <Button variant="outline" size="sm" className="h-10 px-3 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
                                 <Edit className="w-3.5 h-3.5" /> Editar
                               </Button>
                               {(user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cita.created_by === user.id)) && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-7 px-2.5 text-xs gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 cursor-pointer"
+                                  className="h-10 px-3 text-xs gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 cursor-pointer"
                                   onClick={() => confirmDelete(cita, 'lista')}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" /> Eliminar
@@ -1296,12 +1373,12 @@ function CitasContent() {
                               )}
                               {waUrl ? (
                                 <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1 border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/10 cursor-pointer">
+                                  <Button variant="outline" size="sm" className="h-10 px-3 text-xs gap-1 border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/10 cursor-pointer">
                                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                                   </Button>
                                 </a>
                               ) : (
-                                <Button variant="outline" size="sm" disabled className="h-7 px-2.5 text-xs gap-1 opacity-50 cursor-not-allowed">
+                                <Button variant="outline" size="sm" disabled className="h-10 px-3 text-xs gap-1 opacity-50 cursor-not-allowed">
                                   Sin Teléfono
                                 </Button>
                               )}
@@ -1339,7 +1416,7 @@ function CitasContent() {
                     <select
                       value={filtroEmpleado}
                       onChange={e => setFiltroEmpleado(e.target.value)}
-                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm w-full cursor-pointer"
+                      className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm w-full cursor-pointer"
                     >
                       <option value="">Filtrar todos los estilistas</option>
                       {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
@@ -1374,18 +1451,24 @@ function CitasContent() {
       {showModal && (
         <div
           className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cita-dialog-title"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowModal(false);
           }}
         >
-          <Card className="w-full max-w-lg p-0 relative max-h-[90dvh] sm:max-h-[90vh] flex flex-col border-border/50 shadow-2xl rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl overflow-hidden bg-card">
+          <Card className="w-full sm:max-w-xl p-0 relative max-h-[94dvh] sm:max-h-[92vh] flex flex-col border-border/50 shadow-2xl rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl overflow-hidden bg-card">
             
             {/* Tirador táctil superior para móvil */}
             <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-0 sm:hidden shrink-0" />
 
             {/* Header del modal */}
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border/40 shrink-0 bg-secondary/10">
-              <h2 className="text-base sm:text-lg font-bold text-foreground">{editingId ? 'Editar Cita' : 'Nueva Cita'}</h2>
+            <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-border/40 shrink-0 bg-card/95 backdrop-blur-xl">
+              <div className="min-w-0">
+                <h2 id="cita-dialog-title" className="text-lg font-bold text-foreground">{editingId ? 'Editar cita' : 'Nueva cita'}</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Cliente, servicios y horario en un solo flujo.</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
@@ -1397,7 +1480,7 @@ function CitasContent() {
             </div>
 
             {/* Formulario */}
-            <form id="cita-form" onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 custom-scrollbar">
+            <form id="cita-form" onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-5 custom-scrollbar">
               <div className="grid grid-cols-1 gap-3.5">
 
                 {/* ─── Selector Inteligente de Cliente ──────────────────── */}
@@ -1482,21 +1565,11 @@ function CitasContent() {
                             type="button"
                             disabled={!clienteBusqueda.trim()}
                             className="flex-1 min-w-[140px] text-xs font-semibold text-foreground bg-secondary hover:bg-secondary/80 border border-border/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2.5 py-2 flex items-center justify-center gap-1.5 transition-colors group shrink-0"
-                            onClick={() => {
-                              const nombreLimpio = clienteBusqueda.trim();
-                              if (!nombreLimpio) return;
-                              setForm((prev: any) => ({
-                                ...prev,
-                                cliente_id: '',
-                                cliente_nombre: nombreLimpio,
-                                cliente_telefono: '',
-                              }));
-                              setClienteDropdownOpen(false);
-                            }}
+                            onClick={handleCrearClienteMinimo}
                             title={!clienteBusqueda.trim() ? "Escriba un nombre en el buscador primero" : "Agendar cita utilizando solo el nombre"}
                           >
                             <UserCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span className="truncate">Agendar solo con nombre</span>
+                            <span className="truncate">Crear solo con nombre</span>
                           </button>
                         </div>
 
