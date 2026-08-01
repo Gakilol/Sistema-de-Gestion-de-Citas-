@@ -1,7 +1,7 @@
 // lib/__tests__/calendar-token-phone.test.ts
 // Pruebas unitarias para utilidades de calendario, teléfono e ICS
 
-import { normalizarTelefono } from '../normalize-phone';
+import { normalizePhone } from '../phone';
 import { generarTokenCalendario, verificarTokenCalendario } from '../calendar-token';
 import { generarICS } from '../ics';
 
@@ -12,35 +12,35 @@ describe('Pruebas Unitarias - Sistema de Calendario y WhatsApp', () => {
 
   describe('1. Normalización de Teléfonos', () => {
     test('1. Teléfono nicaragüense de 8 dígitos locales con guión (8675-7959)', () => {
-      expect(normalizarTelefono('8675-7959', '505')).toBe('50586757959');
+      expect(normalizePhone('8675-7959', '505')).toBe('50586757959');
     });
 
     test('2. Teléfono nicaragüense de 8 dígitos sin guión (86757959)', () => {
-      expect(normalizarTelefono('86757959', '505')).toBe('50586757959');
+      expect(normalizePhone('86757959', '505')).toBe('50586757959');
     });
 
     test('3. Teléfono con prefijo 505 sin duplicación (50586757959)', () => {
-      expect(normalizarTelefono('50586757959', '505')).toBe('50586757959');
+      expect(normalizePhone('50586757959', '505')).toBe('50586757959');
     });
 
     test('4. Teléfono completo con signo más, espacios y guiones (+505 8675-7959)', () => {
-      expect(normalizarTelefono('+505 8675-7959', '505')).toBe('50586757959');
+      expect(normalizePhone('+505 8675-7959', '505')).toBe('50586757959');
     });
 
     test('5. Teléfono costarricense por defecto de 8 dígitos (88887777)', () => {
-      expect(normalizarTelefono('88887777')).toBe('50688887777');
+      expect(normalizePhone('88887777')).toBe('50688887777');
     });
 
     test('6. Teléfono costarricense con +506', () => {
-      expect(normalizarTelefono('+506 8888 8888', '506')).toBe('50688888888');
+      expect(normalizePhone('+506 8888 8888', '506')).toBe('50688888888');
     });
 
     test('7. Cliente sin teléfono o nulo', () => {
-      expect(normalizarTelefono('')).toBeNull();
-      expect(normalizarTelefono('   ')).toBeNull();
-      expect(normalizarTelefono(null)).toBeNull();
-      expect(normalizarTelefono(undefined)).toBeNull();
-      expect(normalizarTelefono('abc')).toBeNull();
+      expect(normalizePhone('')).toBeNull();
+      expect(normalizePhone('   ')).toBeNull();
+      expect(normalizePhone(null)).toBeNull();
+      expect(normalizePhone(undefined)).toBeNull();
+      expect(normalizePhone('abc')).toBeNull();
     });
   });
 

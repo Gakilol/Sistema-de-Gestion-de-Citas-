@@ -105,7 +105,7 @@ export function parse24hToNormal(time24: string): ParsedTime12 {
 /**
  * Convierte un string 24h ("HH:MM") a formato 12h legible AM/PM.
  */
-export function formatHora12h(time24: string): string {
+export function formatTime12Hour(time24: string): string {
   if (!time24) return '';
   const parsed = parse24hToNormal(time24);
   const mStr = String(parsed.minute).padStart(2, '0');

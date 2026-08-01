@@ -46,14 +46,6 @@ export function getUserContext(req: NextRequest): UserContext {
   };
 }
 
-export function canViewAllAppointments(role: string | null): boolean {
-  return role === 'ADMIN' || role === 'TECH_SUPPORT';
-}
-
-export function canManageAppointment(role: string | null): boolean {
-  return role === 'ADMIN' || role === 'TECH_SUPPORT' || role === 'EMPLEADO';
-}
-
 export function getScopedAppointmentWhere(
   userId: string,
   role: string,

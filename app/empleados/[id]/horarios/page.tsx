@@ -8,7 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { cn, formatTo12h } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 
 const TIME_OPTIONS = Array.from({ length: 96 }).map((_, i) => {
   const h = Math.floor(i / 4);
@@ -16,7 +17,7 @@ const TIME_OPTIONS = Array.from({ length: 96 }).map((_, i) => {
   const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   return {
     value: val,
-    label: formatTo12h(val)
+    label: formatTime12Hour(val)
   };
 });
 
@@ -52,7 +53,7 @@ const getOptions = (currentVal: string) => {
   const cleanVal = currentVal.substring(0, 5);
   const exists = TIME_OPTIONS.some(opt => opt.value === cleanVal);
   if (!exists) {
-    const newOpts = [...TIME_OPTIONS, { value: cleanVal, label: formatTo12h(cleanVal) }];
+    const newOpts = [...TIME_OPTIONS, { value: cleanVal, label: formatTime12Hour(cleanVal) }];
     newOpts.sort((a, b) => {
       const [ha, ma] = a.value.split(':').map(Number);
       const [hb, mb] = b.value.split(':').map(Number);

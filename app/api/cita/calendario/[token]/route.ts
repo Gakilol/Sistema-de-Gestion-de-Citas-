@@ -7,7 +7,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { verificarTokenCalendario } from '@/lib/calendar-token';
 import { formatDBDateLong } from '@/lib/timezone';
-import { formatTo12h } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 import { calcularFinCita } from '@/lib/calendar-event';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -100,8 +100,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       clienteNombre: cita.cliente_nombre,
       fecha: fechaStr,
       fechaLegible,
-      horaInicio: formatTo12h(cita.hora),
-      horaFin: formatTo12h(fin.hora),
+      horaInicio: formatTime12Hour(cita.hora),
+      horaFin: formatTime12Hour(fin.hora),
       horaInicioRaw: cita.hora,
       horaFinRaw: fin.hora,
       duracion: cita.duracion,

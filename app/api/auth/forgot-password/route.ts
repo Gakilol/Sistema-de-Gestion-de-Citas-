@@ -26,8 +26,6 @@ export async function POST(req: NextRequest) {
     );
 
     if (!empleado || !empleado.activo) {
-      // Registrar en consola para debugging pero retornar éxito genérico al cliente
-      console.log(`[FORGOT_PASSWORD] Intento de recuperación para correo no registrado o inactivo: ${trimmedEmail}`);
       return genericResponse;
     }
 
@@ -82,9 +80,8 @@ export async function POST(req: NextRequest) {
       await sendResetPasswordEmail({
         email: empleado.correo,
         nombre: empleado.nombre,
-        token: code, // enviamos el código como token
+        token: code,
       });
-      console.log(`[FORGOT_PASSWORD] Código de verificación enviado exitosamente a: ${empleado.correo}`);
     } catch (mailError) {
       console.error('[FORGOT_PASSWORD] Error crítico al enviar correo SMTP:', mailError);
       return NextResponse.json(

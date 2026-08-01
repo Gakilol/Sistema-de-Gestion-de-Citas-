@@ -36,7 +36,7 @@ export function isCitaEditable(estado: string): boolean {
   return DRAGGABLE_STATES.includes(estado as DraggableState);
 }
 
-import { formatHora12h } from '@/lib/time-utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 
 export const MIN_HOUR_HEIGHT = 45;   // Mínimo: 45px por hora
 export const DEFAULT_HOUR_HEIGHT = 80; // Inicial / Por defecto: 80px por hora
@@ -77,12 +77,12 @@ export const timeStrToMinutes = (timeStr: string): number => {
 
 /** Formatea "HH:MM" a formato 12 horas AM/PM */
 export const formatTime12h = (timeStr: string): string => {
-  return formatHora12h(timeStr);
+  return formatTime12Hour(timeStr);
 };
 
 /** Formatea minutos desde medianoche a formato 12 horas AM/PM */
 export const minutesToLabel = (minutes: number): string => {
-  return formatHora12h(minutesToTimeStr(minutes));
+  return formatTime12Hour(minutesToTimeStr(minutes));
 };
 
 /** Verifica si una cita existente en el mismo día y empleado se traslapa con un rango de minutos */

@@ -74,7 +74,6 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    console.log(`[RESET_PASSWORD] Contraseña restablecida exitosamente para el usuario: ${resetToken.empleado.correo}`);
 
     return NextResponse.json(
       { mensaje: 'Tu contraseña ha sido restablecida exitosamente. Ya puedes iniciar sesión.' },

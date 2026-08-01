@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireReporteRole, parseReportFilters } from '@/lib/reportes-utils';
-import { syncCitaEstados } from '@/lib/automatizacion';
+import { syncAppointmentStatuses } from '@/lib/appointments/appointment-status-automation';
 
 /**
  * GET /api/reportes
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   try {
-    await syncCitaEstados();
+    await syncAppointmentStatuses();
 
     const tipo  = req.nextUrl.searchParams.get('tipo') ?? 'citas';
     const parsed = parseReportFilters(req);

@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { registrarAuditoria } from '@/lib/auditoria';
+import { logLegacyAudit } from '@/lib/audit/legacy-audit';
 import { getUserContext } from '@/lib/auth-helpers';
 
 const CreateCategoriaSchema = z.object({
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await registrarAuditoria({
+    await logLegacyAudit({
       entidad: 'Categoria',
       entidadId: categoria.id,
       accion: 'CREAR',

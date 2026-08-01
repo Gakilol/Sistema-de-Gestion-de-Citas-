@@ -14,6 +14,7 @@ import { PhoneInput } from '@/components/shared/PhoneInput';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface Cliente {
@@ -36,19 +37,6 @@ interface Cliente {
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-NI', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
-const ESTADO_BADGE: Record<string, string> = {
-  PENDIENTE: 'badge-pendiente',
-  CONFIRMADA: 'badge-confirmada',
-  COMPLETADA: 'badge-completada',
-  CANCELADA: 'badge-cancelada',
-  EN_PROGRESO: 'badge-en_progreso',
-  REPROGRAMADA: 'badge-reprogramada',
-};
-const ESTADO_LABEL: Record<string, string> = {
-  PENDIENTE: 'Pendiente', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada',
-  CANCELADA: 'Cancelada', EN_PROGRESO: 'En Progreso', REPROGRAMADA: 'Reprogramada',
-};
 
 // ─── Avatar con iniciales ─────────────────────────────────────────────────
 function Avatar({ nombre, size = 'md' }: { nombre: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -159,8 +147,8 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: any; 
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="text-xs font-semibold text-foreground">{fmtDate(cita.fecha)}</p>
-                  <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', ESTADO_BADGE[cita.estado])}>
-                    {ESTADO_LABEL[cita.estado]}
+                  <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', APPOINTMENT_STATUS_BADGE_CLASSES[cita.estado])}>
+                    {APPOINTMENT_STATUS_LABELS[cita.estado]}
                   </span>
                 </div>
               </div>

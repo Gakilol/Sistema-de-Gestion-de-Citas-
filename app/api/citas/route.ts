@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { syncCitaEstados } from '@/lib/automatizacion';
+import { syncAppointmentStatuses } from '@/lib/appointments/appointment-status-automation';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
 
@@ -35,7 +35,7 @@ const CreateCitaSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await syncCitaEstados();
+    await syncAppointmentStatuses();
 
     const { userId, userRole } = getUserContext(req);
     if (!userId || !userRole) {
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
     const primerServicioId  = serviciosParaCita[0].id;
     // Excepción de horario: Todos los roles autenticados (ADMIN, TECH_SUPPORT, EMPLEADO)
     const permitirHorarioExtendido = Boolean(overrideSchedule || forzar || userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT');
-    const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
+    const { calculateAppointmentAvailability, validateExactAppointmentTime, findAppointmentConflicts } = await import('@/lib/appointments/appointment-availability');
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
     let idClienteFinal: string | null = cliente_id || null;
@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hash})`;
       } catch {}
 
-      const disponibilidad = await calcularDisponibilidad(
+      const disponibilidad = await calculateAppointmentAvailability(
         finalEmpleadoId,
         fecha.split('T')[0],
         primerServicioId,
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
         return { error: 'No se pudo determinar la jornada laboral', status: 400 };
       }
 
-      const conflictos = await detectarConflictos(
+      const conflictos = await findAppointmentConflicts(
         finalEmpleadoId,
         fecha.split('T')[0],
         hora,
@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
         ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
         : disponibilidad.intervalosOcupados;
 
-      const validacion = validarHoraExacta(
+      const validacion = validateExactAppointmentTime(
         hora,
         duracionCalculada,
         disponibilidad.jornada.inicio,

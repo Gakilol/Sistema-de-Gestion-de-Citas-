@@ -20,7 +20,7 @@ export interface CitaWA {
 const SALON_NAME = 'HAIR STYLE Salon & Barber';
 
 import { formatDBDateLong } from './timezone';
-import { formatTo12h } from './utils';
+import { formatTime12Hour } from './time-utils';
 
 function fmtFecha(d: string | Date): string {
   return formatDBDateLong(d);
@@ -35,7 +35,7 @@ export function mensajeConfirmacion(cita: CitaWA): string {
     `Su cita ha sido confirmada con éxito. Aquí están los detalles:`,
     ``,
     `Fecha: ${fmtFecha(cita.fecha)}`,
-    `Hora: ${formatTo12h(cita.hora)}`,
+    `Hora: ${formatTime12Hour(cita.hora)}`,
     cita.duracion ? `Duracion: ${cita.duracion} minutos` : null,
     cita.notas ? `Notas: ${cita.notas}` : null,
     ``,
@@ -52,7 +52,7 @@ export function mensajeRecordatorio(cita: CitaWA): string {
     `Hola ${cita.cliente_nombre}, le recordamos su cita:`,
     ``,
     `Fecha: ${fmtFecha(cita.fecha)}`,
-    `Hora: ${formatTo12h(cita.hora)}`,
+    `Hora: ${formatTime12Hour(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ];
@@ -68,7 +68,7 @@ export function mensajeRecordatorioUnaHora(cita: CitaWA): string {
     `Hola ${cita.cliente_nombre},`,
     `Le recordamos que su cita está programada para hoy:`,
     ``,
-    `Hora: ${formatTo12h(cita.hora)}`,
+    `Hora: ${formatTime12Hour(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ];
@@ -81,7 +81,7 @@ export function mensajeCancelacion(cita: CitaWA): string {
     `${SALON_NAME}`,
     ``,
     `Hola ${cita.cliente_nombre},`,
-    `Su cita del ${fmtFecha(cita.fecha)} a las ${formatTo12h(cita.hora)} ha sido cancelada.`,
+    `Su cita del ${fmtFecha(cita.fecha)} a las ${formatTime12Hour(cita.hora)} ha sido cancelada.`,
     ``,
     `Si desea reagendar, no dude en contactarnos.`,
     `Hasta pronto.`,
@@ -97,7 +97,7 @@ export function mensajeReprogramacion(cita: CitaWA): string {
     `Su cita ha sido reprogramada:`,
     ``,
     `Nueva fecha: ${fmtFecha(cita.fecha)}`,
-    `Nueva hora: ${formatTo12h(cita.hora)}`,
+    `Nueva hora: ${formatTime12Hour(cita.hora)}`,
     ``,
     `Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.`,
   ].join('\n');

@@ -1,0 +1,41 @@
+import { logAudit } from './audit-logger';
+
+export type LegacyAuditAction = 'CREAR' | 'ACTUALIZAR' | 'ELIMINAR' | 'CANCELAR' | 'FORZAR';
+
+interface LegacyAuditParams {
+  entidad: string;           // 'Cita', 'Empleado', 'Servicio', etc.
+  entidadId: string;
+  accion: LegacyAuditAction | string;
+  detalles?: Record<string, any>;
+  realizadoPor?: string | null;
+}
+
+/**
+ * Registra una acción administrativa en la tabla AuditLog (compatibilidad heredada).
+ */
+export async function logLegacyAudit({
+  entidad,
+  entidadId,
+  accion,
+  detalles,
+  realizadoPor,
+}: LegacyAuditParams): Promise<void> {
+  let mappedAction: string;
+  if (accion === 'CREAR') mappedAction = `${entidad.toUpperCase()}_CREATED`;
+  else if (accion === 'ACTUALIZAR') mappedAction = `${entidad.toUpperCase()}_UPDATED`;
+  else if (accion === 'ELIMINAR') mappedAction = `${entidad.toUpperCase()}_DELETED`;
+  else if (accion === 'CANCELAR') mappedAction = `${entidad.toUpperCase()}_CANCELLED`;
+  else mappedAction = accion;
+
+  await logAudit({
+    action: mappedAction,
+    module: entidad.toUpperCase(),
+    entityType: entidad,
+    entityId: entidadId,
+    status: 'SUCCESS',
+    description: `Acción legacy: ${accion} sobre ${entidad}`,
+    userEmail: realizadoPor,
+    metadata: detalles
+  });
+}
+

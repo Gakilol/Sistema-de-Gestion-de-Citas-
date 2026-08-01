@@ -2,9 +2,6 @@ import { defineConfig, devices } from '@playwright/test';
 import { configureIsolatedE2EEnvironment } from './tests/e2e/environment';
 
 const environment = configureIsolatedE2EEnvironment();
-console.log(
-  `Suite aislada configurada para ${environment.database.host}/${environment.database.database}.`
-);
 
 export default defineConfig({
   testDir: './tests',
