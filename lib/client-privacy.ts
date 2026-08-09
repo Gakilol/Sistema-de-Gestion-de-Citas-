@@ -21,6 +21,19 @@ export interface ClientResponseSource {
   [key: string]: unknown;
 }
 
+function maskValue(value: string | null | undefined, visible = 4): string | null {
+  if (!value) return null;
+  const suffix = value.slice(-visible);
+  return `${'*'.repeat(Math.max(4, value.length - visible))}${suffix}`;
+}
+
+function maskEmail(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const [local, domain] = value.split('@');
+  if (!domain) return maskValue(value);
+  return `${local.slice(0, 1)}***@${domain}`;
+}
+
 /**
  * The caller must scope appointments in the database before passing data here.
  * EMPLEADO receives a deliberate allowlist with no ownership metadata.
@@ -29,8 +42,28 @@ export function buildClientResponse(
   client: ClientResponseSource,
   role: string | null
 ): ClientResponseSource & { _privado: boolean } {
-  if (role === 'ADMIN' || role === 'TECH_SUPPORT') {
+  if (role === 'ADMIN') {
     return { ...client, _privado: false };
+  }
+
+  if (role === 'TECH_SUPPORT') {
+    return {
+      id: client.id,
+      nombre: client.nombre,
+      telefono: maskValue(client.telefono),
+      cedula: maskValue(client.cedula),
+      correo: maskEmail(client.correo),
+      notas: null,
+      citas: client.citas ?? [],
+      totalCitas: client.totalCitas ?? 0,
+      citasCompletadas: client.citasCompletadas ?? 0,
+      ultimaCita: client.ultimaCita ?? null,
+      primeraCita: client.primeraCita ?? null,
+      esRecurrente: client.esRecurrente ?? false,
+      servicioFavorito: client.servicioFavorito ?? null,
+      historial: client.historial ?? [],
+      _privado: true,
+    };
   }
 
   return {

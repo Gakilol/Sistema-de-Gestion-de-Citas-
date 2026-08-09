@@ -1,13 +1,11 @@
 import { prisma } from '@/lib/db';
 import { EstadoCita } from '@prisma/client';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
-import { syncAppointmentStatuses } from '@/lib/appointments/appointment-status-automation';
 
 export class DashboardService {
   // ─── Dashboard completo con soporte opcional de empleadoId ─────────────
   static async getDashboardStats(_periodo: 'hoy' | 'semana' | 'mes' = 'mes', empleadoId?: string) {
     // Sincronizar estados de citas de forma automática y JIT antes de computar métricas
-    await syncAppointmentStatuses();
 
     const todayStr = getBusinessTodayString();
     const dateToday = parseLocalDateToUTC(todayStr);
@@ -235,28 +233,21 @@ export class DashboardService {
       return d;
     });
 
-    const resultados = await Promise.all(
-      dias.map(async (d) => {
-        const agg = await prisma.cita.aggregate({
-          where: {
-            estado: EstadoCita.COMPLETADA,
-            fecha: d,
-            ...(empleadoId ? { empleado_id: empleadoId } : {}),
-          },
-          _count: { id: true },
-        });
+    const grouped = await prisma.cita.groupBy({
+      by: ['fecha'],
+      where: {
+        estado: EstadoCita.COMPLETADA,
+        fecha: { gte: dias[0], lte: dias[dias.length - 1] },
+        ...(empleadoId ? { empleado_id: empleadoId } : {}),
+      },
+      _count: { id: true },
+    });
+    const counts = new Map(grouped.map((item: { fecha: Date; _count: { id: number } }) => [item.fecha.toISOString().slice(0, 10), item._count.id]));
 
-        const dayLabel = d.toLocaleDateString('es-CR', { weekday: 'short', timeZone: 'UTC' }).slice(0, 3);
-        const dateLabel = `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-
-        return {
-          fecha: dateLabel,
-          dia: dayLabel,
-          citas: agg._count.id ?? 0,
-        };
-      })
-    );
-
-    return resultados;
+    return dias.map((d) => ({
+      fecha: `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+      dia: d.toLocaleDateString('es-CR', { weekday: 'short', timeZone: 'UTC' }).slice(0, 3),
+      citas: counts.get(d.toISOString().slice(0, 10)) ?? 0,
+    }));
   }
 }

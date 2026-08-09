@@ -495,14 +495,23 @@ export default function Clientes() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [showAgregar, setShowAgregar] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchClientes = useCallback(async (q = '') => {
+  const fetchClientes = useCallback(async (q = '', targetPage = 1) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/clientes?q=${encodeURIComponent(q)}`);
+      const params = new URLSearchParams({ q, page: String(targetPage), limit: '24' });
+      const res = await fetch(`/api/clientes?${params.toString()}`);
       const data = await res.json();
-      if (res.ok) setClientes(data.clientes ?? []);
+      if (res.ok) {
+        setClientes(data.clientes ?? []);
+        setTotal(data.total ?? 0);
+        setPage(data.page ?? targetPage);
+        setTotalPages(data.totalPages ?? 1);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -514,7 +523,7 @@ export default function Clientes() {
   const handleSearch = (val: string) => {
     setBusqueda(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchClientes(val), 350);
+    debounceRef.current = setTimeout(() => fetchClientes(val, 1), 350);
   };
 
   const handleEliminarCliente = async (id: string) => {
@@ -565,7 +574,7 @@ export default function Clientes() {
           {/* ── KPI mini ─────────────────────────────────────────── */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <Card className="surface-panel p-2.5 sm:p-4 text-center">
-              <p className="text-xl font-bold text-foreground">{clientes.length}</p>
+              <p className="text-xl font-bold text-foreground">{total}</p>
               <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Clientes únicos</p>
             </Card>
             <Card className="surface-panel p-2.5 sm:p-4 text-center">
@@ -617,6 +626,21 @@ export default function Clientes() {
                   <ClienteCard key={c.id} cliente={c} onSelect={() => setClienteSeleccionado(c)} />
                 ))}
               </div>
+              {totalPages > 1 && (
+                <div className="surface-panel flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    PÃ¡gina {page} de {totalPages} Â· {total} clientes
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => fetchClientes(busqueda, page - 1)} disabled={page <= 1} className="min-h-11 flex-1 sm:flex-none">
+                      Anterior
+                    </Button>
+                    <Button variant="outline" onClick={() => fetchClientes(busqueda, page + 1)} disabled={page >= totalPages} className="min-h-11 flex-1 sm:flex-none">
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

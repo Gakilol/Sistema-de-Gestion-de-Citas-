@@ -52,10 +52,14 @@ describe('Security boundaries', () => {
     expect(citas.some((c) => c.id === 'other')).toBe(true);
   });
 
-  test('TECH_SUPPORT conserva cliente y citas completas', () => {
+  test('TECH_SUPPORT recibe PII enmascarada y sin notas privadas', () => {
     const result = buildClientResponse(rawClient, 'TECH_SUPPORT');
     expect((result.citas ?? []).length).toBe(2);
-    expect(result.telefono).toBe(rawClient.telefono);
+    expect(result.telefono).not.toBe(rawClient.telefono);
+    expect(result.telefono).toMatch(/7777$/);
+    expect(result.correo).not.toBe(rawClient.correo);
+    expect(result.notas).toBeNull();
+    expect(result._privado).toBe(true);
   });
 
   test('EMPLOYEE recibe el DTO permitido para un cliente accesible', () => {

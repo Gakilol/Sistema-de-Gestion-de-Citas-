@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon, UserRound, Users } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { AppointmentTimeSelector } from '@/components/appointments/AppointmentTimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
-import { getBusinessTodayString, getDefaultBookingDate, getDefaultAgendaDate } from '@/lib/timezone';
+import { getBusinessTodayString, getDefaultBookingDate } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
 import { AppointmentCalendar } from '@/components/appointments/AppointmentCalendar';
 import { AppointmentDetailsSheet } from '@/components/appointments/AppointmentDetailsSheet';
@@ -58,10 +58,9 @@ function CitasContent() {
   // Modos de Vista y Scopes
   const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('agenda');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
-  // Fecha predeterminada: hoy antes de las 18:30 CR, mañana desde las 18:30.
-  // getDefaultAgendaDate() usa America/Costa_Rica vía Intl — funciona igual
-  // en localhost, Vercel (UTC), iOS, Android y usuarios de otro país.
-  const [selectedDateStr, setSelectedDateStr] = useState(getDefaultAgendaDate());
+  // La agenda siempre parte de hoy. El formulario de creación conserva por
+  // separado la regla operativa que puede proponer mañana después del cierre.
+  const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [citaToDelete, setCitaToDelete] = useState<CalendarAppointment | null>(null);
   const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
@@ -181,7 +180,26 @@ function CitasContent() {
     try {
       const activeScope = scopeParam || scope;
       const activeEmp = empParam !== undefined ? empParam : filtroEmpleado;
-      const res  = await fetch(`/api/citas?scope=${activeScope}&empleado_id=${activeEmp}`);
+      const params = new URLSearchParams({
+        scope: activeScope,
+        empleado_id: activeEmp,
+        limit: vistaModo === 'agenda' ? '500' : '100',
+      });
+      if (vistaModo === 'agenda') {
+        const [year, month, day] = selectedDateStr.split('-').map(Number);
+        const formatDate = (date: Date) => [
+          date.getFullYear(),
+          String(date.getMonth() + 1).padStart(2, '0'),
+          String(date.getDate()).padStart(2, '0'),
+        ].join('-');
+        const rangeStart = new Date(year, month - 1, day);
+        const rangeEnd = new Date(year, month - 1, day);
+        rangeStart.setDate(rangeStart.getDate() - 7);
+        rangeEnd.setDate(rangeEnd.getDate() + 13);
+        params.set('from', formatDate(rangeStart));
+        params.set('to', formatDate(rangeEnd));
+      }
+      const res  = await fetch(`/api/citas?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al obtener citas');
       setCitas(data.citas || []);
@@ -229,7 +247,7 @@ function CitasContent() {
   // Carga reactiva de citas en base al scope y filtro de empleado
   useEffect(() => {
     fetchCitas(scope, filtroEmpleado);
-  }, [scope, filtroEmpleado]);
+  }, [scope, filtroEmpleado, selectedDateStr, vistaModo]);
 
 
   useEffect(() => {
@@ -750,14 +768,90 @@ function CitasContent() {
   const totalPages = Math.ceil(filteredAndSortedCitas.length / APPOINTMENTS_PER_PAGE);
   const paginated  = filteredAndSortedCitas.slice((page - 1) * APPOINTMENTS_PER_PAGE, page * APPOINTMENTS_PER_PAGE);
 
+  const renderAgendaNavigation = (compact = false) => (
+    <div className={cn(
+      'border border-border/60 bg-card/80 p-1 shadow-sm',
+      compact
+        ? cn('grid w-full gap-1 rounded-xl', canSeeAll ? 'grid-cols-4' : 'grid-cols-2')
+        : 'flex w-full flex-nowrap items-center justify-between gap-1 overflow-x-auto rounded-xl sm:gap-2.5'
+    )}>
+      <div className={cn('contents', !compact && 'sm:flex sm:shrink-0 sm:gap-1')}>
+        <button
+          type="button"
+          onClick={() => setVistaModo('lista')}
+          aria-pressed={vistaModo === 'lista'}
+          className={cn(
+            'flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all sm:min-h-9 sm:px-3.5 sm:text-xs',
+            vistaModo === 'lista'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+          )}
+        >
+          <ListIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Lista</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setVistaModo('agenda')}
+          aria-pressed={vistaModo === 'agenda'}
+          className={cn(
+            'flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all sm:min-h-9 sm:px-3.5 sm:text-xs',
+            vistaModo === 'agenda'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+          )}
+        >
+          <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Agenda</span>
+        </button>
+      </div>
+
+      {canSeeAll && (
+        <div className={cn('contents', !compact && 'sm:ml-auto sm:flex sm:shrink-0 sm:gap-1')}>
+          <button
+            type="button"
+            onClick={() => {
+              setScope('mine');
+              setFiltroEmpleado('');
+            }}
+            aria-pressed={scope === 'mine'}
+            className={cn(
+              'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 text-[10px] font-bold transition-all sm:min-h-9 sm:px-3 sm:text-xs',
+              scope === 'mine'
+                ? 'border border-primary/35 bg-primary/12 text-primary shadow-sm'
+                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+            )}
+          >
+            <UserRound className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Mi agenda</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            aria-pressed={scope === 'all'}
+            className={cn(
+              'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 text-[10px] font-bold transition-all sm:min-h-9 sm:px-3 sm:text-xs',
+              scope === 'all'
+                ? 'border border-primary/35 bg-primary/12 text-primary shadow-sm'
+                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+            )}
+          >
+            <Users className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Todos</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   const mainContent = (
     <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-        <div className="app-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
+        <div className="app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
 
           {/* Header */}
-          <div className="flex items-center justify-between gap-3">
+          <div className={cn('items-center justify-between gap-3', vistaModo === 'agenda' ? 'hidden sm:flex' : 'flex')}>
             <div className="min-w-0">
               <h1 className="page-heading text-foreground">Agenda y citas</h1>
               <p className="page-description truncate sm:whitespace-normal">
@@ -775,69 +869,8 @@ function CitasContent() {
             </Button>
           </div>
 
-          {/* Barra de Vista e Integración de Scope (Fila Única en Móvil y Escritorio) */}
-          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 border-b border-border/30 pb-2 sm:pb-3 w-full flex-nowrap overflow-x-auto no-scrollbar">
-            {/* Selector de Pestaña Principal (Modo) */}
-            <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shrink-0">
-              <button
-                type="button"
-                onClick={() => setVistaModo('lista')}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
-                  vistaModo === 'lista'
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                )}
-              >
-                <ListIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> <span>Lista</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setVistaModo('agenda')}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
-                  vistaModo === 'agenda'
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                )}
-              >
-                <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> <span>Agenda</span>
-              </button>
-            </div>
-
-            {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
-            {canSeeAll && (
-              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shadow-inner shrink-0 ml-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScope('mine');
-                    setFiltroEmpleado('');
-                  }}
-                  className={cn(
-                    "px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
-                    scope === 'mine'
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                  )}
-                >
-                  {vistaModo === 'agenda' ? 'Mi agenda' : 'Mis Citas'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScope('all')}
-                  className={cn(
-                    "px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
-                    scope === 'all'
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                  )}
-                >
-                  {vistaModo === 'agenda' ? 'Agenda de todos' : 'Ver Todas'}
-                </button>
-              </div>
-            )}
-          </div>
+          {vistaModo === 'lista' && renderAgendaNavigation(false)}
+          {vistaModo === 'agenda' && <div className="hidden sm:block">{renderAgendaNavigation(false)}</div>}
 
           {/* VISTA DE LISTADO TRADICIONAL */}
           {vistaModo === 'lista' && (
@@ -911,7 +944,7 @@ function CitasContent() {
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="hidden flex-col gap-3 sm:flex sm:flex-row">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -1311,8 +1344,8 @@ function CitasContent() {
                       Página {page} de {totalPages} · {filteredAndSortedCitas.length} resultados
                     </p>
                     <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-7 text-xs">Anterior</Button>
-                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 text-xs">Siguiente</Button>
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="min-h-11 sm:min-h-8 text-xs">Anterior</Button>
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="min-h-11 sm:min-h-8 text-xs">Siguiente</Button>
                     </div>
                   </div>
                 )}
@@ -1352,6 +1385,8 @@ function CitasContent() {
                 localCitaOverrides={localCitaOverrides}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
+                onCreateCita={openCreate}
+                mobileToolbar={renderAgendaNavigation(true)}
                 isLoading={isLoading}
                 isModalOpen={showModal}
               />

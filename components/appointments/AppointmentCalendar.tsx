@@ -58,10 +58,12 @@ export function AppointmentCalendar({
   localCitaOverrides = {},
   selectedDateStr,
   setSelectedDateStr,
+  onCreateCita,
+  mobileToolbar,
   isLoading = false,
   isModalOpen,
 }: AppointmentCalendarProps) {
-  const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('dia');
+  const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('3dias');
   const [hoveredSlot, setHoveredSlot] = useState<{ dayStr: string; empleadoId: string; top: number; timeLabel: string } | null>(null);
   const [provisionalSlot, setProvisionalSlot] = useState<ProvisionalSlot | null>(null);
 
@@ -101,6 +103,8 @@ export function AppointmentCalendar({
   });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrollRef = useRef(false);
+  const dateSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const autoScrollRafRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressPendingRef = useRef<boolean>(false);
@@ -303,13 +307,9 @@ export function AppointmentCalendar({
         dias.push(d);
       }
     } else if (vista === 'semana') {
-      const d = new Date(fechaBase);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const lunes = new Date(d.setDate(diff));
       for (let i = 0; i < 7; i++) {
-        const temp = new Date(lunes);
-        temp.setDate(lunes.getDate() + i);
+        const temp = new Date(fechaBase);
+        temp.setDate(fechaBase.getDate() + i);
         dias.push(temp);
       }
     }
@@ -328,14 +328,25 @@ export function AppointmentCalendar({
 
   const cambiarFecha = (offset: number) => {
     const nuevaFecha = new Date(fechaBase);
-    if (vista === 'dia') {
-      nuevaFecha.setDate(fechaBase.getDate() + offset);
-    } else if (vista === '3dias') {
-      nuevaFecha.setDate(fechaBase.getDate() + offset * 3);
-    } else if (vista === 'semana') {
-      nuevaFecha.setDate(fechaBase.getDate() + offset * 7);
-    }
+    nuevaFecha.setDate(fechaBase.getDate() + offset);
     setSelectedDateStr(formatCalendarDate(nuevaFecha));
+  };
+
+  const handleDateSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    dateSwipeStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleDateSwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = dateSwipeStartRef.current;
+    const touch = event.changedTouches[0];
+    dateSwipeStartRef.current = null;
+    if (!start || !touch) return;
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 52 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.35) return;
+    cambiarFecha(deltaX < 0 ? 1 : -1);
   };
 
   const irAHoy = () => {
@@ -462,15 +473,29 @@ export function AppointmentCalendar({
     if (vista === 'dia') {
       return totalSubColumnas > 1 ? `${Math.max(340, totalSubColumnas * 140)}px` : '100%';
     }
-    return `${Math.max(680, totalSubColumnas * 135)}px`;
+    if (vista === '3dias') {
+      return totalSubColumnas <= 3 ? '100%' : `${Math.max(390, totalSubColumnas * 105)}px`;
+    }
+    return `${Math.max(735, totalSubColumnas * 105)}px`;
   }, [vista, totalSubColumnas]);
 
-  // Si la pantalla es móvil (< 768px), ajustar por defecto la vista a 'dia'
+  // En móvil y tablet se priorizan tres días; en escritorio se aprovecha
+  // el ancho para mostrar una semana desde la fecha seleccionada.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setVista('dia');
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      setVista('semana');
     }
   }, []);
+
+  useEffect(() => {
+    if (hasInitialScrollRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      if (!scrollContainerRef.current) return;
+      scrollContainerRef.current.scrollTop = Math.max(0, (7.75 - HORA_INICIO) * hourHeight);
+      hasInitialScrollRef.current = true;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [hourHeight]);
 
   // ─── Snackbar helpers ─────────────────────────────────────────────────────────
   const dismissSnackbar = useCallback(() => {
@@ -1725,27 +1750,42 @@ export function AppointmentCalendar({
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="surface-panel flex flex-col h-[calc(100dvh-17.5rem)] min-h-[32rem] max-h-[52rem] sm:h-[calc(100dvh-13.5rem)] lg:h-[calc(100dvh-10rem)] overflow-hidden select-none relative">
+    <div className="surface-panel relative flex h-[calc(100dvh-8.75rem)] min-h-[32rem] max-h-none select-none flex-col overflow-hidden sm:h-[calc(100dvh-13.5rem)] sm:max-h-[58rem] lg:h-[calc(100dvh-10rem)]">
       
       {/* CABECERA DEL CALENDARIO */}
       <div className="flex flex-col gap-2 p-2.5 sm:p-4 border-b border-border/50 bg-card/95 z-30 shrink-0 sticky top-0 backdrop-blur-xl">
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between"
+          onTouchStart={handleDateSwipeStart}
+          onTouchEnd={handleDateSwipeEnd}
+        >
           {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto">
-            <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1.5 text-xs cursor-pointer h-11 sm:h-9 px-3 shrink-0">
+          <div className="order-1 flex w-full items-center gap-1.5 sm:w-auto">
+            <Button variant="outline" size="sm" onClick={irAHoy} className="h-11 shrink-0 cursor-pointer gap-1 px-2.5 text-[11px] font-bold sm:h-9 sm:px-3 sm:text-xs">
               <CalendarIcon className="w-3.5 h-3.5" /> Hoy
             </Button>
-            <div className="flex flex-1 sm:flex-none items-center border border-border rounded-xl bg-background shadow-xs h-11 sm:h-9 min-w-0">
+            <div className="flex h-11 min-w-0 flex-1 items-center rounded-xl border border-border bg-background shadow-xs sm:h-9 sm:flex-none">
               <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="flex-1 text-xs sm:text-sm font-extrabold px-2 sm:px-3 border-x border-border py-1 text-foreground min-w-0 sm:min-w-[130px] text-center truncate">
+              <span className="min-w-0 flex-1 truncate border-x border-border px-1 py-1 text-center text-[10px] font-bold text-foreground sm:min-w-[130px] sm:px-3 sm:text-sm sm:font-extrabold">
                 {tituloCabecera}
               </span>
               <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
+
+            {onCreateCita && (
+              <Button
+                type="button"
+                onClick={onCreateCita}
+                className="h-11 shrink-0 gap-1 rounded-xl px-2 text-[10px] font-extrabold shadow-md sm:hidden"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Nueva cita</span>
+              </Button>
+            )}
 
             {/* Control Discreto de Zoom Vertical (- 100% +) */}
             <div className="hidden sm:flex items-center border border-border rounded-lg bg-background shadow-xs h-9 p-0.5">
@@ -1786,8 +1826,10 @@ export function AppointmentCalendar({
             )}
           </div>
 
+          {mobileToolbar && <div className="order-2 sm:hidden">{mobileToolbar}</div>}
+
           {/* Toggles de Vista */}
-          <div className="flex w-full sm:w-auto bg-secondary/40 p-0.5 rounded-xl border border-border/50 shadow-inner h-11 sm:h-9 items-center">
+          <div className="order-3 flex h-11 w-full items-center rounded-xl border border-border/50 bg-secondary/40 p-0.5 shadow-inner sm:order-none sm:h-9 sm:w-auto">
             {[
               { id: 'dia', label: 'Día' },
               { id: '3dias', label: '3 Días' },
@@ -1843,6 +1885,19 @@ export function AppointmentCalendar({
             })}
           </div>
         )}
+
+        <div className="flex items-center gap-3 overflow-x-auto border-t border-border/25 pt-2 text-[9px] font-bold text-muted-foreground sm:hidden">
+          {[
+            { label: 'Pendientes', color: '#f5b800' },
+            { label: 'Programadas', color: '#3b82f6' },
+            { label: 'Cumplidas', color: '#10b981' },
+          ].map((item) => (
+            <span key={item.label} className="flex shrink-0 items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+              {item.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* CONTENEDOR DE GRID Y HORAS (SCROLL) */}
@@ -2142,6 +2197,16 @@ export function AppointmentCalendar({
                           {citasDia.map((cita) => {
                             const { topPx, heightPx, colIndex, totalColumns } = cita;
                             const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
+                            const statusVisual: Record<string, { accent: string; surfaceMix: number }> = {
+                              PENDIENTE: { accent: '#f5b800', surfaceMix: 17 },
+                              CONFIRMADA: { accent: '#3b82f6', surfaceMix: 18 },
+                              EN_PROGRESO: { accent: '#06b6d4', surfaceMix: 18 },
+                              COMPLETADA: { accent: '#10b981', surfaceMix: 14 },
+                              CANCELADA: { accent: '#64748b', surfaceMix: 10 },
+                              NO_SHOW: { accent: '#ef4444', surfaceMix: 12 },
+                              REPROGRAMADA: { accent: '#8b5cf6', surfaceMix: 16 },
+                            };
+                            const appointmentVisual = statusVisual[cita.estado] ?? { accent: catColor, surfaceMix: 14 };
                             
                             const widthPct = 100 / totalColumns;
                             const leftPct = colIndex * widthPct;
@@ -2160,10 +2225,13 @@ export function AppointmentCalendar({
 
                             // ── Badge de estado ──
                             const statusBadge: Record<string, { label: string; cls: string }> = {
-                              completada:  { label: 'Completada', cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
-                              cancelada:   { label: 'Cancelada',  cls: 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30' },
-                              'no-show':   { label: 'No show',    cls: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30' },
-                              pendiente:   { label: 'Pendiente',  cls: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30' },
+                              COMPLETADA: { label: 'Cumplida', cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
+                              CANCELADA: { label: 'Cancelada', cls: 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/30' },
+                              NO_SHOW: { label: 'No asistió', cls: 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30' },
+                              PENDIENTE: { label: 'Pendiente', cls: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30' },
+                              CONFIRMADA: { label: 'Programada', cls: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30' },
+                              EN_PROGRESO: { label: 'En curso', cls: 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-cyan-500/30' },
+                              REPROGRAMADA: { label: 'Reprogramada', cls: 'bg-violet-500/20 text-violet-700 dark:text-violet-300 border-violet-500/30' },
                             };
                             const statInfo = statusBadge[cita.estado];
 
@@ -2201,9 +2269,9 @@ export function AppointmentCalendar({
                                   left:   `calc(${leftPct}% + ${gapPx}px)`,
                                   width:  `calc(${widthPct}% - ${gapPx * 2}px)`,
                                   backgroundColor: cita.allowOverlap
-                                    ? `color-mix(in srgb, ${catColor} 12%, color-mix(in srgb, #f59e0b 8%, var(--color-card)))`
-                                    : `color-mix(in srgb, ${catColor} 14%, var(--color-card))`,
-                                  borderColor:  cita.allowOverlap ? '#d97706' : `color-mix(in srgb, ${catColor} 35%, var(--color-border))`,
+                                    ? `color-mix(in srgb, ${appointmentVisual.accent} 12%, color-mix(in srgb, #f59e0b 8%, var(--color-card)))`
+                                    : `color-mix(in srgb, ${appointmentVisual.accent} ${appointmentVisual.surfaceMix}%, var(--color-card))`,
+                                  borderColor: cita.allowOverlap ? '#d97706' : `color-mix(in srgb, ${appointmentVisual.accent} 42%, var(--color-border))`,
                                   borderStyle:  cita.allowOverlap ? 'dashed' : 'solid',
                                   borderWidth:  cita.allowOverlap ? '2px' : '1px',
                                   zIndex: isSelected ? 20 : 5,
@@ -2234,7 +2302,7 @@ export function AppointmentCalendar({
                                 {/* Indicador lateral de categoría */}
                                 <div
                                   className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl transition-all group-hover:w-2 shrink-0"
-                                  style={{ backgroundColor: catColor }}
+                                  style={{ backgroundColor: appointmentVisual.accent }}
                                 />
 
                                 {/* ─────────── CONTENIDO ADAPTABLE ─────────── */}

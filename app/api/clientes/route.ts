@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
     const busqueda = normalizarNombre(req.nextUrl.searchParams.get('q') ?? '');
+    const page = Math.max(1, Number(req.nextUrl.searchParams.get('page') ?? '1') || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '24') || 24));
 
     const searchWhere = busqueda
       ? {
@@ -33,24 +35,30 @@ export async function GET(req: NextRequest) {
         }
       : {};
 
-    const clientesData = await prisma.cliente.findMany({
-      where: searchWhere,
-      include: {
-        citas: {
-          ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
-          select: {
-            id: true,
-            fecha: true,
-            hora: true,
-            estado: true,
-            empleado_id: true,
-            servicio: { select: { nombre: true } },
-            empleado: { select: { nombre: true } },
+    const [total, clientesData] = await Promise.all([
+      prisma.cliente.count({ where: searchWhere }),
+      prisma.cliente.findMany({
+        where: searchWhere,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          citas: {
+            ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
+            select: {
+              id: true,
+              fecha: true,
+              hora: true,
+              estado: true,
+              empleado_id: true,
+              servicio: { select: { nombre: true } },
+              empleado: { select: { nombre: true } },
+            },
+            orderBy: { fecha: 'desc' },
           },
-          orderBy: { fecha: 'desc' },
         },
-      },
-    });
+      }),
+    ]);
 
     const clientes = clientesData.map((c: any) => {
       let citasCompletadas = 0;
@@ -98,7 +106,13 @@ export async function GET(req: NextRequest) {
 
     clientes.sort((a: any, b: any) => b.totalCitas - a.totalCitas);
 
-    return NextResponse.json({ clientes, total: clientes.length }, { status: 200 });
+    return NextResponse.json({
+      clientes,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    }, { status: 200 });
   } catch (err: any) {
     console.error('[CLIENTS_GET_ERROR] Error al obtener clientes:', err);
     return NextResponse.json({ error: 'Error al consultar la lista de clientes' }, { status: 500 });

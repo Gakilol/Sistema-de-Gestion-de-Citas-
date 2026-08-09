@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export interface CalendarAppointment {
   id: string;
   fecha: string;
@@ -66,6 +68,8 @@ export interface AppointmentCalendarProps {
   localCitaOverrides?: Record<string, { fecha?: string; hora?: string; duracion?: number; empleado_id?: string }>;
   selectedDateStr: string;
   setSelectedDateStr: (date: string) => void;
+  onCreateCita?: () => void;
+  mobileToolbar?: ReactNode;
   isLoading?: boolean;
   isModalOpen?: boolean;
 }

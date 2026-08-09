@@ -1,13 +1,8 @@
 import { prisma } from '@/lib/db';
 import { BUSINESS_TIMEZONE } from '@/lib/timezone';
-import { EstadoCita } from '@prisma/client';
+import { EstadoCita, Prisma } from '@prisma/client';
 
-/**
- * Obtiene la fecha y hora actuales en la zona horaria del negocio (Costa Rica UTC-6).
- * Retorna un objeto Date con la hora "local" expresada en UTC para comparaciones consistentes.
- */
 function getNowInBusinessTZ(): Date {
-  const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: BUSINESS_TIMEZONE,
     year: 'numeric',
@@ -18,89 +13,113 @@ function getNowInBusinessTZ(): Date {
     second: '2-digit',
     hour12: false,
   });
-  const parts = formatter.formatToParts(now);
-  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '00';
-  const localIso = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}Z`;
-  return new Date(localIso);
+  const parts = formatter.formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '00';
+  return new Date(
+    `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}Z`
+  );
 }
 
-/**
- * Sincroniza automáticamente los estados de las citas elegibles en base a la hora actual de Costa Rica.
- * Las citas 'CANCELADA' y 'REPROGRAMADA' quedan totalmente excluidas de esta automatización.
- */
-export async function syncAppointmentStatuses(): Promise<void> {
-  try {
-    // 1. Hora actual en la zona horaria del negocio (como UTC-neutral para comparar)
-    const nowLocal = getNowInBusinessTZ();
+export interface AppointmentStatusSyncResult {
+  inspected: number;
+  updated: number;
+}
 
-    // 2. Consultar citas activas que estén en un estado automatizable
-    const citasActivas = await prisma.cita.findMany({
-      where: {
-        estado: {
-          in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO]
-        }
+export async function syncAppointmentStatuses(
+  actor: { userId?: string | null; userRole?: string | null } = {}
+): Promise<AppointmentStatusSyncResult> {
+  const nowLocal = getNowInBusinessTZ();
+  const appointments = await prisma.cita.findMany({
+    where: {
+      estado: {
+        in: [EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROGRESO],
       },
-      select: {
-        id: true,
-        fecha: true,
-        hora: true,
-        duracion: true,
-        estado: true,
-        cliente_nombre: true,
-        completed_at: true,
-      },
-    });
+    },
+    select: {
+      id: true,
+      fecha: true,
+      hora: true,
+      duracion: true,
+      estado: true,
+      completed_at: true,
+    },
+  });
 
-    if (citasActivas.length === 0) {
-      return;
-    }
+  const changes: Array<{
+    id: string;
+    before: EstadoCita;
+    after: EstadoCita;
+    completedAt?: Date;
+  }> = [];
 
-    const updates: Promise<any>[] = [];
+  for (const appointment of appointments) {
+    const date = appointment.fecha.toISOString().split('T')[0];
+    const [hours, minutes] = appointment.hora.split(':').map(Number);
+    const start = new Date(
+      `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00Z`
+    );
+    const end = new Date(start.getTime() + appointment.duracion * 60_000);
 
-    for (const cita of citasActivas) {
-      // Construir la fecha de la cita como string YYYY-MM-DD en UTC (el campo @db.Date
-      // se guarda como medianoche UTC, que equivale exactamente al día en Costa Rica)
-      const fechaStr = cita.fecha.toISOString().split('T')[0];
-      const [hours, minutes] = cita.hora.split(':').map(Number);
-
-      // Reconstruir inicio y fin de la cita en la misma escala que nowLocal
-      const startOfCita = new Date(`${fechaStr}T${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:00Z`);
-      const endOfCita   = new Date(startOfCita.getTime() + cita.duracion * 60 * 1000);
-
-      let targetEstado = cita.estado;
-
-      if (nowLocal < startOfCita) {
-        // Aún no ha iniciado: conservar PENDIENTE o CONFIRMADA
-        if (cita.estado !== EstadoCita.PENDIENTE && cita.estado !== EstadoCita.CONFIRMADA) {
-          targetEstado = EstadoCita.PENDIENTE;
-        }
-      } else if (nowLocal >= startOfCita && nowLocal < endOfCita) {
-        // Cita en curso
-        targetEstado = EstadoCita.EN_PROGRESO;
-      } else if (nowLocal >= endOfCita) {
-        // Cita finalizada
-        targetEstado = EstadoCita.COMPLETADA;
+    let target = appointment.estado;
+    if (nowLocal < start) {
+      if (![EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA].includes(appointment.estado)) {
+        target = EstadoCita.PENDIENTE;
       }
-
-      if (targetEstado !== cita.estado) {
-        const updateData: any = { estado: targetEstado };
-        // Set tracking timestamps for analytics
-        if (targetEstado === EstadoCita.COMPLETADA && !cita.completed_at) {
-          updateData.completed_at = endOfCita;
-        }
-        updates.push(
-          prisma.cita.update({
-            where: { id: cita.id },
-            data: updateData,
-          })
-        );
-      }
+    } else if (nowLocal < end) {
+      target = EstadoCita.EN_PROGRESO;
+    } else {
+      target = EstadoCita.COMPLETADA;
     }
 
-    if (updates.length > 0) {
-      await Promise.all(updates);
+    if (target !== appointment.estado) {
+      changes.push({
+        id: appointment.id,
+        before: appointment.estado,
+        after: target,
+        completedAt:
+          target === EstadoCita.COMPLETADA && !appointment.completed_at ? end : undefined,
+      });
     }
-  } catch (error) {
-    console.error('[AUTOMATIZACIÓN] Error crítico al sincronizar estados de citas:', error);
   }
+
+  if (changes.length === 0) return { inspected: appointments.length, updated: 0 };
+
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    let applied = 0;
+    for (const change of changes) {
+      const result = await tx.cita.updateMany({
+        where: { id: change.id, estado: change.before },
+        data: {
+          estado: change.after,
+          ...(change.completedAt ? { completed_at: change.completedAt } : {}),
+        },
+      });
+      if (result.count === 0) continue;
+
+      applied += 1;
+      await tx.auditLog.create({
+        data: {
+          entidad: 'Cita',
+          entidadId: change.id,
+          accion: 'ESTADO_AUTOMATICO',
+          realizadoPor: actor.userId ?? 'System',
+          detalles: { before: change.before, after: change.after },
+          userId: actor.userId ?? null,
+          userRole: actor.userRole ?? null,
+          action: 'APPOINTMENT_STATUS_AUTO_UPDATED',
+          module: 'CITAS',
+          entityType: 'Cita',
+          entityId: change.id,
+          description: 'Estado actualizado por sincronizacion controlada',
+          status: 'SUCCESS',
+          beforeData: { estado: change.before },
+          afterData: { estado: change.after },
+          metadata: { source: 'controlled-sync' },
+        },
+      });
+    }
+    return applied;
+  });
+
+  return { inspected: appointments.length, updated };
 }

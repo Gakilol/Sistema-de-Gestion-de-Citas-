@@ -365,6 +365,14 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
         </div>
         <span className="truncate text-[hsl(var(--sidebar-foreground))] font-bold text-sm tracking-tight">{currentPage}</span>
       </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="Abrir perfil y navegación"
+        className="ml-auto flex h-11 w-11 items-center justify-center rounded-xl text-[hsl(var(--sidebar-foreground)/0.7)] transition-colors hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]"
+      >
+        <UserRound className="h-5 w-5" />
+      </button>
     </header>
   );
 }
