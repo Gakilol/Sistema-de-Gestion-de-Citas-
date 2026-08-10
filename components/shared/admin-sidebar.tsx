@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
   Calendar,
+  CalendarDays,
   Users,
   Settings,
   LogOut,
@@ -351,20 +352,27 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
   const currentPage = pageNames[pathname] ?? 'HAIR STYLE';
 
   return (
-    <header className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar)/0.96)] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-3 sm:px-4 pt-safe backdrop-blur-xl">
+    <header className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[hsl(var(--sidebar)/0.97)] border-b border-[hsl(var(--sidebar-border))] flex items-center gap-3 px-3 sm:px-4 pt-safe backdrop-blur-xl shadow-[0_8px_30px_hsl(225_30%_3%/0.22)]">
       <button
         onClick={onOpen}
         aria-label="Abrir menú de navegación"
-        className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-xl text-[hsl(var(--sidebar-foreground)/0.75)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] active:scale-95 transition-all"
+        className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-xl text-[hsl(var(--sidebar-foreground)/0.72)] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] active:scale-95 transition-all"
       >
-        <Menu className="w-5 h-5" />
+        <Menu className="w-6 h-6" strokeWidth={1.8} />
       </button>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="w-7 h-7 flex-shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center shadow-sm">
-          <Scissors className="w-3.5 h-3.5 text-white" />
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <div className="w-9 h-9 flex-shrink-0 bg-primary rounded-xl flex items-center justify-center shadow-[0_6px_18px_hsl(var(--primary)/0.2)] text-primary-foreground">
+          <CalendarDays className="w-5 h-5" strokeWidth={2.2} />
         </div>
-        <span className="truncate text-[hsl(var(--sidebar-foreground))] font-bold text-sm tracking-tight">{currentPage}</span>
+        <span className="truncate text-[hsl(var(--sidebar-foreground))] font-extrabold text-base tracking-tight">{currentPage}</span>
       </div>
+      <Link
+        href="/configuracion"
+        aria-label="Abrir perfil y configuración"
+        className="flex size-11 items-center justify-center rounded-xl text-[hsl(var(--sidebar-foreground)/0.68)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] active:scale-95 transition-all"
+      >
+        <UserRound className="size-6" strokeWidth={1.7} />
+      </Link>
     </header>
   );
 }
@@ -382,9 +390,9 @@ function MobileBottomNav({ onOpen }: { onOpen: () => void }) {
     <nav
       data-mobile-bottom-nav
       aria-label="Navegación principal"
-      className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/0.97)] px-2 pb-safe shadow-[0_-10px_30px_hsl(var(--foreground)/0.08)] backdrop-blur-xl"
+      className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/0.98)] px-2 pb-safe shadow-[0_-14px_34px_hsl(225_30%_3%/0.28)] backdrop-blur-xl"
     >
-      <div className="grid h-[4.25rem] grid-cols-4 items-stretch">
+      <div className="grid h-[4.5rem] grid-cols-4 items-stretch">
         {items.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -396,16 +404,13 @@ function MobileBottomNav({ onOpen }: { onOpen: () => void }) {
               href={item.href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors',
+                'relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold transition-colors',
                 isActive
                   ? 'text-[hsl(var(--sidebar-primary))]'
                   : 'text-[hsl(var(--sidebar-foreground)/0.58)] active:bg-[hsl(var(--sidebar-accent))]'
               )}
             >
-              {isActive && (
-                <span className="absolute top-1 h-0.5 w-7 rounded-full bg-[hsl(var(--sidebar-primary))]" />
-              )}
-              <item.icon className="h-5 w-5" />
+              <item.icon className="h-6 w-6" strokeWidth={isActive ? 2.3 : 1.8} />
               <span className="truncate">{item.title}</span>
             </Link>
           );
@@ -415,9 +420,9 @@ function MobileBottomNav({ onOpen }: { onOpen: () => void }) {
           type="button"
           onClick={onOpen}
           aria-label="Abrir todos los módulos"
-          className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-[hsl(var(--sidebar-foreground)/0.58)] active:bg-[hsl(var(--sidebar-accent))]"
+          className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold text-[hsl(var(--sidebar-foreground)/0.58)] active:bg-[hsl(var(--sidebar-accent))]"
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-6 w-6" strokeWidth={1.8} />
           <span>Más</span>
         </button>
       </div>
@@ -442,7 +447,7 @@ export function AdminSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-60 xl:w-64 flex-shrink-0 h-screen sticky top-0 overflow-hidden border-r border-[hsl(var(--sidebar-border))]">
+      <aside className="hidden lg:flex w-60 xl:w-64 flex-shrink-0 h-screen sticky top-0 overflow-hidden border-r border-[hsl(var(--sidebar-border))] shadow-[12px_0_36px_hsl(225_30%_3%/0.18)]">
         <SidebarContent />
       </aside>
 

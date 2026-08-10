@@ -53,6 +53,7 @@ interface AgendaCalendarioProps {
   setSelectedDateStr: (date: string) => void;
   isLoading?: boolean;
   isModalOpen?: boolean;
+  mobileToolbarExternal?: boolean;
 }
 
 const DIAS_SEMANA_ABR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -158,8 +159,10 @@ export function AgendaCalendario({
   setSelectedDateStr,
   isLoading = false,
   isModalOpen,
+  mobileToolbarExternal = false,
 }: AgendaCalendarioProps) {
   const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('dia');
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const [hoveredSlot, setHoveredSlot] = useState<{ dayStr: string; empleadoId: string; top: number; timeLabel: string } | null>(null);
   const [provisionalSlot, setProvisionalSlot] = useState<ProvisionalSlot | null>(null);
 
@@ -586,18 +589,45 @@ export function AgendaCalendario({
   }, [diasAMostrar, empleadosColumnas]);
 
   const minGridWidth = useMemo(() => {
+    if (isNarrowViewport && empleadosColumnas.length === 1 && (vista === 'dia' || vista === '3dias')) {
+      return '100%';
+    }
     if (vista === 'dia') {
       return totalSubColumnas > 1 ? `${Math.max(340, totalSubColumnas * 140)}px` : '100%';
     }
     return `${Math.max(680, totalSubColumnas * 135)}px`;
-  }, [vista, totalSubColumnas]);
+  }, [vista, totalSubColumnas, isNarrowViewport, empleadosColumnas.length]);
 
   // Si la pantalla es móvil (< 768px), ajustar por defecto la vista a 'dia'
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setVista('dia');
-    }
+    if (typeof window === 'undefined') return;
+    const syncViewport = () => {
+      const narrow = window.innerWidth < 640;
+      setIsNarrowViewport(narrow);
+      setHourHeight(narrow ? 64 : DEFAULT_HOUR_HEIGHT);
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
   }, []);
+
+  useEffect(() => {
+    if (!isNarrowViewport) return;
+    setVista('3dias');
+    if (activeMobileEmpId === 'all' && empleadosBase[0]?.id) {
+      setActiveMobileEmpId(empleadosBase[0].id);
+    }
+  }, [isNarrowViewport, empleadosBase, activeMobileEmpId]);
+
+  useEffect(() => {
+    if (!isNarrowViewport || !scrollContainerRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = Math.max(0, (7 - HORA_INICIO) * hourHeight);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isNarrowViewport, hourHeight]);
 
   // ─── Snackbar helpers ─────────────────────────────────────────────────────────
   const dismissSnackbar = useCallback(() => {
@@ -1855,8 +1885,14 @@ export function AgendaCalendario({
     <div className="surface-panel flex flex-col h-[calc(100dvh-17.5rem)] min-h-[32rem] max-h-[52rem] sm:h-[calc(100dvh-13.5rem)] lg:h-[calc(100dvh-10rem)] overflow-hidden select-none relative">
       
       {/* CABECERA DEL CALENDARIO */}
-      <div className="flex flex-col gap-2 p-2.5 sm:p-4 border-b border-border/50 bg-card/95 z-30 shrink-0 sticky top-0 backdrop-blur-xl">
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className={cn(
+        "flex flex-col gap-2 p-2.5 sm:p-4 border-b border-border/50 bg-card/95 z-30 shrink-0 sticky top-0 backdrop-blur-xl",
+        mobileToolbarExternal && empleadosBase.length <= 1 && "hidden sm:flex"
+      )}>
+        <div className={cn(
+          "flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between",
+          mobileToolbarExternal && "hidden sm:flex"
+        )}>
           {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
           <div className="flex items-center gap-1.5 w-full sm:w-auto">
             <Button variant="outline" size="sm" onClick={irAHoy} className="font-bold gap-1.5 text-xs cursor-pointer h-11 sm:h-9 px-3 shrink-0">
@@ -1938,12 +1974,15 @@ export function AgendaCalendario({
 
         {/* SELECTOR MÓVIL DE PROFESIONAL (Pestañas horizontales amplias) */}
         {empleadosBase.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar pt-2 border-t border-border/30 touch-pan-x">
+          <div className={cn(
+            "flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar pt-2 border-t border-border/30 touch-pan-x",
+            mobileToolbarExternal && "pt-0 border-t-0 sm:pt-2 sm:border-t"
+          )}>
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">Estilista:</span>
             <button
               onClick={() => setActiveMobileEmpId('all')}
               className={cn(
-                "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-11 sm:h-8 flex items-center gap-1.5 border",
+                "hidden sm:flex px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-11 sm:h-8 items-center gap-1.5 border",
                 activeMobileEmpId === 'all'
                   ? "bg-primary/15 text-primary border-primary/50 font-black shadow-xs"
                   : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"

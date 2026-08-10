@@ -2,8 +2,8 @@
 -- NOVACITA - SCRIPT DE ESQUEMA COMPLETO Y CONTROLADO PARA POSTGRESQL / NEONDB
 -- ============================================================================
 -- Sistema: NovaCita (Gestión de Citas, Empleados, Auditoría, Notificaciones y Reportes)
--- Versión del Sistema: 1.0.0
--- Fecha de Generación: 2026-06-22
+-- Versión del Sistema: 1.1.0
+-- Fecha de Generación: 2026-08-01
 --
 -- ADVERTENCIA:
 -- Este script recrea la estructura de la base de datos desde cero.
@@ -54,17 +54,19 @@ $$;
 
 -- --- TABLA: Empleado ---
 CREATE TABLE IF NOT EXISTS "Empleado" (
-    "id"           TEXT NOT NULL DEFAULT gen_random_uuid(),
-    "nombre"       TEXT NOT NULL,
-    "correo"       TEXT NOT NULL,
-    "telefono"     TEXT,
-    "passwordHash" TEXT NOT NULL,
-    "especialidad" TEXT,
-    "horario"      JSONB,
-    "rol"          "RolUsuario" NOT NULL DEFAULT 'EMPLEADO',
-    "activo"       BOOLEAN NOT NULL DEFAULT true,
-    "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "id"            TEXT NOT NULL DEFAULT gen_random_uuid(),
+    "nombre"        TEXT NOT NULL,
+    "correo"        TEXT NOT NULL,
+    "telefono"      TEXT,
+    "passwordHash"  TEXT NOT NULL,
+    "especialidad"  TEXT,
+    "tituloCliente" TEXT,
+    "horario"       JSONB,
+    "rol"           "RolUsuario" NOT NULL DEFAULT 'EMPLEADO',
+    "activo"        BOOLEAN NOT NULL DEFAULT true,
+    "esAgendable"   BOOLEAN NOT NULL DEFAULT true,
+    "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Empleado_pkey" PRIMARY KEY ("id")
 );
@@ -119,16 +121,22 @@ CREATE TABLE IF NOT EXISTS "Servicio" (
 
 -- --- TABLA: Cliente ---
 CREATE TABLE IF NOT EXISTS "Cliente" (
-    "id"        TEXT NOT NULL DEFAULT gen_random_uuid(),
-    "nombre"    TEXT NOT NULL,
-    "telefono"  TEXT,
-    "correo"    TEXT,
-    "notas"     TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "id"              TEXT NOT NULL DEFAULT gen_random_uuid(),
+    "nombre"          TEXT NOT NULL,
+    "telefono"        TEXT,
+    "cedula"          TEXT,
+    "correo"          TEXT,
+    "notas"           TEXT,
+    "createdByUserId" TEXT,
+    "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "Cliente_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Cliente_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Cliente_createdByUserId_fkey" FOREIGN KEY ("createdByUserId") REFERENCES "Empleado" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
+
+-- Índices en Cliente
+CREATE INDEX IF NOT EXISTS "Cliente_createdByUserId_idx" ON "Cliente"("createdByUserId");
 
 -- Trigger para Cliente
 DROP TRIGGER IF EXISTS tr_update_Cliente ON "Cliente";
@@ -163,6 +171,12 @@ CREATE TABLE IF NOT EXISTS "Cita" (
     -- WhatsApp Reminders
     "whatsapp_reminder_sent"    BOOLEAN NOT NULL DEFAULT false,
     "whatsapp_reminder_sent_at" TIMESTAMP(3),
+
+    -- Traslape Controlado
+    "allowOverlap"         BOOLEAN NOT NULL DEFAULT false,
+    "overlapReason"        TEXT,
+    "overlapConfirmedById" TEXT,
+    "overlapConfirmedAt"   TIMESTAMP(3),
 
     CONSTRAINT "Cita_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "Cita_cliente_id_fkey" FOREIGN KEY ("cliente_id") REFERENCES "Cliente" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
@@ -250,6 +264,27 @@ CREATE TABLE IF NOT EXISTS "PasswordResetToken" (
 CREATE UNIQUE INDEX IF NOT EXISTS "PasswordResetToken_token_hash_key" ON "PasswordResetToken"("token_hash");
 
 
+-- --- TABLA: DispositivoRecordado ---
+CREATE TABLE IF NOT EXISTS "DispositivoRecordado" (
+    "id"          TEXT NOT NULL DEFAULT gen_random_uuid(),
+    "userId"      TEXT NOT NULL,
+    "tokenHash"   TEXT NOT NULL,
+    "userAgent"   TEXT,
+    "ipAddress"   TEXT,
+    "deviceName"  TEXT,
+    "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastUsedAt"  TIMESTAMP(3),
+    "expiresAt"   TIMESTAMP(3) NOT NULL,
+    "revokedAt"   TIMESTAMP(3),
+
+    CONSTRAINT "DispositivoRecordado_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "DispositivoRecordado_userId_fkey" FOREIGN KEY ("userId") REFERENCES "Empleado" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Índices Únicos
+CREATE UNIQUE INDEX IF NOT EXISTS "DispositivoRecordado_tokenHash_key" ON "DispositivoRecordado"("tokenHash");
+
+
 -- --- TABLA: Configuracion ---
 CREATE TABLE IF NOT EXISTS "Configuracion" (
     "id"         TEXT NOT NULL DEFAULT 'default',
@@ -287,6 +322,7 @@ CREATE TABLE IF NOT EXISTS "AuditLog" (
     "action"       TEXT,
     "module"       TEXT,
     "entityType"   TEXT,
+    "entityId"     TEXT,
     "entityName"   TEXT,
     "description"  TEXT,
     "status"       TEXT,
@@ -329,6 +365,11 @@ CREATE INDEX IF NOT EXISTS "CitaServicio_cita_id_idx" ON "CitaServicio"("cita_id
 CREATE INDEX IF NOT EXISTS "PasswordResetToken_user_id_idx" ON "PasswordResetToken"("user_id");
 CREATE INDEX IF NOT EXISTS "PasswordResetToken_token_hash_idx" ON "PasswordResetToken"("token_hash");
 
+-- Índices en DispositivoRecordado
+CREATE INDEX IF NOT EXISTS "DispositivoRecordado_userId_idx" ON "DispositivoRecordado"("userId");
+CREATE INDEX IF NOT EXISTS "DispositivoRecordado_tokenHash_idx" ON "DispositivoRecordado"("tokenHash");
+CREATE INDEX IF NOT EXISTS "DispositivoRecordado_expiresAt_idx" ON "DispositivoRecordado"("expiresAt");
+
 -- Índices en AuditLog (Filtros masivos en el panel de auditoría)
 CREATE INDEX IF NOT EXISTS "AuditLog_entidad_entidadId_idx" ON "AuditLog"("entidad", "entidadId");
 CREATE INDEX IF NOT EXISTS "AuditLog_fecha_idx" ON "AuditLog"("fecha");
@@ -345,7 +386,7 @@ CREATE INDEX IF NOT EXISTS "AuditLog_entityType_entityId_idx" ON "AuditLog"("ent
 
 -- Inserción de Usuario Administrador Principal por Defecto (contraseña: Admin123!)
 -- Hash bcryptjs con 10 rounds: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
-INSERT INTO "Empleado" ("id", "nombre", "correo", "telefono", "passwordHash", "rol", "activo", "createdAt", "updatedAt")
+INSERT INTO "Empleado" ("id", "nombre", "correo", "telefono", "passwordHash", "rol", "activo", "esAgendable", "createdAt", "updatedAt")
 VALUES (
     'admin-init-uuid-0000-000000000000',
     'Administrador Principal',
@@ -353,6 +394,7 @@ VALUES (
     '000000000',
     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
     'ADMIN',
+    true,
     true,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP

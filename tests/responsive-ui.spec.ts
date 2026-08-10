@@ -145,14 +145,23 @@ test.describe('UI responsive autenticada', () => {
           new URL(response.url()).pathname === '/api/citas' &&
           response.request().method() === 'GET'
       ),
+      page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return (
+          url.pathname === '/api/clientes' &&
+          !url.searchParams.has('q') &&
+          response.request().method() === 'GET'
+        );
+      }),
     ]);
 
     await page.goto('/citas');
-    const [serviciosResponse, empleadosResponse, citasResponse] = await datosAgendaListos;
-    const [{ servicios = [] }, { empleados = [] }, { citas = [] }] = await Promise.all([
+    const [serviciosResponse, empleadosResponse, citasResponse, clientesAgendaResponse] = await datosAgendaListos;
+    const [{ servicios = [] }, { empleados = [] }, { citas = [] }, { clientes: clientesAgenda = [] }] = await Promise.all([
       serviciosResponse.json(),
       empleadosResponse.json(),
       citasResponse.json(),
+      clientesAgendaResponse.json(),
     ]);
 
     const nuevaCitaButton = page.getByRole('button', { name: /Nueva cita|Nueva/i }).first();
@@ -165,6 +174,23 @@ test.describe('UI responsive autenticada', () => {
       await expect(citaDialog.getByText(/Cliente, servicios y horario/i)).toBeVisible();
 
       const clienteSearch = citaDialog.getByPlaceholder(/Buscar por nombre, teléfono o correo/i);
+      if (clientesAgenda.length > 0) {
+        const clienteExistente = clientesAgenda[0];
+        const consultaParcial = clienteExistente.nombre.slice(
+          0,
+          Math.max(2, Math.min(8, clienteExistente.nombre.length))
+        );
+        const busquedaRemota = page.waitForResponse((response) => {
+          const url = new URL(response.url());
+          return url.pathname === '/api/clientes' && url.searchParams.get('q') === consultaParcial;
+        });
+
+        await clienteSearch.fill(consultaParcial);
+        const respuestaBusqueda = await busquedaRemota;
+        expect(respuestaBusqueda.ok()).toBeTruthy();
+        await expect(citaDialog.getByText(clienteExistente.nombre, { exact: true })).toBeVisible();
+      }
+
       await clienteSearch.fill('Cliente de prueba UI');
       await expect(citaDialog.getByRole('button', { name: /\+ Nuevo Cliente/i })).toBeVisible();
       await expect(citaDialog.getByRole('button', { name: /Crear solo con nombre/i })).toBeEnabled();

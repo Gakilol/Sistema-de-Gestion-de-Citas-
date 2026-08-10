@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Users, ChevronLeft, ChevronRight, Calendar as CalendarIcon, List as ListIcon } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { TimeSelector } from '@/components/citas/TimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -159,6 +159,28 @@ function CitasContent() {
 
   const { user }                  = useAuth();
 
+  const agendaMonthLabel = useMemo(() => {
+    const [year, month, day] = selectedDateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return new Intl.DateTimeFormat('es', {
+      month: 'long',
+      year: 'numeric',
+    })
+      .format(date)
+      .replace(' de ', ' ')
+      .replace(/^./, (letter) => letter.toUpperCase());
+  }, [selectedDateStr]);
+
+  const moveAgendaDate = (offset: number) => {
+    const [year, month, day] = selectedDateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + offset);
+    const nextYear = date.getFullYear();
+    const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const nextDay = String(date.getDate()).padStart(2, '0');
+    setSelectedDateStr(`${nextYear}-${nextMonth}-${nextDay}`);
+  };
+
 
   const isAdmin                   = user?.rol === 'ADMIN';
   const isTechSupport             = user?.rol === 'TECH_SUPPORT';
@@ -228,6 +250,7 @@ function CitasContent() {
   // Estado para el buscador inteligente de clientes
   const [clienteBusqueda, setClienteBusqueda] = useState('');
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false);
+  const [clienteBusquedaLoading, setClienteBusquedaLoading] = useState(false);
   const [forzar, setForzar]       = useState(false);
   const [showOverlapModal, setShowOverlapModal] = useState(false);
   const [overlapConflicts, setOverlapConflicts] = useState<any[]>([]);
@@ -261,6 +284,48 @@ function CitasContent() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Consultar el directorio en cada búsqueda evita depender del catálogo inicial,
+  // que puede quedar desactualizado mientras la agenda permanece abierta.
+  useEffect(() => {
+    const q = clienteBusqueda.trim();
+    if (!showModal || !clienteDropdownOpen || q.length < 2) {
+      setClienteBusquedaLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setClienteBusquedaLoading(true);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/clientes?q=${encodeURIComponent(q)}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al buscar clientes');
+
+        const encontrados = Array.isArray(data.clientes) ? data.clientes : [];
+        setClientesList((prev: any[]) => {
+          const clientesPorId = new Map(prev.map((cliente) => [cliente.id, cliente]));
+          encontrados.forEach((cliente: any) => clientesPorId.set(cliente.id, cliente));
+          return Array.from(clientesPorId.values());
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('[CLIENT_SEARCH_ERROR]', error);
+        }
+      } finally {
+        if (!controller.signal.aborted) setClienteBusquedaLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [clienteBusqueda, clienteDropdownOpen, showModal]);
 
   const fetchCitas = async (scopeParam?: string, empParam?: string) => {
     setIsLoading(true);
@@ -840,10 +905,10 @@ function CitasContent() {
     <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-        <div className="app-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
+        <div className="app-page space-y-3 sm:space-y-5 page-enter overflow-x-hidden">
 
           {/* Header */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="hidden sm:flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="page-heading text-foreground">Agenda y citas</h1>
               <p className="page-description truncate sm:whitespace-normal">
@@ -862,14 +927,59 @@ function CitasContent() {
           </div>
 
           {/* Barra de Vista e Integración de Scope (Fila Única en Móvil y Escritorio) */}
-          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 border-b border-border/30 pb-2 sm:pb-3 w-full flex-nowrap overflow-x-auto no-scrollbar">
+          {vistaModo === 'agenda' && (
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-stretch gap-2 sm:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSelectedDateStr(getBusinessTodayString())}
+                className="h-11 rounded-xl border-border/80 bg-card px-3 text-sm font-bold"
+              >
+                <CalendarIcon className="size-4" />
+                Hoy
+              </Button>
+              <div className="flex min-w-0 items-center rounded-xl border border-border/80 bg-card shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => moveAgendaDate(-1)}
+                  aria-label="Fecha anterior"
+                  className="flex h-11 w-9 shrink-0 items-center justify-center rounded-l-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+                <span className="min-w-0 flex-1 truncate border-x border-border/70 px-1 text-center text-xs font-extrabold text-foreground">
+                  {agendaMonthLabel}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => moveAgendaDate(1)}
+                  aria-label="Fecha siguiente"
+                  className="flex h-11 w-9 shrink-0 items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <ChevronRight className="size-5" />
+                </button>
+              </div>
+              <Button
+                type="button"
+                onClick={openCreate}
+                disabled={catalogosLoading}
+                className="h-11 gap-1.5 rounded-xl px-2 text-[11px] font-extrabold shadow-[0_8px_22px_hsl(var(--primary)/0.2)]"
+              >
+                <Plus className="size-5" />
+                <span className="hidden min-[370px]:inline">Nueva cita</span>
+                <span className="min-[370px]:hidden">Nueva</span>
+              </Button>
+            </div>
+          )}
+
+          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 rounded-2xl border border-border/70 bg-card/80 p-1.5 sm:rounded-none sm:border-x-0 sm:border-t-0 sm:bg-transparent sm:p-0 sm:pb-3 w-full flex-nowrap overflow-x-auto no-scrollbar">
             {/* Selector de Pestaña Principal (Modo) */}
             <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shrink-0">
               <button
                 type="button"
                 onClick={() => setVistaModo('lista')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
+                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
                   vistaModo === 'lista'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -881,7 +991,7 @@ function CitasContent() {
                 type="button"
                 onClick={() => setVistaModo('agenda')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
+                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
                   vistaModo === 'agenda'
                     ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -901,25 +1011,29 @@ function CitasContent() {
                     setFiltroEmpleado('');
                   }}
                   className={cn(
-                    "px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
+                    "flex items-center gap-1 px-2 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
                     scope === 'mine'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  {vistaModo === 'agenda' ? 'Mi agenda' : 'Mis Citas'}
+                  <UserCheck className="size-3.5 sm:hidden" />
+                  <span className="hidden sm:inline">{vistaModo === 'agenda' ? 'Mi agenda' : 'Mis Citas'}</span>
+                  <span className="sm:hidden">Mía</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setScope('all')}
                   className={cn(
-                    "px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
+                    "flex items-center gap-1 px-2 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
                     scope === 'all'
                       ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  {vistaModo === 'agenda' ? 'Agenda de todos' : 'Ver Todas'}
+                  <Users className="size-3.5 sm:hidden" />
+                  <span className="hidden sm:inline">{vistaModo === 'agenda' ? 'Agenda de todos' : 'Ver Todas'}</span>
+                  <span className="sm:hidden">Todos</span>
                 </button>
               </div>
             )}
@@ -1440,6 +1554,7 @@ function CitasContent() {
                 setSelectedDateStr={setSelectedDateStr}
                 isLoading={isLoading}
                 isModalOpen={showModal}
+                mobileToolbarExternal
               />
             </div>
           )}
@@ -1573,7 +1688,11 @@ function CitasContent() {
                           </button>
                         </div>
 
-                        {clientesFiltrados.length > 0 ? (
+                        {clienteBusquedaLoading ? (
+                          <div className="px-4 py-4 text-center">
+                            <p className="text-sm font-semibold text-muted-foreground">Buscando clientes...</p>
+                          </div>
+                        ) : clientesFiltrados.length > 0 ? (
                           <ul className="divide-y divide-border/40 max-h-48 overflow-y-auto">
                             {clientesFiltrados.map(c => (
                               <li key={c.id}>
