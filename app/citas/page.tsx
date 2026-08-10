@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Users, ChevronLeft, ChevronRight, Calendar as CalendarIcon, List as ListIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon, UserRound, Users } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
-import { TimeSelector } from '@/components/citas/TimeSelector';
+import { AppointmentTimeSelector } from '@/components/appointments/AppointmentTimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,127 +12,41 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { urlWhatsAppConfirmacion, urlWhatsAppRecordatorio } from '@/lib/whatsapp';
-import { formatDBDate, getBusinessTodayString, getDefaultBookingDate, getDefaultAgendaDate } from '@/lib/timezone';
+import { getBusinessTodayString, getDefaultBookingDate } from '@/lib/timezone';
 import { useAuth } from '@/components/providers/auth-provider';
-import { AgendaCalendario } from '@/components/citas/AgendaCalendario';
-import { CitaDetalleBottomSheet } from '@/components/citas/CitaDetalleBottomSheet';
-import { CitaCreadaConfirmacion } from '@/components/citas/CitaCreadaConfirmacion';
-import { formatHora12h } from '@/lib/time-utils';
-
-function fmtDate(d: string | Date) {
-  return formatDBDate(d);
-}
-
-function to12h(timeStr: string): string {
-  return formatHora12h(timeStr);
-}
-
-const getEmptyForm = () => ({
-  cliente_id: '',
-  cliente_nombre: '',
-  cliente_telefono: '',
-  servicio_id: '',
-  servicio_ids: [] as string[],
-  servicio_duraciones: [] as number[],
-  empleado_id: '',
-  fecha: '',
-  hora: '',
-  notas: '',
-});
-
-const ESTADOS = ['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA', 'NO_SHOW', 'REPROGRAMADA'];
-const ESTADO_LABEL: Record<string, string> = {
-  PENDIENTE: 'Pendiente',
-  CONFIRMADA: 'Confirmada',
-  EN_PROGRESO: 'En Progreso',
-  COMPLETADA: 'Completada',
-  CANCELADA: 'Cancelada',
-  NO_SHOW: 'No se presentó',
-  REPROGRAMADA: 'Reprogramada',
-};
-const ESTADO_BADGE: Record<string, string> = {
-  PENDIENTE: 'badge-pendiente',
-  CONFIRMADA: 'badge-confirmada',
-  EN_PROGRESO: 'badge-en_progreso',
-  COMPLETADA: 'badge-completada',
-  CANCELADA: 'badge-cancelada',
-  NO_SHOW: 'badge-cancelada',
-  REPROGRAMADA: 'badge-reprogramada',
-};
-
-function getBusinessTomorrowString(): string {
-  const todayStr = getBusinessTodayString();
-  const [year, month, day] = todayStr.split('-').map(Number);
-  const d = new Date(Date.UTC(year, month - 1, day));
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().split('T')[0];
-}
-
-function isSameBusinessWeek(dateStr: string): boolean {
-  const todayStr = getBusinessTodayString();
-  const [ty, tm, td] = todayStr.split('-').map(Number);
-  const todayDate = new Date(Date.UTC(ty, tm - 1, td));
-  
-  const dayOfWeek = todayDate.getUTCDay(); 
-  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  
-  const startOfWeek = new Date(todayDate);
-  startOfWeek.setUTCDate(todayDate.getUTCDate() - diffToMonday);
-  
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
-  
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const targetTime = Date.UTC(y, m - 1, d);
-  
-  return targetTime >= startOfWeek.getTime() && targetTime <= endOfWeek.getTime();
-}
-
-function isSameBusinessMonth(dateStr: string): boolean {
-  const todayStr = getBusinessTodayString();
-  const [ty, tm] = todayStr.split('-');
-  const [y, m] = dateStr.split('-');
-  return ty === y && tm === m;
-}
-
-function isWithinBusinessQuincena(dateStr: string): boolean {
-  const todayStr = getBusinessTodayString();
-  const [ty, tm, td] = todayStr.split('-').map(Number);
-  const todayDate = new Date(Date.UTC(ty, tm - 1, td));
-  
-  const fifteenDaysAgo = new Date(todayDate);
-  fifteenDaysAgo.setUTCDate(todayDate.getUTCDate() - 14);
-  
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const targetTime = Date.UTC(y, m - 1, d);
-  
-  return targetTime >= fifteenDaysAgo.getTime() && targetTime <= todayDate.getTime();
-}
-
-function sortCitas(citasList: any[], ascending: boolean) {
-  return [...citasList].sort((a, b) => {
-    const dateA = a.fecha.split('T')[0] + 'T' + a.hora;
-    const dateB = b.fecha.split('T')[0] + 'T' + b.hora;
-    if (ascending) {
-      return dateA.localeCompare(dateB);
-    } else {
-      return dateB.localeCompare(dateA);
-    }
-  });
-}
-
-const PAGE_SIZE = 15;
+import { AppointmentCalendar } from '@/components/appointments/AppointmentCalendar';
+import { AppointmentDetailsSheet } from '@/components/appointments/AppointmentDetailsSheet';
+import { AppointmentCreatedConfirmation } from '@/components/appointments/AppointmentCreatedConfirmation';
+import { formatTime12Hour } from '@/lib/time-utils';
+import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
+import {
+  APPOINTMENTS_PER_PAGE,
+  APPOINTMENT_STATUS_OPTIONS,
+  createEmptyAppointmentForm,
+  formatAppointmentDate,
+  getBusinessTomorrowString,
+  isInCurrentBusinessMonth,
+  isInCurrentBusinessWeek,
+  isInRecentBusinessFortnight,
+  sortAppointmentsByDate,
+  type AppointmentClientOption,
+  type AppointmentForm,
+  type AppointmentServiceOption,
+} from './appointment-page-utils';
+import type { CalendarAppointment, CalendarEmployee } from '@/components/appointments/appointment-calendar-types';
+import type { AppointmentConflict } from '@/lib/appointments/appointment-availability';
+import { getErrorMessage } from '@/lib/errors';
 
 function CitasContent() {
-  const [citas, setCitas]         = useState<any[]>([]);
-  const [servicios, setServicios] = useState<any[]>([]);
-  const [empleados, setEmpleados] = useState<any[]>([]);
-  const [clientesList, setClientesList] = useState<any[]>([]);
+  const [citas, setCitas]         = useState<CalendarAppointment[]>([]);
+  const [servicios, setServicios] = useState<AppointmentServiceOption[]>([]);
+  const [empleados, setEmpleados] = useState<CalendarEmployee[]>([]);
+  const [clientesList, setClientesList] = useState<AppointmentClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [catalogosLoading, setCatalogosLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm]           = useState<any>(getEmptyForm());
+  const [form, setForm]           = useState<AppointmentForm>(createEmptyAppointmentForm());
   const [saving, setSaving]       = useState(false);
   const [busqueda, setBusqueda]   = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
@@ -144,42 +58,19 @@ function CitasContent() {
   // Modos de Vista y Scopes
   const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('agenda');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
-  // Fecha predeterminada: hoy antes de las 18:30 CR, mañana desde las 18:30.
-  // getDefaultAgendaDate() usa America/Costa_Rica vía Intl — funciona igual
-  // en localhost, Vercel (UTC), iOS, Android y usuarios de otro país.
-  const [selectedDateStr, setSelectedDateStr] = useState(getDefaultAgendaDate());
+  // La agenda siempre parte de hoy. El formulario de creación conserva por
+  // separado la regla operativa que puede proponer mañana después del cierre.
+  const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [citaToDelete, setCitaToDelete] = useState<any>(null);
+  const [citaToDelete, setCitaToDelete] = useState<CalendarAppointment | null>(null);
   const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [citaResumen, setCitaResumen] = useState<any>(null);
-  const [citaCreada, setCitaCreada] = useState<any>(null);
+  const [citaResumen, setCitaResumen] = useState<CalendarAppointment | null>(null);
+  const [citaCreada, setCitaCreada] = useState<CalendarAppointment | null>(null);
   // Overrides optimistas para posición visual de citas siendo movidas/redimensionadas
   const [localCitaOverrides, setLocalCitaOverrides] = useState<Record<string, { fecha?: string; hora?: string; duracion?: number; empleado_id?: string }>>({});
 
   const { user }                  = useAuth();
-
-  const agendaMonthLabel = useMemo(() => {
-    const [year, month, day] = selectedDateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    return new Intl.DateTimeFormat('es', {
-      month: 'long',
-      year: 'numeric',
-    })
-      .format(date)
-      .replace(' de ', ' ')
-      .replace(/^./, (letter) => letter.toUpperCase());
-  }, [selectedDateStr]);
-
-  const moveAgendaDate = (offset: number) => {
-    const [year, month, day] = selectedDateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    date.setDate(date.getDate() + offset);
-    const nextYear = date.getFullYear();
-    const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
-    const nextDay = String(date.getDate()).padStart(2, '0');
-    setSelectedDateStr(`${nextYear}-${nextMonth}-${nextDay}`);
-  };
 
 
   const isAdmin                   = user?.rol === 'ADMIN';
@@ -199,7 +90,7 @@ function CitasContent() {
         const employee = empleados.find(e => e.id === qEmpleadoId);
         const service = servicios.find(s => s.id === qServicioId);
 
-        const newForm = { ...getEmptyForm() };
+        const newForm = { ...createEmptyAppointmentForm() };
         newForm.fecha = getDefaultBookingDate();
 
         if (client) {
@@ -253,7 +144,7 @@ function CitasContent() {
   const [clienteBusquedaLoading, setClienteBusquedaLoading] = useState(false);
   const [forzar, setForzar]       = useState(false);
   const [showOverlapModal, setShowOverlapModal] = useState(false);
-  const [overlapConflicts, setOverlapConflicts] = useState<any[]>([]);
+  const [overlapConflicts, setOverlapConflicts] = useState<AppointmentConflict[]>([]);
   const [selectedOverlapReason, setSelectedOverlapReason] = useState('Cliente en tiempo de espera');
   const [customOverlapReason, setCustomOverlapReason] = useState('');
 
@@ -285,7 +176,7 @@ function CitasContent() {
     };
   }, []);
 
-  // Consultar el directorio en cada búsqueda evita depender del catálogo inicial,
+  // Buscar contra el directorio actual evita depender del catálogo inicial,
   // que puede quedar desactualizado mientras la agenda permanece abierta.
   useEffect(() => {
     const q = clienteBusqueda.trim();
@@ -307,9 +198,9 @@ function CitasContent() {
         if (!res.ok) throw new Error(data.error || 'Error al buscar clientes');
 
         const encontrados = Array.isArray(data.clientes) ? data.clientes : [];
-        setClientesList((prev: any[]) => {
+        setClientesList((prev) => {
           const clientesPorId = new Map(prev.map((cliente) => [cliente.id, cliente]));
-          encontrados.forEach((cliente: any) => clientesPorId.set(cliente.id, cliente));
+          encontrados.forEach((cliente: AppointmentClientOption) => clientesPorId.set(cliente.id, cliente));
           return Array.from(clientesPorId.values());
         });
       } catch (error) {
@@ -332,13 +223,32 @@ function CitasContent() {
     try {
       const activeScope = scopeParam || scope;
       const activeEmp = empParam !== undefined ? empParam : filtroEmpleado;
-      const res  = await fetch(`/api/citas?scope=${activeScope}&empleado_id=${activeEmp}`);
+      const params = new URLSearchParams({
+        scope: activeScope,
+        empleado_id: activeEmp,
+        limit: vistaModo === 'agenda' ? '500' : '100',
+      });
+      if (vistaModo === 'agenda') {
+        const [year, month, day] = selectedDateStr.split('-').map(Number);
+        const formatDate = (date: Date) => [
+          date.getFullYear(),
+          String(date.getMonth() + 1).padStart(2, '0'),
+          String(date.getDate()).padStart(2, '0'),
+        ].join('-');
+        const rangeStart = new Date(year, month - 1, day);
+        const rangeEnd = new Date(year, month - 1, day);
+        rangeStart.setDate(rangeStart.getDate() - 7);
+        rangeEnd.setDate(rangeEnd.getDate() + 13);
+        params.set('from', formatDate(rangeStart));
+        params.set('to', formatDate(rangeEnd));
+      }
+      const res  = await fetch(`/api/citas?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al obtener citas');
       setCitas(data.citas || []);
       setPage(1);
-    } catch (err: any) {
-      toast.error(err.message || 'Error al cargar citas');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Error al cargar citas'));
     } finally {
       setIsLoading(false);
     }
@@ -380,7 +290,7 @@ function CitasContent() {
   // Carga reactiva de citas en base al scope y filtro de empleado
   useEffect(() => {
     fetchCitas(scope, filtroEmpleado);
-  }, [scope, filtroEmpleado]);
+  }, [scope, filtroEmpleado, selectedDateStr, vistaModo]);
 
 
   useEffect(() => {
@@ -403,7 +313,7 @@ function CitasContent() {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
-    const emptyForm = getEmptyForm();
+    const emptyForm = createEmptyAppointmentForm();
     emptyForm.fecha = getDefaultBookingDate();
     
     // Seleccionar por defecto el colaborador logueado si es agendable (o si es Empleado, forzosamente él mismo), de lo contrario el primero disponible
@@ -431,7 +341,7 @@ function CitasContent() {
       toast.error('Crea al menos un servicio y un empleado activos primero');
       return;
     }
-    const emptyForm = getEmptyForm();
+    const emptyForm = createEmptyAppointmentForm();
     emptyForm.fecha = date;
     emptyForm.hora = time;
     emptyForm.empleado_id = empleadoId;
@@ -479,9 +389,9 @@ function CitasContent() {
 
       const nuevoCliente = data.cliente;
       // Añadir al inicio de la lista local sin recargar la página
-      setClientesList((prev: any[]) => [nuevoCliente, ...prev]);
+      setClientesList((prev) => [nuevoCliente, ...prev]);
       // Seleccionar automáticamente el nuevo cliente en el formulario de cita
-      setForm((prev: any) => ({
+      setForm((prev) => ({
         ...prev,
         cliente_id: nuevoCliente.id,
         cliente_nombre: nuevoCliente.nombre,
@@ -493,8 +403,8 @@ function CitasContent() {
       setPhoneValidCliente(true);
       setShowCrearCliente(false);
       toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
-    } catch (err: any) {
-      toast.error(err.message || 'Error al crear cliente');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Error al crear cliente'));
     } finally {
       setSavingCliente(false);
     }
@@ -528,8 +438,8 @@ function CitasContent() {
       if (!res.ok) throw new Error(data.error);
 
       const nuevoCliente = data.cliente;
-      setClientesList((prev: any[]) => [nuevoCliente, ...prev]);
-      setForm((prev: any) => ({
+      setClientesList((prev) => [nuevoCliente, ...prev]);
+      setForm((prev) => ({
         ...prev,
         cliente_id: nuevoCliente.id,
         cliente_nombre: nuevoCliente.nombre,
@@ -538,8 +448,8 @@ function CitasContent() {
       setClienteBusqueda(nuevoCliente.nombre);
       setClienteDropdownOpen(false);
       toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
-    } catch (err: any) {
-      toast.error(err.message || 'Error al crear cliente');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Error al crear cliente'));
     } finally {
       setSavingCliente(false);
     }
@@ -628,8 +538,8 @@ function CitasContent() {
       setForzar(false);
       if (!editingId && d.cita) setCitaCreada(d.cita);
       fetchCitas();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al guardar');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Error al guardar'));
     } finally {
       setSaving(false);
     }
@@ -647,13 +557,13 @@ function CitasContent() {
         fetchCitas();
         return;
       }
-      toast.success(`Estado → ${ESTADO_LABEL[estado]}`);
+      toast.success(`Estado → ${APPOINTMENT_STATUS_LABELS[estado]}`);
     } catch {
       fetchCitas();
     }
   };
 
-  const confirmDelete = (cita: any, origen: 'agenda' | 'lista') => {
+  const confirmDelete = (cita: CalendarAppointment, origen: 'agenda' | 'lista') => {
     const hasPermission = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cita.created_by === user.id);
     if (!hasPermission) {
       toast.error('No tienes permiso para eliminar esta cita');
@@ -680,22 +590,22 @@ function CitasContent() {
       setCitaToDelete(null);
       setShowModal(false);
       fetchCitas();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar la cita');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Error al eliminar la cita'));
     } finally {
       setIsDeleting(false);
     }
   };
 
   // openEdit también resetea estado de forzar
-  const openEdit = (c: any) => {
+  const openEdit = (c: CalendarAppointment) => {
     const ids = Array.isArray(c.citaServicios) && c.citaServicios.length > 0
-      ? c.citaServicios.map((cs: any) => cs.servicio_id)
+      ? c.citaServicios.map((appointmentService) => appointmentService.servicio_id)
       : (c.servicio_id ? [c.servicio_id] : []);
 
     const duraciones: number[] = [];
     if (Array.isArray(c.citaServicios) && c.citaServicios.length > 0) {
-      c.citaServicios.forEach((cs: any) => { duraciones.push(cs.duracion); });
+      c.citaServicios.forEach((appointmentService) => { duraciones.push(appointmentService.duracion); });
     } else if (c.servicio_id) {
       duraciones.push(c.duracion);
     }
@@ -726,7 +636,7 @@ function CitasContent() {
     empleadoId: string;
     duracion: number;
     clientUpdatedAt: string;
-  }): Promise<{ error?: string; type?: string; conflicts?: any[] } | void> => {
+  }): Promise<{ error?: string; type?: string; conflicts?: AppointmentConflict[] } | void> => {
     const { citaId, fecha, hora, empleadoId, duracion, clientUpdatedAt } = params;
 
     // ── 1. Snapshot anterior (para posible rollback) ──────────────────────────
@@ -813,14 +723,14 @@ function CitasContent() {
       });
 
       return; // éxito, sin error
-    } catch (err: any) {
+    } catch (error: unknown) {
       // ── Rollback en caso de error de red ─────────────────────────────────
       setLocalCitaOverrides(prev => ({
         ...prev,
         [citaId]: { fecha: prevFecha, hora: prevHora, duracion: prevDur, empleado_id: prevEmpId },
       }));
       toast.error('Error de conexión al actualizar la cita');
-      return { error: err.message };
+      return { error: getErrorMessage(error, 'Error de conexión al actualizar la cita') };
     }
   };
 
@@ -835,7 +745,7 @@ function CitasContent() {
         c.cliente_nombre.toLowerCase().includes(q) ||
         (c.cliente_telefono && c.cliente_telefono.includes(q)) ||
         (c.servicio?.nombre && c.servicio.nombre.toLowerCase().includes(q)) ||
-        (c.citaServicios && c.citaServicios.some((cs: any) => cs.servicio?.nombre?.toLowerCase().includes(q)))
+        (c.citaServicios && c.citaServicios.some((appointmentService) => appointmentService.servicio?.nombre?.toLowerCase().includes(q)))
       );
     }
     
@@ -864,10 +774,10 @@ function CitasContent() {
         result = result.filter(c => c.fecha.split('T')[0] === tomorrowStr);
         isAscending = true;
       } else if (filtroSmart === 'semana') {
-        result = result.filter(c => isSameBusinessWeek(c.fecha.split('T')[0]));
+        result = result.filter(c => isInCurrentBusinessWeek(c.fecha.split('T')[0]));
         isAscending = true;
       } else if (filtroSmart === 'mes') {
-        result = result.filter(c => isSameBusinessMonth(c.fecha.split('T')[0]));
+        result = result.filter(c => isInCurrentBusinessMonth(c.fecha.split('T')[0]));
         isAscending = true;
       } else if (filtroSmart === 'historial') {
         if (filtroHistorialPeriodo === 'todos') {
@@ -877,11 +787,11 @@ function CitasContent() {
           if (filtroHistorialPeriodo === 'diario') {
             result = result.filter(c => c.fecha.split('T')[0] === todayStr);
           } else if (filtroHistorialPeriodo === 'semanal') {
-            result = result.filter(c => isSameBusinessWeek(c.fecha.split('T')[0]));
+            result = result.filter(c => isInCurrentBusinessWeek(c.fecha.split('T')[0]));
           } else if (filtroHistorialPeriodo === 'quincenal') {
-            result = result.filter(c => isWithinBusinessQuincena(c.fecha.split('T')[0]));
+            result = result.filter(c => isInRecentBusinessFortnight(c.fecha.split('T')[0]));
           } else if (filtroHistorialPeriodo === 'mensual') {
-            result = result.filter(c => isSameBusinessMonth(c.fecha.split('T')[0]));
+            result = result.filter(c => isInCurrentBusinessMonth(c.fecha.split('T')[0]));
           }
         }
         isAscending = false;
@@ -894,21 +804,97 @@ function CitasContent() {
     }
     
     // 5. Ordenar
-    return sortCitas(result, isAscending);
+    return sortAppointmentsByDate(result, isAscending);
   }, [citas, busqueda, filtroEmpleado, filtroEstado, filtroSmart]);
 
   // Paginación
-  const totalPages = Math.ceil(filteredAndSortedCitas.length / PAGE_SIZE);
-  const paginated  = filteredAndSortedCitas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.ceil(filteredAndSortedCitas.length / APPOINTMENTS_PER_PAGE);
+  const paginated  = filteredAndSortedCitas.slice((page - 1) * APPOINTMENTS_PER_PAGE, page * APPOINTMENTS_PER_PAGE);
+
+  const renderAgendaNavigation = (compact = false) => (
+    <div className={cn(
+      'border border-border/60 bg-card/80 p-1 shadow-sm',
+      compact
+        ? cn('grid w-full gap-1 rounded-xl', canSeeAll ? 'grid-cols-4' : 'grid-cols-2')
+        : 'flex w-full flex-nowrap items-center justify-between gap-1 overflow-x-auto rounded-xl sm:gap-2.5'
+    )}>
+      <div className={cn('contents', !compact && 'sm:flex sm:shrink-0 sm:gap-1')}>
+        <button
+          type="button"
+          onClick={() => setVistaModo('lista')}
+          aria-pressed={vistaModo === 'lista'}
+          className={cn(
+            'flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all sm:min-h-9 sm:px-3.5 sm:text-xs',
+            vistaModo === 'lista'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+          )}
+        >
+          <ListIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Lista</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setVistaModo('agenda')}
+          aria-pressed={vistaModo === 'agenda'}
+          className={cn(
+            'flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all sm:min-h-9 sm:px-3.5 sm:text-xs',
+            vistaModo === 'agenda'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+          )}
+        >
+          <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Agenda</span>
+        </button>
+      </div>
+
+      {canSeeAll && (
+        <div className={cn('contents', !compact && 'sm:ml-auto sm:flex sm:shrink-0 sm:gap-1')}>
+          <button
+            type="button"
+            onClick={() => {
+              setScope('mine');
+              setFiltroEmpleado('');
+            }}
+            aria-pressed={scope === 'mine'}
+            className={cn(
+              'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 text-[10px] font-bold transition-all sm:min-h-9 sm:px-3 sm:text-xs',
+              scope === 'mine'
+                ? 'border border-primary/35 bg-primary/12 text-primary shadow-sm'
+                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+            )}
+          >
+            <UserRound className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Mi agenda</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            aria-pressed={scope === 'all'}
+            className={cn(
+              'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 text-[10px] font-bold transition-all sm:min-h-9 sm:px-3 sm:text-xs',
+              scope === 'all'
+                ? 'border border-primary/35 bg-primary/12 text-primary shadow-sm'
+                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+            )}
+          >
+            <Users className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Todos</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   const mainContent = (
     <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-        <div className="app-page space-y-3 sm:space-y-5 page-enter overflow-x-hidden">
+        <div className="app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
 
           {/* Header */}
-          <div className="hidden sm:flex items-center justify-between gap-3">
+          <div className={cn('items-center justify-between gap-3', vistaModo === 'agenda' ? 'hidden sm:flex' : 'flex')}>
             <div className="min-w-0">
               <h1 className="page-heading text-foreground">Agenda y citas</h1>
               <p className="page-description truncate sm:whitespace-normal">
@@ -926,118 +912,8 @@ function CitasContent() {
             </Button>
           </div>
 
-          {/* Barra de Vista e Integración de Scope (Fila Única en Móvil y Escritorio) */}
-          {vistaModo === 'agenda' && (
-            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-stretch gap-2 sm:hidden">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setSelectedDateStr(getBusinessTodayString())}
-                className="h-11 rounded-xl border-border/80 bg-card px-3 text-sm font-bold"
-              >
-                <CalendarIcon className="size-4" />
-                Hoy
-              </Button>
-              <div className="flex min-w-0 items-center rounded-xl border border-border/80 bg-card shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => moveAgendaDate(-1)}
-                  aria-label="Fecha anterior"
-                  className="flex h-11 w-9 shrink-0 items-center justify-center rounded-l-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <span className="min-w-0 flex-1 truncate border-x border-border/70 px-1 text-center text-xs font-extrabold text-foreground">
-                  {agendaMonthLabel}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => moveAgendaDate(1)}
-                  aria-label="Fecha siguiente"
-                  className="flex h-11 w-9 shrink-0 items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  <ChevronRight className="size-5" />
-                </button>
-              </div>
-              <Button
-                type="button"
-                onClick={openCreate}
-                disabled={catalogosLoading}
-                className="h-11 gap-1.5 rounded-xl px-2 text-[11px] font-extrabold shadow-[0_8px_22px_hsl(var(--primary)/0.2)]"
-              >
-                <Plus className="size-5" />
-                <span className="hidden min-[370px]:inline">Nueva cita</span>
-                <span className="min-[370px]:hidden">Nueva</span>
-              </Button>
-            </div>
-          )}
-
-          <div className="flex flex-row items-center justify-between gap-1 sm:gap-2.5 rounded-2xl border border-border/70 bg-card/80 p-1.5 sm:rounded-none sm:border-x-0 sm:border-t-0 sm:bg-transparent sm:p-0 sm:pb-3 w-full flex-nowrap overflow-x-auto no-scrollbar">
-            {/* Selector de Pestaña Principal (Modo) */}
-            <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shrink-0">
-              <button
-                type="button"
-                onClick={() => setVistaModo('lista')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
-                  vistaModo === 'lista'
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                )}
-              >
-                <ListIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> <span>Lista</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setVistaModo('agenda')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px]",
-                  vistaModo === 'agenda'
-                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                )}
-              >
-                <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> <span>Agenda</span>
-              </button>
-            </div>
-
-            {/* Switch de Scope (Mis Citas vs Ver Todas / Ver mi agenda vs Ver agenda de todos) */}
-            {canSeeAll && (
-              <div className="flex bg-secondary/30 p-0.5 rounded-xl border border-border/50 shadow-inner shrink-0 ml-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScope('mine');
-                    setFiltroEmpleado('');
-                  }}
-                  className={cn(
-                    "flex items-center gap-1 px-2 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
-                    scope === 'mine'
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                  )}
-                >
-                  <UserCheck className="size-3.5 sm:hidden" />
-                  <span className="hidden sm:inline">{vistaModo === 'agenda' ? 'Mi agenda' : 'Mis Citas'}</span>
-                  <span className="sm:hidden">Mía</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScope('all')}
-                  className={cn(
-                    "flex items-center gap-1 px-2 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer min-h-10 sm:min-h-[36px] whitespace-nowrap",
-                    scope === 'all'
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                  )}
-                >
-                  <Users className="size-3.5 sm:hidden" />
-                  <span className="hidden sm:inline">{vistaModo === 'agenda' ? 'Agenda de todos' : 'Ver Todas'}</span>
-                  <span className="sm:hidden">Todos</span>
-                </button>
-              </div>
-            )}
-          </div>
+          {vistaModo === 'lista' && renderAgendaNavigation(false)}
+          {vistaModo === 'agenda' && <div className="hidden sm:block">{renderAgendaNavigation(false)}</div>}
 
           {/* VISTA DE LISTADO TRADICIONAL */}
           {vistaModo === 'lista' && (
@@ -1111,7 +987,7 @@ function CitasContent() {
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="hidden flex-col gap-3 sm:flex sm:flex-row">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -1131,7 +1007,7 @@ function CitasContent() {
                     className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
                   >
                     <option value="">Filtrar por estado</option>
-                    {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+                    {APPOINTMENT_STATUS_OPTIONS.map(e => <option key={e} value={e}>{APPOINTMENT_STATUS_LABELS[e]}</option>)}
                   </select>
                   
                   {/* Filtro por empleado sólo visible para Admin/Tech y si el scope es 'all' */}
@@ -1228,7 +1104,7 @@ function CitasContent() {
                                   })
                               )
                             : null;
-                          const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
+                          const isPersonalizado = cita.citaServicios?.some((appointmentService) => appointmentService.duracion !== appointmentService.servicio?.duracion);
                           return (
                             <tr key={cita.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
                               <td className="px-4 py-3.5">
@@ -1238,7 +1114,7 @@ function CitasContent() {
                               <td className="px-4 py-3.5 text-muted-foreground">
                                 {cita.citaServicios && cita.citaServicios.length > 0 ? (
                                   <div className="flex flex-wrap gap-1.5 max-w-[220px]">
-                                    {cita.citaServicios.map((cs: any) => {
+                                    {cita.citaServicios.map((cs) => {
                                       const cat = cs.servicio?.categoriaRel;
                                       const catColor = cat?.color || '#6366f1';
                                       return (
@@ -1286,9 +1162,9 @@ function CitasContent() {
                               </td>
                               <td className="px-4 py-3.5 text-muted-foreground">{cita.empleado?.nombre || '-'}</td>
                               <td className="px-4 py-3.5">
-                                <p className="font-medium text-foreground">{fmtDate(cita.fecha)}</p>
+                                <p className="font-medium text-foreground">{formatAppointmentDate(cita.fecha)}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {to12h(cita.hora)} · {cita.duracion} min
+                                  {formatTime12Hour(cita.hora)} · {cita.duracion} min
                                   {isPersonalizado && (
                                     <span className="block text-[10px] text-amber-500 font-bold mt-0.5" title="Duración modificada manualmente">
                                       ⏱ personalizado
@@ -1300,9 +1176,9 @@ function CitasContent() {
                                 <select
                                   value={cita.estado}
                                   onChange={e => changeEstado(cita.id, e.target.value)}
-                                  className={cn('text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
+                                  className={cn('text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer bg-transparent', APPOINTMENT_STATUS_BADGE_CLASSES[cita.estado])}
                                 >
-                                  {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+                                  {APPOINTMENT_STATUS_OPTIONS.map(e => <option key={e} value={e}>{APPOINTMENT_STATUS_LABELS[e]}</option>)}
                                 </select>
                               </td>
                               <td className="px-4 py-3.5">
@@ -1390,7 +1266,7 @@ function CitasContent() {
                                   })
                               )
                             : null;
-                      const isPersonalizado = cita.citaServicios?.some((cs: any) => cs.duracion !== cs.servicio?.duracion);
+                      const isPersonalizado = cita.citaServicios?.some((appointmentService) => appointmentService.duracion !== appointmentService.servicio?.duracion);
                       return (
                         <Card key={cita.id} className="surface-panel p-4 bg-card/80 hover:bg-secondary/15 transition-colors space-y-3">
                           <div className="flex justify-between items-start">
@@ -1402,9 +1278,9 @@ function CitasContent() {
                               value={cita.estado}
                               onChange={e => changeEstado(cita.id, e.target.value)}
                               aria-label={`Estado de la cita de ${cita.cliente_nombre}`}
-                              className={cn('min-h-10 text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer bg-transparent', ESTADO_BADGE[cita.estado])}
+                              className={cn('min-h-10 text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer bg-transparent', APPOINTMENT_STATUS_BADGE_CLASSES[cita.estado])}
                             >
-                              {ESTADOS.map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+                              {APPOINTMENT_STATUS_OPTIONS.map(e => <option key={e} value={e}>{APPOINTMENT_STATUS_LABELS[e]}</option>)}
                             </select>
                           </div>
 
@@ -1413,7 +1289,7 @@ function CitasContent() {
                               <span className="font-medium text-foreground text-[10px] uppercase tracking-wide">Servicios:</span>
                               {cita.citaServicios && cita.citaServicios.length > 0 ? (
                                 <div className="flex flex-wrap gap-1 max-w-full">
-                                  {cita.citaServicios.map((cs: any) => {
+                                  {cita.citaServicios.map((cs) => {
                                     const cat = cs.servicio?.categoriaRel;
                                     const catColor = cat?.color || '#6366f1';
                                     return (
@@ -1468,8 +1344,8 @@ function CitasContent() {
 
                           <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
                             <div className="text-xs flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-primary">{fmtDate(cita.fecha)}</span>
-                              <span className="text-muted-foreground">· {to12h(cita.hora)}</span>
+                              <span className="font-bold text-primary">{formatAppointmentDate(cita.fecha)}</span>
+                              <span className="text-muted-foreground">· {formatTime12Hour(cita.hora)}</span>
                             </div>
                             <div className="flex gap-1.5 flex-wrap justify-end">
                               <Button variant="outline" size="sm" className="h-10 px-3 text-xs gap-1 cursor-pointer" onClick={() => openEdit(cita)}>
@@ -1511,8 +1387,8 @@ function CitasContent() {
                       Página {page} de {totalPages} · {filteredAndSortedCitas.length} resultados
                     </p>
                     <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-7 text-xs">Anterior</Button>
-                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 text-xs">Siguiente</Button>
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="min-h-11 sm:min-h-8 text-xs">Anterior</Button>
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="min-h-11 sm:min-h-8 text-xs">Siguiente</Button>
                     </div>
                   </div>
                 )}
@@ -1539,7 +1415,7 @@ function CitasContent() {
                 </div>
               )}
               
-              <AgendaCalendario
+              <AppointmentCalendar
                 citas={citas}
                 empleados={empleados}
                 filtroEmpleado={filtroEmpleado}
@@ -1552,9 +1428,10 @@ function CitasContent() {
                 localCitaOverrides={localCitaOverrides}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
+                onCreateCita={openCreate}
+                mobileToolbar={renderAgendaNavigation(true)}
                 isLoading={isLoading}
                 isModalOpen={showModal}
-                mobileToolbarExternal
               />
             </div>
           )}
@@ -1634,7 +1511,7 @@ function CitasContent() {
                     <button
                       type="button"
                       onClick={() => {
-                        setForm((prev: any) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
+                        setForm((prev) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
                         setClienteBusqueda('');
                       }}
                       className="min-h-11 text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-md px-3 py-1 transition-colors shrink-0"
@@ -1651,7 +1528,7 @@ function CitasContent() {
                       onChange={e => {
                         setClienteBusqueda(e.target.value);
                         setClienteDropdownOpen(true);
-                        setForm((prev: any) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
+                        setForm((prev) => ({ ...prev, cliente_id: '', cliente_nombre: '', cliente_telefono: '' }));
                       }}
                       onFocus={() => setClienteDropdownOpen(true)}
                       placeholder="Buscar por nombre, teléfono o correo..."
@@ -1700,7 +1577,7 @@ function CitasContent() {
                                   type="button"
                                   className="w-full text-left px-4 py-2.5 hover:bg-secondary/40 transition-colors"
                                   onClick={() => {
-                                    setForm((prev: any) => ({
+                                    setForm((prev) => ({
                                       ...prev,
                                       cliente_id: c.id,
                                       cliente_nombre: c.nombre,
@@ -1740,7 +1617,7 @@ function CitasContent() {
                       const val = e.target.value;
                       if (!val) return;
                       const s = servicios.find(srv => srv.id === val);
-                      setForm((prev: any) => {
+                      setForm((prev) => {
                         const isFirstWithSlotDuration = prev.servicio_ids.length === 0 && prev.servicio_duraciones.length === 1;
                         const newDurations = isFirstWithSlotDuration
                           ? [prev.servicio_duraciones[0]]
@@ -1785,7 +1662,7 @@ function CitasContent() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setForm((prev: any) => {
+                                  setForm((prev) => {
                                     const newIds = prev.servicio_ids.filter((_: string, idx: number) => idx !== index);
                                     const newDurs = prev.servicio_duraciones.filter((_: number, idx: number) => idx !== index);
                                     return {
@@ -1810,7 +1687,7 @@ function CitasContent() {
                                   type="button"
                                   onClick={() => {
                                     const newVal = Math.max(5, currentDur - 5);
-                                    setForm((prev: any) => {
+                                    setForm((prev) => {
                                       const newDurs = [...prev.servicio_duraciones];
                                       newDurs[index] = newVal;
                                       return {
@@ -1830,7 +1707,7 @@ function CitasContent() {
                                   value={currentDur}
                                   onChange={(e) => {
                                     const val = Math.max(5, Math.min(240, Number(e.target.value) || 5));
-                                    setForm((prev: any) => {
+                                    setForm((prev) => {
                                       const newDurs = [...prev.servicio_duraciones];
                                       newDurs[index] = val;
                                       return {
@@ -1845,7 +1722,7 @@ function CitasContent() {
                                   type="button"
                                   onClick={() => {
                                     const newVal = Math.min(240, currentDur + 5);
-                                    setForm((prev: any) => {
+                                    setForm((prev) => {
                                       const newDurs = [...prev.servicio_duraciones];
                                       newDurs[index] = newVal;
                                       return {
@@ -1869,7 +1746,7 @@ function CitasContent() {
                                     type="button"
                                     onClick={() => {
                                       const newVal = Math.min(240, currentDur + p);
-                                      setForm((prev: any) => {
+                                      setForm((prev) => {
                                         const newDurs = [...prev.servicio_duraciones];
                                         newDurs[index] = newVal;
                                         return {
@@ -1937,13 +1814,13 @@ function CitasContent() {
               {form.fecha && form.empleado_id && (
                 <div className="bg-secondary/30 border border-border/50 rounded-xl p-4">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-3">Selecciona la Hora *</label>
-                  <TimeSelector
+                  <AppointmentTimeSelector
                     empleadoId={form.empleado_id}
                     fecha={form.fecha}
                     servicioId={form.servicio_ids[0]}
                     duracionTotal={form.servicio_duraciones.reduce((sum: number, dur: number) => sum + dur, 0)}
                     selectedTime={form.hora}
-                    onTimeSelect={h => setForm((prev: any) => ({ ...prev, hora: h }))}
+                    onTimeSelect={h => setForm((prev) => ({ ...prev, hora: h }))}
                     excludeCitaId={editingId}
                   />
                 </div>
@@ -1971,7 +1848,7 @@ function CitasContent() {
                 {editingId && (() => {
                   const currentCita = citas.find(c => c.id === editingId);
                   const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && currentCita?.created_by === user.id);
-                  if (canDelete) {
+                   if (canDelete && currentCita) {
                     return (
                       <Button
                         type="button"
@@ -2141,7 +2018,7 @@ function CitasContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-2 text-xs">
                       <span className="text-muted-foreground font-semibold">Cliente: <span className="font-bold text-foreground">{c.clientName}</span></span>
                       <span className="text-muted-foreground font-semibold">Servicio: <span className="font-semibold text-foreground">{c.serviceName}</span></span>
-                      <span className="text-muted-foreground font-semibold">Horario: <span className="font-semibold text-foreground tabular-nums">{to12h(c.startTime)} - {to12h(c.endTime)}</span></span>
+                      <span className="text-muted-foreground font-semibold">Horario: <span className="font-semibold text-foreground tabular-nums">{formatTime12Hour(c.startTime)} - {formatTime12Hour(c.endTime)}</span></span>
                       <span className="text-muted-foreground font-semibold">Profesional: <span className="font-semibold text-foreground">{c.professionalName}</span></span>
                     </div>
                   </div>
@@ -2251,11 +2128,11 @@ function CitasContent() {
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 text-xs">
                   <span className="text-muted-foreground font-semibold uppercase tracking-wider">Fecha:</span>
-                  <span className="col-span-2 text-foreground font-medium">{fmtDate(citaToDelete.fecha)}</span>
+                  <span className="col-span-2 text-foreground font-medium">{formatAppointmentDate(citaToDelete.fecha)}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 text-xs">
                   <span className="text-muted-foreground font-semibold uppercase tracking-wider">Hora:</span>
-                  <span className="col-span-2 text-foreground font-medium">{to12h(citaToDelete.hora)} ({citaToDelete.duracion} min)</span>
+                  <span className="col-span-2 text-foreground font-medium">{formatTime12Hour(citaToDelete.hora)} ({citaToDelete.duracion} min)</span>
                 </div>
                 {citaToDelete.notas && (
                   <div className="grid grid-cols-3 gap-1.5 text-xs border-t border-border/20 pt-2">
@@ -2297,7 +2174,7 @@ function CitasContent() {
 
 
       {/* Bottom Sheet de Detalle de Cita */}
-      <CitaDetalleBottomSheet
+      <AppointmentDetailsSheet
         open={!!citaResumen}
         onOpenChange={(open) => {
           if (!open) setCitaResumen(null);
@@ -2310,7 +2187,7 @@ function CitasContent() {
         }}
       />
 
-      <CitaCreadaConfirmacion
+      <AppointmentCreatedConfirmation
         cita={citaCreada}
         open={!!citaCreada}
         onClose={() => setCitaCreada(null)}

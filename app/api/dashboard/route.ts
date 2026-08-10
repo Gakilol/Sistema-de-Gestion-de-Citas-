@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { AdminServicio } from '@/src/servicios/admin.servicio';
+import { DashboardService } from '@/lib/services/dashboard-service';
 import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     // Si es EMPLEADO, forzar el filtrado por su propio ID de empleado
     const empleadoId = userRole === 'EMPLEADO' ? userId : undefined;
     
-    const data = await AdminServicio.getDashboardStats(periodo, empleadoId);
+    const data = await DashboardService.getDashboardStats(periodo, empleadoId);
     return NextResponse.json(data, {
       status: 200,
       headers: {

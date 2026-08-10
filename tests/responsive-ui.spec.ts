@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { loadEnvConfig } from '@next/env';
 import { PrismaClient } from '@prisma/client';
 import { SignJWT } from 'jose';
-import { getDefaultAgendaDate } from '../lib/timezone';
+import { getBusinessTodayString } from '../lib/timezone';
 
 loadEnvConfig(process.cwd());
 
@@ -210,7 +210,7 @@ test.describe('UI responsive autenticada', () => {
     const citaExistente = citas.find((cita: { estado?: string }) => cita.estado !== 'CANCELADA') ?? citas[0];
     if (citaExistente) {
       const targetDate = String(citaExistente.fecha).slice(0, 10);
-      const initialDate = getDefaultAgendaDate();
+      const initialDate = getBusinessTodayString();
       const dayDifference = Math.round(
         (Date.parse(`${targetDate}T00:00:00Z`) - Date.parse(`${initialDate}T00:00:00Z`)) /
           86_400_000

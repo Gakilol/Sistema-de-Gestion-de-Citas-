@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { calcularDisponibilidad } from '@/lib/disponibilidad';
+import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
 import { getUserContext } from '@/lib/auth-helpers';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
-    const resultado = await calcularDisponibilidad(
+    const resultado = await calculateAppointmentAvailability(
       id, 
       fechaParam, 
       servicioId, 

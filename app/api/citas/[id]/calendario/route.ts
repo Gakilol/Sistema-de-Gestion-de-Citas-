@@ -3,9 +3,9 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserContext } from '@/lib/auth-helpers';
 import { generarTokenCalendario } from '@/lib/calendar-token';
-import { normalizarTelefono } from '@/lib/normalize-phone';
+import { normalizePhone } from '@/lib/phone';
 import { formatDBDateLong } from '@/lib/timezone';
-import { formatTo12h } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 import { buildGoogleCalendarUrl, calcularFinCita, isValidTimeZone } from '@/lib/calendar-event';
 
 const DEFAULT_CALENDAR_TIMEZONE = 'America/Costa_Rica';
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const icsUrl = `${baseUrl}/api/cita/calendario/${encodeURIComponent(token)}/ics`;
     const fechaStr = cita.fecha.toISOString().split('T')[0];
     const fechaLegible = formatDBDateLong(cita.fecha);
-    const horaInicio12h = formatTo12h(cita.hora);
+    const horaInicio12h = formatTime12Hour(cita.hora);
     const fin = calcularFinCita(fechaStr, cita.hora, cita.duracion);
     const profesional = cita.empleado.nombre;
     const servicios = cita.citaServicios.length > 0
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       '',
       'Le agradecemos presentarse 5 minutos antes de su cita para una mejor atención.',
     ].join('\n');
-    const telefonoNormalizado = normalizarTelefono(cita.cliente_telefono);
+    const telefonoNormalizado = normalizePhone(cita.cliente_telefono);
     const waUrlConfirmacion = telefonoNormalizado
       ? `https://wa.me/${telefonoNormalizado}?text=${encodeURIComponent(mensajeConfirmacion)}`
       : null;
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       profesional,
       fecha: fechaLegible,
       horaInicio: horaInicio12h,
-      horaFin: formatTo12h(fin.hora),
+      horaFin: formatTime12Hour(fin.hora),
     });
   } catch {
     console.error('[calendario/route] Error generando token de calendario');

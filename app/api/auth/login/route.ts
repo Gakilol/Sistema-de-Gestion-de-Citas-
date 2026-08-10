@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { AuthServicio } from '@/src/servicios/auth.servicio';
+import { AuthService } from '@/lib/services/auth-service';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { checkLoginRateLimit } from '@/lib/audit/rate-limiter';
 import { prisma } from '@/lib/db';
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Intentar autenticación
-    const result = await AuthServicio.login({
+    const result = await AuthService.login({
       email: parseResult.data.email,
       password: parseResult.data.password,
     });

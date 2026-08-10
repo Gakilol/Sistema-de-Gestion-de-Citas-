@@ -454,6 +454,10 @@
       border-radius: 0.9rem;
       box-shadow: 0 10px 30px hsl(225 30% 3% / 0.2);
     }
+
+    .agenda-page {
+      padding-inline: 0.75rem;
+    }
   }
 
   /* Toque optimizado */
@@ -469,6 +473,21 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+    }
+  }
+
+  @media (pointer: coarse) {
+    button,
+    [role="button"],
+    input:not([type="checkbox"]):not([type="radio"]),
+    select {
+      min-height: 44px;
+    }
+
+    input[type="checkbox"],
+    input[type="radio"] {
+      min-width: 20px;
+      min-height: 20px;
     }
   }
 }

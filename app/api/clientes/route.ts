@@ -1,22 +1,10 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { z } from 'zod';
-import { registrarAuditoria } from '@/lib/auditoria';
+import { logLegacyAudit } from '@/lib/audit/legacy-audit';
 import { getUserContext } from '@/lib/auth-helpers';
 import { buildClientResponse } from '@/lib/client-privacy';
-import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
-
-const CreateClienteSchema = z.object({
-  nombre: z.string().min(2, 'El nombre es obligatorio (mínimo 2 caracteres)').max(150).trim(),
-  telefono: z.string().max(30).trim().optional().nullable(),
-  cedula: z.string().max(50).trim().optional().nullable(),
-  correo: z.preprocess(
-    (val) => (val === '' ? null : val),
-    z.string().email('Correo inválido').max(254).trim().optional().nullable()
-  ),
-  notas: z.string().max(1000).trim().optional().nullable(),
-  confirmarDuplicadoNombre: z.boolean().optional(),
-});
+import { validateAndNormalizePhone } from '@/lib/phone';
+import { createClientSchema } from '@/lib/validation/client-schemas';
 
 function normalizarNombre(nombre: string): string {
   return nombre.trim().replace(/\s+/g, ' ');
@@ -33,6 +21,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
     const busqueda = normalizarNombre(req.nextUrl.searchParams.get('q') ?? '');
+    const page = Math.max(1, Number(req.nextUrl.searchParams.get('page') ?? '1') || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '24') || 24));
 
     const searchWhere = busqueda
       ? {
@@ -45,24 +35,30 @@ export async function GET(req: NextRequest) {
         }
       : {};
 
-    const clientesData = await prisma.cliente.findMany({
-      where: searchWhere,
-      include: {
-        citas: {
-          ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
-          select: {
-            id: true,
-            fecha: true,
-            hora: true,
-            estado: true,
-            empleado_id: true,
-            servicio: { select: { nombre: true } },
-            empleado: { select: { nombre: true } },
+    const [total, clientesData] = await Promise.all([
+      prisma.cliente.count({ where: searchWhere }),
+      prisma.cliente.findMany({
+        where: searchWhere,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          citas: {
+            ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
+            select: {
+              id: true,
+              fecha: true,
+              hora: true,
+              estado: true,
+              empleado_id: true,
+              servicio: { select: { nombre: true } },
+              empleado: { select: { nombre: true } },
+            },
+            orderBy: { fecha: 'desc' },
           },
-          orderBy: { fecha: 'desc' },
         },
-      },
-    });
+      }),
+    ]);
 
     const clientes = clientesData.map((c: any) => {
       let citasCompletadas = 0;
@@ -110,7 +106,13 @@ export async function GET(req: NextRequest) {
 
     clientes.sort((a: any, b: any) => b.totalCitas - a.totalCitas);
 
-    return NextResponse.json({ clientes, total: clientes.length }, { status: 200 });
+    return NextResponse.json({
+      clientes,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    }, { status: 200 });
   } catch (err: any) {
     console.error('[CLIENTS_GET_ERROR] Error al obtener clientes:', err);
     return NextResponse.json({ error: 'Error al consultar la lista de clientes' }, { status: 500 });
@@ -128,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     const rawBody = await req.json();
-    const parseResult = CreateClienteSchema.safeParse(rawBody);
+    const parseResult = createClientSchema.safeParse(rawBody);
     if (!parseResult.success) {
       return NextResponse.json(
         { error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors },
@@ -145,7 +147,7 @@ export async function POST(req: NextRequest) {
     // Normalizar y validar teléfono
     let telefonoNormalizado: string | null = null;
     if (telefono !== undefined && telefono !== null && String(telefono).trim() !== '') {
-      const phoneValidation = validarYNormalizarTelefono(telefono, '506');
+      const phoneValidation = validateAndNormalizePhone(telefono, '506');
       if (!phoneValidation.isValid) {
         return NextResponse.json(
           { error: phoneValidation.error || 'Número de teléfono inválido' },
@@ -211,7 +213,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await registrarAuditoria({
+    await logLegacyAudit({
       entidad: 'Cliente',
       entidadId: nuevoCliente.id,
       accion: 'CREAR',

@@ -136,11 +136,6 @@ export const sendResetPasswordEmail = async ({
   `;
 
   if (process.env.DISABLE_EMAILS === 'true' || process.env.DISABLE_NOTIFICATIONS === 'true') {
-    console.log(`\n--- [SIMULACIÓN CORREO ENVIADO (Restablecer contraseña)] ---`);
-    console.log(`Para: ${email}`);
-    console.log(`Asunto: Código de verificación - ${appName}`);
-    console.log(`Token/Código: ${token}`);
-    console.log(`--------------------------------------------------------\n`);
     return;
   }
 

@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { syncCitaEstados } from '@/lib/automatizacion';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
 
@@ -35,7 +34,6 @@ const CreateCitaSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await syncCitaEstados();
 
     const { userId, userRole } = getUserContext(req);
     if (!userId || !userRole) {
@@ -46,16 +44,32 @@ export async function GET(req: NextRequest) {
     const busqueda = req.nextUrl.searchParams.get('q') || '';
     const scope    = req.nextUrl.searchParams.get('scope') || (userRole === 'ADMIN' ? 'all' : 'mine');
     const filterEmp = req.nextUrl.searchParams.get('empleado_id') || '';
+    const from = req.nextUrl.searchParams.get('from');
+    const to = req.nextUrl.searchParams.get('to');
+    const limit = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '100') || 100));
 
     const scopeWhere = getScopedAppointmentWhere(userId, userRole, scope, filterEmp);
 
     const citas = await prisma.cita.findMany({
       where: {
         ...(estado && estado !== 'all' ? { estado: estado as any } : {}),
+        ...(from || to ? {
+          fecha: {
+            ...(from ? { gte: parseLocalDateToUTC(from) } : {}),
+            ...(to ? { lte: parseLocalDateToUTC(to) } : {}),
+          },
+        } : {}),
+        ...(busqueda ? {
+          OR: [
+            { cliente_nombre: { contains: busqueda, mode: 'insensitive' } },
+            { cliente_telefono: { contains: busqueda, mode: 'insensitive' } },
+            { servicio: { nombre: { contains: busqueda, mode: 'insensitive' } } },
+          ],
+        } : {}),
         ...scopeWhere,
       },
       include: {
-        empleado: { select: { id: true, nombre: true, correo: true, tituloCliente: true } },
+        empleado: { select: { id: true, nombre: true, tituloCliente: true } },
         servicio: {
           select: {
             nombre: true,
@@ -77,18 +91,10 @@ export async function GET(req: NextRequest) {
         }
       },
       orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
+      take: limit,
     });
 
-    const filtradas = busqueda
-      ? citas.filter((c: any) =>
-          c.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-          (c.cliente_telefono && c.cliente_telefono.includes(busqueda)) ||
-          c.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-          c.citaServicios.some((cs: any) => cs.servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-        )
-      : citas;
-
-    return NextResponse.json({ citas: filtradas }, { status: 200 });
+    return NextResponse.json({ citas, limit }, { status: 200 });
   } catch (error: any) {
     console.error('[CITAS_GET_ERROR]', error);
     return NextResponse.json({ error: 'Error al consultar las citas' }, { status: 500 });
@@ -197,7 +203,7 @@ export async function POST(req: NextRequest) {
     const primerServicioId  = serviciosParaCita[0].id;
     // Excepción de horario: Todos los roles autenticados (ADMIN, TECH_SUPPORT, EMPLEADO)
     const permitirHorarioExtendido = Boolean(overrideSchedule || forzar || userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT');
-    const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
+    const { calculateAppointmentAvailability, validateExactAppointmentTime, findAppointmentConflicts } = await import('@/lib/appointments/appointment-availability');
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
     let idClienteFinal: string | null = cliente_id || null;
@@ -228,7 +234,7 @@ export async function POST(req: NextRequest) {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hash})`;
       } catch {}
 
-      const disponibilidad = await calcularDisponibilidad(
+      const disponibilidad = await calculateAppointmentAvailability(
         finalEmpleadoId,
         fecha.split('T')[0],
         primerServicioId,
@@ -247,7 +253,7 @@ export async function POST(req: NextRequest) {
         return { error: 'No se pudo determinar la jornada laboral', status: 400 };
       }
 
-      const conflictos = await detectarConflictos(
+      const conflictos = await findAppointmentConflicts(
         finalEmpleadoId,
         fecha.split('T')[0],
         hora,
@@ -281,7 +287,7 @@ export async function POST(req: NextRequest) {
         ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
         : disponibilidad.intervalosOcupados;
 
-      const validacion = validarHoraExacta(
+      const validacion = validateExactAppointmentTime(
         hora,
         duracionCalculada,
         disponibilidad.jornada.inicio,

@@ -2,8 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { getUserContext } from '@/lib/auth-helpers';
-import { validarYNormalizarTelefono } from '@/lib/normalize-phone';
-import { ActualizarClienteSchema } from '@/src/validadores';
+import { validateAndNormalizePhone } from '@/lib/phone';
+import { updateClientSchema } from '@/lib/validation/client-schemas';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,7 +14,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const parseResult = ActualizarClienteSchema.safeParse(await req.json());
+    const parseResult = updateClientSchema.safeParse(await req.json());
     if (!parseResult.success) {
       return NextResponse.json({ error: 'Datos inválidos', detalles: parseResult.error.flatten().fieldErrors }, { status: 400 });
     }
@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // Normalizar y validar teléfono
     let telefonoNormalizado: string | null = null;
     if (telefono !== undefined && telefono !== null && String(telefono).trim() !== '') {
-      const phoneValidation = validarYNormalizarTelefono(telefono, '506');
+      const phoneValidation = validateAndNormalizePhone(telefono, '506');
       if (!phoneValidation.isValid) {
         return NextResponse.json(
           { error: phoneValidation.error || 'Número de teléfono inválido' },

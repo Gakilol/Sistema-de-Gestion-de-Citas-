@@ -1,26 +1,35 @@
+require('dotenv/config');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Sembrando base de datos con Admin por defecto...');
+  const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
-  const passwordHash = await bcrypt.hash('Admin123!', 10);
+  if (!adminEmail || !adminPassword) {
+    throw new Error('SEED_ADMIN_EMAIL y SEED_ADMIN_PASSWORD son obligatorios para ejecutar el seed.');
+  }
 
-  const admin = await prisma.empleado.upsert({
-    where: { correo: 'admin@sistema.com' },
+  if (adminPassword.length < 12) {
+    throw new Error('SEED_ADMIN_PASSWORD debe tener al menos 12 caracteres.');
+  }
+
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
+
+  await prisma.empleado.upsert({
+    where: { correo: adminEmail },
     update: {},
     create: {
       nombre: 'Administrador Principal',
-      correo: 'admin@sistema.com',
+      correo: adminEmail,
       passwordHash,
       rol: 'ADMIN',
-      telefono: '000000000',
     },
   });
 
-  console.log('Admin creado exitosamente:', admin.correo);
+  console.log('Administrador inicial creado correctamente.');
 }
 
 main()

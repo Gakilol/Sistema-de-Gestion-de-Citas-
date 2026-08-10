@@ -1,7 +1,7 @@
 // lib/calendar-share.ts
 // Acción reutilizable para compartir o enviar el evento al cliente sin requerer OAuth directo de Google.
 
-import { formatTo12h } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 import { formatDBDateLong } from '@/lib/timezone';
 
 export interface CalendarEventShareData {
@@ -36,13 +36,13 @@ export function getServiciosNombres(cita: CalendarEventShareData): string[] {
  * Formatea el horario de inicio y fin legible (ej: "10:00 AM – 10:30 AM")
  */
 export function getHorarioLegible(horaInicioStr: string, duracionMin: number = 30): { horaInicio: string; horaFin: string; textoHorario: string } {
-  const horaInicio = formatTo12h(horaInicioStr);
+  const horaInicio = formatTime12Hour(horaInicioStr);
   const [h, m] = (horaInicioStr || '00:00').split(':').map(Number);
   const totalMin = (h || 0) * 60 + (m || 0) + (duracionMin || 30);
   const hFin = Math.floor(totalMin / 60);
   const mFin = totalMin % 60;
   const horaFinStr = `${String(hFin).padStart(2, '0')}:${String(mFin).padStart(2, '0')}`;
-  const horaFin = formatTo12h(horaFinStr);
+  const horaFin = formatTime12Hour(horaFinStr);
 
   return {
     horaInicio,

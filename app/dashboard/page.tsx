@@ -14,7 +14,9 @@ import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
-import { cn, formatTo12h } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
+import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
 import Link from 'next/link';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
@@ -39,25 +41,6 @@ interface DashboardData {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const ESTADO_BADGE: Record<string, string> = {
-  PENDIENTE: 'badge-pendiente',
-  CONFIRMADA: 'badge-confirmada',
-  COMPLETADA: 'badge-completada',
-  CANCELADA: 'badge-cancelada',
-  EN_PROGRESO: 'badge-en_progreso',
-  NO_SHOW: 'badge-cancelada',
-  REPROGRAMADA: 'badge-reprogramada',
-};
-const ESTADO_LABEL: Record<string, string> = {
-  PENDIENTE: 'Pendiente',
-  CONFIRMADA: 'Confirmada',
-  COMPLETADA: 'Completada',
-  CANCELADA: 'Cancelada',
-  EN_PROGRESO: 'En Progreso',
-  NO_SHOW: 'No se presentó',
-  REPROGRAMADA: 'Reprogramada',
-};
-
 const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
 
 function fmtDate(d: string | Date) {
@@ -432,9 +415,9 @@ export default function Dashboard() {
                         <p className="text-xs text-muted-foreground">{cita.servicio?.nombre} · {cita.empleado?.nombre}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-foreground">{formatTo12h(cita.hora)}</p>
-                        <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', ESTADO_BADGE[cita.estado])}>
-                          {ESTADO_LABEL[cita.estado]}
+                        <p className="text-xs font-bold text-foreground">{formatTime12Hour(cita.hora)}</p>
+                        <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', APPOINTMENT_STATUS_BADGE_CLASSES[cita.estado])}>
+                          {APPOINTMENT_STATUS_LABELS[cita.estado]}
                         </span>
                       </div>
                     </div>
@@ -478,7 +461,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-xs font-bold text-foreground">{fmtDate(cita.fecha)}</p>
-                        <p className="text-[10px] text-muted-foreground">{formatTo12h(cita.hora)}</p>
+                        <p className="text-[10px] text-muted-foreground">{formatTime12Hour(cita.hora)}</p>
                       </div>
                     </div>
                   ))}
@@ -513,10 +496,10 @@ export default function Dashboard() {
                         {item.cliente_nombre}
                         <span className="text-muted-foreground font-normal"> — {item.servicio}</span>
                       </p>
-                      <p className="text-[10px] text-muted-foreground">con {item.empleado} · {fmtDate(item.fecha)} {formatTo12h(item.hora)}</p>
+                      <p className="text-[10px] text-muted-foreground">con {item.empleado} · {fmtDate(item.fecha)} {formatTime12Hour(item.hora)}</p>
                     </div>
-                    <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full hidden sm:inline-flex', ESTADO_BADGE[item.estado])}>
-                      {ESTADO_LABEL[item.estado]}
+                    <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full hidden sm:inline-flex', APPOINTMENT_STATUS_BADGE_CLASSES[item.estado])}>
+                      {APPOINTMENT_STATUS_LABELS[item.estado]}
                     </span>
                   </div>
                 ))}

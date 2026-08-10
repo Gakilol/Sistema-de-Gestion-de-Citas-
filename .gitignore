@@ -41,6 +41,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Database and local backups
+*.sql
 *.backup
 *.sql.bak
 *.bak
@@ -72,4 +73,4 @@ tasks/
 # Test artifacts
 playwright-report/
 test-results/
-*.trace.zip
+*.trace.zip

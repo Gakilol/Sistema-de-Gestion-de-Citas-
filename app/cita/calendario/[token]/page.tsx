@@ -7,7 +7,7 @@ import { Metadata } from 'next';
 import { verificarTokenCalendario } from '@/lib/calendar-token';
 import { prisma } from '@/lib/db';
 import { formatDBDateLong } from '@/lib/timezone';
-import { formatTo12h } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 import { buildGoogleCalendarUrl, calcularFinCita, isValidTimeZone } from '@/lib/calendar-event';
 import CalendarioClienteUI from './CalendarioClienteUI';
 
@@ -116,8 +116,8 @@ export default async function CalendarioPublicoPage({ params }: PageProps) {
     <CalendarioClienteUI
       clienteNombre={cita.cliente_nombre}
       fechaLegible={fechaLegible}
-      horaInicio={formatTo12h(cita.hora)}
-      horaFin={formatTo12h(fin.hora)}
+      horaInicio={formatTime12Hour(cita.hora)}
+      horaFin={formatTime12Hour(fin.hora)}
       profesional={cita.empleado?.nombre || ''}
       servicios={servicios.length > 0 ? servicios : null}
       ubicacion={ubicacion}

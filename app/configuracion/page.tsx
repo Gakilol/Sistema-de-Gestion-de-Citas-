@@ -14,6 +14,7 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatTime12Hour } from '@/lib/time-utils';
 
 const TABS = [
   { id: 'negocio',     label: 'Negocio',      icon: Store, roles: ['ADMIN', 'TECH_SUPPORT'] },
@@ -33,25 +34,13 @@ const DIAS = [
   { key: 'domingo',   label: 'Domingo' },
 ];
 
-export function formatTo12h(timeStr: string): string {
-  if (!timeStr) return '';
-  const [hStr, mStr] = timeStr.split(':');
-  let h = parseInt(hStr, 10);
-  const m = mStr || '00';
-  if (isNaN(h)) return timeStr;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${m} ${ampm}`;
-}
-
 const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
   const h = Math.floor(i / 2);
   const m = i % 2 === 0 ? '00' : '30';
   const val = `${String(h).padStart(2, '0')}:${m}`;
   return {
     value: val,
-    label: formatTo12h(val)
+    label: formatTime12Hour(val)
   };
 });
 

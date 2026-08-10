@@ -228,9 +228,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
 
-      const { calcularDisponibilidad, validarHoraExacta, detectarConflictos } = await import('@/lib/disponibilidad');
+      const { calculateAppointmentAvailability, validateExactAppointmentTime, findAppointmentConflicts } = await import('@/lib/appointments/appointment-availability');
       
-      conflictos = await detectarConflictos(
+      conflictos = await findAppointmentConflicts(
         empleadoFinal,
         fechaFinal,
         horaFinal,
@@ -238,7 +238,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         id // excludeCitaId
       );
 
-      const disponibilidad = await calcularDisponibilidad(
+      const disponibilidad = await calculateAppointmentAvailability(
         empleadoFinal,
         fechaFinal,
         null,
@@ -283,7 +283,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
           : disponibilidad.intervalosOcupados;
 
-        const validacion = validarHoraExacta(
+        const validacion = validateExactAppointmentTime(
           horaFinal,
           duracionFinal,
           disponibilidad.jornada.inicio,
@@ -323,7 +323,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
       });
 
-      const { timeToMinutes } = await import('@/lib/disponibilidad');
+      const { timeToMinutes } = await import('@/lib/appointments/appointment-availability');
       const startMinOrig = timeToMinutes(citaActual.hora);
       const endMinOrig = startMinOrig + citaActual.duracion;
 
