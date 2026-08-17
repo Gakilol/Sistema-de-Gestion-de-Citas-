@@ -1,5 +1,6 @@
 'use client';
 
+import { authFetch } from '@/lib/api-client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Star, Phone, Calendar,
@@ -298,7 +299,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
     if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
     try {
-      let res = await fetch('/api/clientes', {
+      let res = await authFetch('/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -307,7 +308,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
       if (!res.ok && data.requiresConfirmation) {
         const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
         if (!continuar) return;
-        res = await fetch('/api/clientes', {
+        res = await authFetch('/api/clientes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...form, confirmarDuplicadoNombre: true }),
@@ -405,7 +406,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
     if (form.telefono && !phoneValid) { toast.error('El número de teléfono no es válido'); return; }
     setSaving(true);
     try {
-      const res = await fetch(`/api/clientes/${cliente.id}`, {
+      const res = await authFetch(`/api/clientes/${cliente.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -504,7 +505,7 @@ export default function Clientes() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({ q, page: String(targetPage), limit: '24' });
-      const res = await fetch(`/api/clientes?${params.toString()}`);
+      const res = await authFetch(`/api/clientes?${params.toString()}`);
       const data = await res.json();
       if (res.ok) {
         setClientes(data.clientes ?? []);
@@ -531,7 +532,7 @@ export default function Clientes() {
       return;
     }
     try {
-      const res = await fetch(`/api/clientes/${id}`, {
+      const res = await authFetch(`/api/clientes/${id}`, {
         method: 'DELETE',
       });
       const data = await res.json();

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60,
+      maxAge: 60 * 60 * 24, // 24 horas, igual que la vigencia del JWT
       path: '/',
     });
 

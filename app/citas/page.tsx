@@ -1,5 +1,6 @@
 'use client';
 
+import { authFetch } from '@/lib/api-client';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon, UserRound, Users } from 'lucide-react';
@@ -190,7 +191,7 @@ function CitasContent() {
 
     const timeoutId = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/clientes?q=${encodeURIComponent(q)}`, {
+        const res = await authFetch(`/api/clientes?q=${encodeURIComponent(q)}`, {
           cache: 'no-store',
           signal: controller.signal,
         });
@@ -242,7 +243,7 @@ function CitasContent() {
         params.set('from', formatDate(rangeStart));
         params.set('to', formatDate(rangeEnd));
       }
-      const res  = await fetch(`/api/citas?${params.toString()}`);
+      const res  = await authFetch(`/api/citas?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al obtener citas');
       setCitas(data.citas || []);
@@ -259,9 +260,9 @@ function CitasContent() {
     setCatalogosLoading(true);
     try {
       const [sR, eR, cR] = await Promise.all([
-        fetch('/api/servicios'),
-        fetch('/api/empleados?schedulable=true'),
-        fetch('/api/clientes')
+        authFetch('/api/servicios'),
+        authFetch('/api/empleados?schedulable=true'),
+        authFetch('/api/clientes')
       ]);
       const sD = await sR.json();
       const eD = await eR.json();
@@ -369,7 +370,7 @@ function CitasContent() {
     }
     setSavingCliente(true);
     try {
-      let res = await fetch('/api/clientes', {
+      let res = await authFetch('/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formNuevoCliente),
@@ -378,7 +379,7 @@ function CitasContent() {
       if (!res.ok && data.requiresConfirmation) {
         const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
         if (!continuar) return;
-        res = await fetch('/api/clientes', {
+        res = await authFetch('/api/clientes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...formNuevoCliente, confirmarDuplicadoNombre: true }),
@@ -419,7 +420,7 @@ function CitasContent() {
 
     setSavingCliente(true);
     try {
-      let res = await fetch('/api/clientes', {
+      let res = await authFetch('/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre }),
@@ -428,7 +429,7 @@ function CitasContent() {
       if (!res.ok && data.requiresConfirmation) {
         const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
         if (!continuar) return;
-        res = await fetch('/api/clientes', {
+        res = await authFetch('/api/clientes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, confirmarDuplicadoNombre: true }),
@@ -513,7 +514,7 @@ function CitasContent() {
     try {
       const url  = editingId ? `/api/citas/${editingId}` : '/api/citas';
       const meth = editingId ? 'PATCH' : 'POST';
-      const res  = await fetch(url, {
+      const res  = await authFetch(url, {
         method: meth,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -548,7 +549,7 @@ function CitasContent() {
   const changeEstado = async (id: string, estado: string) => {
     setCitas(prev => prev.map(c => c.id === id ? { ...c, estado } : c));
     try {
-      const res = await fetch(`/api/citas/${id}`, {
+      const res = await authFetch(`/api/citas/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado }),
@@ -578,7 +579,7 @@ function CitasContent() {
     if (!citaToDelete) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/citas/${citaToDelete.id}?origen=${deleteOrigen}`, {
+      const res = await authFetch(`/api/citas/${citaToDelete.id}?origen=${deleteOrigen}`, {
         method: 'DELETE',
       });
       const data = await res.json();
@@ -656,7 +657,7 @@ function CitasContent() {
     }));
 
     try {
-      const res = await fetch(`/api/citas/${citaId}`, {
+      const res = await authFetch(`/api/citas/${citaId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
