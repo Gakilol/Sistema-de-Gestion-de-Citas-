@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyRefreshToken, signToken } from '@/lib/jwt';
+import { ACCESS_TOKEN_TTL_SECONDS, verifyRefreshToken, signToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
 import { cleanupRememberedDevicesForUser } from '@/lib/remember-device';
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24, // 24 horas, igual que la vigencia del JWT
+      maxAge: ACCESS_TOKEN_TTL_SECONDS,
       path: '/',
     });
 

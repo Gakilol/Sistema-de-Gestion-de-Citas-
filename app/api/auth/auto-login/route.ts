@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { signToken, signRefreshToken } from '@/lib/jwt';
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+  signToken,
+  signRefreshToken,
+} from '@/lib/jwt';
 import { hashRememberToken, generateRememberToken, parseUserAgent } from '@/lib/remember-device';
 import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24, // 24 horas
+      maxAge: ACCESS_TOKEN_TTL_SECONDS,
       path: '/',
     });
 
@@ -96,7 +101,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 7, // 7 días
+      maxAge: REFRESH_TOKEN_TTL_SECONDS,
       path: '/api/auth/refresh',
     });
 

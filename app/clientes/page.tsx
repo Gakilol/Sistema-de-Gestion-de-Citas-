@@ -507,12 +507,14 @@ export default function Clientes() {
       const params = new URLSearchParams({ q, page: String(targetPage), limit: '24' });
       const res = await authFetch(`/api/clientes?${params.toString()}`);
       const data = await res.json();
-      if (res.ok) {
-        setClientes(data.clientes ?? []);
-        setTotal(data.total ?? 0);
-        setPage(data.page ?? targetPage);
-        setTotalPages(data.totalPages ?? 1);
-      }
+      if (!res.ok) throw new Error(data.error || 'Error al consultar la lista de clientes');
+
+      setClientes(data.clientes ?? []);
+      setTotal(data.total ?? 0);
+      setPage(data.page ?? targetPage);
+      setTotalPages(data.totalPages ?? 1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al consultar la lista de clientes');
     } finally {
       setIsLoading(false);
     }

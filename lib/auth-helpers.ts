@@ -68,3 +68,7 @@ export function getScopedAppointmentWhere(
 
   return {};
 }
+
+export function getDefaultAppointmentScope(role: string): 'mine' | 'all' {
+  return role === 'EMPLEADO' ? 'mine' : 'all';
+}
