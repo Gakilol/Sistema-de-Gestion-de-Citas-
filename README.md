@@ -101,7 +101,7 @@ npx vercel@latest env run -e production -- npm run db:baseline
 Después, configure el **Build Command** de Vercel como:
 
 ```bash
-npm run build:vercel
+npx prisma migrate deploy && npm run build
 ```
 
-`build:vercel` aplica las migraciones pendientes antes de compilar. Para bases de datos nuevas no se ejecuta el paso de línea base: el primer despliegue aplicará la migración inicial automáticamente.
+Este comando aplica las migraciones pendientes antes de compilar. El script `npm run build:vercel` ofrece el mismo flujo para validarlo localmente. Para bases de datos nuevas no se ejecuta el paso de línea base: el primer despliegue aplicará la migración inicial automáticamente.
