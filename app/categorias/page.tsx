@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { authFetch } from '@/lib/api-client';
 
 const emptyForm = { nombre: '', color: '#6366f1', orden: '0', activo: true };
 
@@ -43,7 +44,7 @@ export default function Categorias() {
 
   const fetchCategorias = async () => {
     try {
-      const res = await fetch('/api/categorias');
+      const res = await authFetch('/api/categorias');
       const data = await res.json();
       if (res.ok) {
         setCategorias(data.categorias || []);
@@ -87,7 +88,7 @@ export default function Categorias() {
     // Optimistic UI update
     setCategorias(prev => prev.map(c => c.id === cat.id ? { ...c, activo: !cat.activo } : c));
     try {
-      const res = await fetch(`/api/categorias/${cat.id}`, {
+      const res = await authFetch(`/api/categorias/${cat.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activo: !cat.activo }),
@@ -109,7 +110,7 @@ export default function Categorias() {
       return;
     }
     try {
-      const res = await fetch(`/api/categorias/${cat.id}`, {
+      const res = await authFetch(`/api/categorias/${cat.id}`, {
         method: 'DELETE',
       });
       const d = await res.json();
@@ -139,7 +140,7 @@ export default function Categorias() {
     try {
       const url = editingId ? `/api/categorias/${editingId}` : '/api/categorias';
       const meth = editingId ? 'PATCH' : 'POST';
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method: meth,
         headers: { 
           'Content-Type': 'application/json',

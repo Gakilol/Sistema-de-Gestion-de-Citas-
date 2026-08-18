@@ -66,12 +66,13 @@ export function getClientIp(headers: any): string {
 
 /**
  * Writes an audit entry to the database. Sanitizes beforeData, afterData, and metadata.
- * Does not throw errors, to avoid interrupting business operations.
+ * Does not throw errors, to avoid interrupting business operations. Returns
+ * false when persistence fails so critical callers can report the failure.
  */
-export async function logAudit(options: AuditLogOptions): Promise<void> {
+export async function logAudit(options: AuditLogOptions): Promise<boolean> {
   // Prevent infinite loops by not logging reads/writes to AuditLog itself
   if (options.module === 'AUDITORIA' && (options.action.startsWith('AUDIT_LOG_VIEWED') || options.action.startsWith('AUDIT_LOG_FETCHED'))) {
-    return;
+    return true;
   }
 
   try {
@@ -117,8 +118,10 @@ export async function logAudit(options: AuditLogOptions): Promise<void> {
         createdAt: new Date()
       }
     });
+    return true;
   } catch (err) {
     console.error('[logAudit] Failed to write audit log:', err);
+    return false;
   }
 }
 

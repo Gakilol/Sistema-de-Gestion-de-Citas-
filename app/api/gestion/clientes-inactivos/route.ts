@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserContext } from '@/lib/auth-helpers';
+import { canContactInactiveClient } from '@/lib/inactive-clients';
+import { getBusinessTodayString } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
     const estadoRecordatorio = sp.get('estadoRecordatorio') || ''; // 'none' | 'recent' | 'old' | 'failed'
     
     // Scope and Employee filtering
-    let scope = sp.get('scope') || 'mine';
+    let scope = sp.get('scope') === 'all' ? 'all' : 'mine';
     let targetEmpleadoId = sp.get('empleadoId') || '';
 
     // Enforce EMPLEADO permissions:
@@ -40,7 +42,9 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * pageSize;
 
     const now = new Date();
-    const cutoffDate = new Date(now.getTime() - diasInactividad * 86400000);
+    const [year, month, day] = getBusinessTodayString().split('-').map(Number);
+    const businessToday = new Date(Date.UTC(year, month - 1, day));
+    const cutoffDate = new Date(businessToday.getTime() - diasInactividad * 86400000);
 
     // Filter by employee determines if we match appointments with a specific professional
     const filtrarPorEmpleado = !!targetEmpleadoId;
@@ -69,7 +73,7 @@ export async function GET(req: NextRequest) {
         AND NOT EXISTS (
           SELECT 1 FROM "Cita" fc
           WHERE fc."cliente_id" = c."id"
-            AND fc."fecha" > ${now}
+            AND fc."fecha" >= ${businessToday}
             AND fc."estado" IN ('PENDIENTE', 'CONFIRMADA', 'REPROGRAMADA')
         )
         -- Scoping: has at least one appointment with target employee if filtering is on
@@ -159,35 +163,39 @@ export async function GET(req: NextRequest) {
             gte: startOfMonth,
             lte: endOfMonth
           },
-          // If scoping, restrict by sending user or target employee
-          ...(userRole === 'EMPLEADO' ? { userId: userId } : {})
+          ...(scope === 'mine' ? { userId } : {})
         }
       });
       stats.enviadosEsteMes = thisMonthRemindersCount;
 
-      // Count "reagendados" (clients who received a reminder, and later had a new appointment created)
-      // For simplicity, we check: client has a reminder, and also a Cita created_at > reminder.createdAt
+      // Count "reagendados" without issuing one database query per client.
       let reagendadosCount = 0;
       const uniqueReminderClients = Array.from(clientsWithReminder) as string[];
       if (uniqueReminderClients.length > 0) {
-        for (const clientId of uniqueReminderClients) {
-          const latestReminder = latestReminderMap[clientId];
-          if (!latestReminder) continue;
-          
-          const newBookingAfterReminder = await prisma.cita.findFirst({
-            where: {
-              cliente_id: clientId,
-              created_at: {
-                gt: latestReminder.createdAt
-              }
-            }
-          });
-          if (newBookingAfterReminder) {
-            reagendadosCount++;
-          }
-        }
+        const bookingsAfterAnyReminder = await prisma.cita.findMany({
+          where: { cliente_id: { in: uniqueReminderClients } },
+          select: { cliente_id: true, created_at: true },
+        });
+        const rescheduledClients = new Set(
+          bookingsAfterAnyReminder
+            .filter((booking: { cliente_id: string | null; created_at: Date }) => {
+              if (!booking.cliente_id) return false;
+              const reminder = latestReminderMap[booking.cliente_id];
+              return reminder && booking.created_at > reminder.createdAt;
+            })
+            .map((booking: { cliente_id: string | null }) => booking.cliente_id)
+        );
+        reagendadosCount = rescheduledClients.size;
       }
       stats.reagendados = reagendadosCount;
+
+      // TECH_SUPPORT can diagnose global activity, but client PII remains masked.
+      const canAccessContact = (clientId: string) => {
+        const hasServedClient = lastCompletedAppointments.some(
+          (appt: any) => appt.cliente_id === clientId && appt.empleado_id === userId
+        );
+        return canContactInactiveClient(userRole, hasServedClient);
+      };
 
       // Map raw records to enriched objects
       enrichedClients = clientesInactivosRaw.map((r: any) => {
@@ -199,14 +207,9 @@ export async function GET(req: NextRequest) {
           diasDesdeUltimoReminder = Math.floor((now.getTime() - new Date(lastReminder.createdAt).getTime()) / 86400000);
         }
 
-        // Privacy rule: Employees can only see contact details of their own clients
-        // Mask details if this is not the employee's client (i.e. they never attended them)
-        // Wait, since we already restricted the raw SQL to only return clients who have at least one appointment
-        // with the logged in employee, the employee inherently HAS access to all returned records!
-        // But let's double check to be safe:
-        const hasAccess = userRole !== 'EMPLEADO' || (
-          lastAppt && lastAppt.empleado_id === userId
-        ) || lastCompletedAppointments.some((appt: any) => appt.cliente_id === r.id && appt.empleado_id === userId);
+        // ADMIN sees contact data; EMPLEADO only for clients already served;
+        // TECH_SUPPORT keeps PII masked.
+        const hasAccess = canAccessContact(r.id);
 
         const maskedTelefono = hasAccess ? r.telefono : '••••••••';
 

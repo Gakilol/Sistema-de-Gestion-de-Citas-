@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
 import Link from 'next/link';
+import { authFetch } from '@/lib/api-client';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -140,7 +141,7 @@ export default function Dashboard() {
     if (!silent) setIsLoading(true);
     else setRefreshing(true);
     try {
-      const res = await fetch('/api/dashboard?t=' + Date.now());
+      const res = await authFetch('/api/dashboard?t=' + Date.now());
       const d = await res.json();
       setData(d);
     } catch (err) {

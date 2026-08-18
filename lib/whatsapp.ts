@@ -21,6 +21,7 @@ const SALON_NAME = 'HAIR STYLE Salon & Barber';
 
 import { formatDBDateLong } from './timezone';
 import { formatTime12Hour } from './time-utils';
+import { normalizePhone } from './phone';
 
 function fmtFecha(d: string | Date): string {
   return formatDBDateLong(d);
@@ -104,12 +105,10 @@ export function mensajeReprogramacion(cita: CitaWA): string {
 }
 
 // ─── Generar enlace wa.me ───────────────────────────────────────────────────
-export function generarEnlaceWA(telefono: string, mensaje: string): string {
-  // Limpiar teléfono: solo dígitos, agregar código de país si no tiene
-  const cleaned = telefono.replace(/\D/g, '');
-  const numero = cleaned.startsWith('505') || cleaned.startsWith('506')
-    ? cleaned
-    : `506${cleaned}`; // 506 = Costa Rica por defecto
+export function generarEnlaceWA(telefono: string, mensaje: string): string | null {
+  const numero = normalizePhone(telefono);
+  if (!numero) return null;
+
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
 

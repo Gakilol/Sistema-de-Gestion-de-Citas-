@@ -14,6 +14,7 @@ import {
   Eye, Copy, Check, Layers
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/api-client';
 
 // Tab definitions
 type AuditTab = 'resumen' | 'actividad' | 'seguridad' | 'cambios' | 'roles' | 'citas' | 'configuracion' | 'exportar';
@@ -67,7 +68,7 @@ export default function AuditoriaPage() {
   // Fetch KPI Summary
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch('/api/auditoria/resumen');
+      const res = await authFetch('/api/auditoria/resumen');
       if (!res.ok) throw new Error('Error al cargar resumen');
       const data = await res.json();
       setSummaryData(data);
@@ -79,7 +80,7 @@ export default function AuditoriaPage() {
   // Fetch Security Stats
   const fetchSecurity = useCallback(async () => {
     try {
-      const res = await fetch('/api/auditoria/seguridad');
+      const res = await authFetch('/api/auditoria/seguridad');
       if (!res.ok) throw new Error('Error al cargar seguridad');
       const data = await res.json();
       setSecurityData(data);
@@ -118,7 +119,7 @@ export default function AuditoriaPage() {
         params.set('module', 'CONFIGURACION');
       }
 
-      const res = await fetch(`/api/auditoria/logs?${params}`);
+      const res = await authFetch(`/api/auditoria/logs?${params}`);
       const json = await res.json();
       if (!res.ok) {
         setError(json.error || 'Error al obtener registros');
@@ -173,7 +174,7 @@ export default function AuditoriaPage() {
 
       if (formato === 'pdf') {
         // Fetch raw data
-        const res = await fetch(`/api/auditoria/exportar?${params}`);
+        const res = await authFetch(`/api/auditoria/exportar?${params}`);
         const data = await res.json();
         
         if (!res.ok) {
@@ -241,7 +242,7 @@ export default function AuditoriaPage() {
   // Show detailed logs info by fetching full detail by ID
   const openDetail = async (logId: string) => {
     try {
-      const res = await fetch(`/api/auditoria/logs/${logId}`);
+      const res = await authFetch(`/api/auditoria/logs/${logId}`);
       if (!res.ok) throw new Error('Fallo al obtener detalle');
       const detail = await res.json();
       setSelectedLog(detail);

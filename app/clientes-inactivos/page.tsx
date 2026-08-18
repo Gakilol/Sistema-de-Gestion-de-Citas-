@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { urlWhatsAppReactivacion } from '@/lib/whatsapp';
+import { mensajeReactivacion, urlWhatsAppReactivacion } from '@/lib/whatsapp';
+import { authFetch } from '@/lib/api-client';
 import {
   UserX, Phone, Calendar, RefreshCcw, Loader2,
   MessageSquare, Star, Search, ShieldAlert, CheckCircle,
@@ -78,9 +79,13 @@ export default function ClientesInactivos() {
   const isTechSupport = user?.rol === 'TECH_SUPPORT';
   const canSeeAll = isAdmin || isTechSupport;
 
+  useEffect(() => {
+    if (canSeeAll) setScope('all');
+  }, [canSeeAll]);
+
   // 1. Fetch catalogs
   useEffect(() => {
-    fetch('/api/empleados?schedulable=true')
+    authFetch('/api/empleados?schedulable=true')
       .then(r => r.json())
       .then(d => {
         // Exclude Tech Support from the filter list (already done in API, but double check)
@@ -88,7 +93,7 @@ export default function ClientesInactivos() {
         setEmpleados(activeSchedulable);
       });
     
-    fetch('/api/servicios')
+    authFetch('/api/servicios')
       .then(r => r.json())
       .then(d => setServicios(d.servicios || []));
   }, []);
@@ -109,7 +114,7 @@ export default function ClientesInactivos() {
         ...(empleadoId ? { empleadoId } : {})
       });
 
-      const res = await fetch(`/api/gestion/clientes-inactivos?${params}`);
+      const res = await authFetch(`/api/gestion/clientes-inactivos?${params}`);
       const data = await res.json();
       
       if (!res.ok) throw new Error(data.error || 'Error al obtener clientes inactivos');
@@ -142,19 +147,40 @@ export default function ClientesInactivos() {
 
   // 3. Send/Log reminder action
   const handleSendReminder = async (client: any, force = false) => {
+    const reminderParams = {
+      cliente_nombre: client.nombre,
+      cliente_telefono: client.telefonoRaw || client.telefono,
+      dias_inactividad: client.diasSinVisita,
+      ultimo_servicio: client.ultimoServicioNombre,
+      empleado_nombre: client.ultimoProfesionalNombre !== '—' ? client.ultimoProfesionalNombre : null
+    };
+    const waUrl = urlWhatsAppReactivacion(reminderParams);
+
+    if (!waUrl) {
+      toast.error('El cliente no tiene un número de WhatsApp válido.');
+      return;
+    }
+
+    // Abrir la pestaña dentro del gesto del usuario evita que el navegador móvil
+    // la bloquee mientras esperamos la respuesta de la API.
+    const whatsappWindow = window.open('', '_blank');
+    if (!whatsappWindow) {
+      toast.error('El navegador bloqueó WhatsApp. Permite las ventanas emergentes e inténtalo de nuevo.');
+      return;
+    }
+    whatsappWindow.opener = null;
+
     setSubmittingReminder(true);
     try {
-      // Build message content
-      const msg = `Hola ${client.nombre}, esperamos que estés muy bien.\n\nTe recordamos que ya han pasado ${client.diasSinVisita} días desde tu último servicio de ${client.ultimoServicioNombre} en HAIR STYLE Salon & Barber.\n\nSi deseas, podemos ayudarte a agendar nuevamente el mismo servicio o cualquier otro que necesites.\n\n¿Te gustaría programar una nueva cita?`;
+      const msg = mensajeReactivacion(reminderParams);
       
-      const res = await fetch(`/api/gestion/clientes-inactivos/recordatorio?forzar=${force}`, {
+      const res = await authFetch(`/api/gestion/clientes-inactivos/recordatorio?forzar=${force}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clienteId: client.id,
           message: msg,
-          channel: 'WHATSAPP',
-          status: 'SUCCESS'
+          channel: 'WHATSAPP'
         })
       });
 
@@ -163,6 +189,7 @@ export default function ClientesInactivos() {
       if (!res.ok) throw new Error(data.error || 'Error al registrar recordatorio');
 
       if (data.advertencia) {
+        whatsappWindow.close();
         // Show confirmation dialog before sending
         setWarningClient({ ...client, diasDesdeUltimo: data.diasDesdeUltimo });
         setSubmittingReminder(false);
@@ -172,24 +199,11 @@ export default function ClientesInactivos() {
       // Close warning modal if it was open
       setWarningClient(null);
 
-      // Trigger WhatsApp tab
-      const waUrl = urlWhatsAppReactivacion({
-        cliente_nombre: client.nombre,
-        cliente_telefono: client.telefonoRaw || client.telefono,
-        dias_inactividad: client.diasSinVisita,
-        ultimo_servicio: client.ultimoServicioNombre,
-        empleado_nombre: client.ultimoProfesionalNombre !== '—' ? client.ultimoProfesionalNombre : null
-      });
-
-      if (waUrl) {
-        window.open(waUrl, '_blank');
-      } else {
-        toast.error('El número del cliente no es válido o está incompleto.');
-      }
-
+      whatsappWindow.location.href = waUrl;
       toast.success('Recordatorio registrado y WhatsApp abierto');
-      fetchClientesInactivos(); // Refresh table & stats
+      await fetchClientesInactivos(); // Refresh table & stats
     } catch (err: any) {
+      whatsappWindow.close();
       toast.error(err.message || 'Error al enviar recordatorio');
     } finally {
       setSubmittingReminder(false);

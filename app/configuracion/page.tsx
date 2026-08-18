@@ -15,6 +15,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
+import { authFetch } from '@/lib/api-client';
 
 const TABS = [
   { id: 'negocio',     label: 'Negocio',      icon: Store, roles: ['ADMIN', 'TECH_SUPPORT'] },
@@ -93,7 +94,7 @@ export default function Configuracion() {
   const fetchDispositivos = async () => {
     setLoadingDispositivos(true);
     try {
-      const res = await fetch('/api/auth/dispositivos');
+      const res = await authFetch('/api/auth/dispositivos');
       if (res.ok) {
         const data = await res.json();
         setDispositivos(data);
@@ -107,7 +108,7 @@ export default function Configuracion() {
 
   const handleRevokeDevice = async (id: string) => {
     try {
-      const res = await fetch(`/api/auth/dispositivos?id=${id}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/auth/dispositivos?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Sesión revocada exitosamente');
         const revoked = dispositivos.find(d => d.id === id);
@@ -127,7 +128,7 @@ export default function Configuracion() {
   const handleRevokeAllDevices = async () => {
     if (!confirm('¿Estás seguro de que deseas cerrar sesión en todos los dispositivos?')) return;
     try {
-      const res = await fetch('/api/auth/dispositivos?all=true', { method: 'DELETE' });
+      const res = await authFetch('/api/auth/dispositivos?all=true', { method: 'DELETE' });
       if (res.ok) {
         toast.success('Todas las sesiones revocadas');
         window.location.href = '/login';
@@ -155,7 +156,7 @@ export default function Configuracion() {
 
   useEffect(() => {
     // Cargar la configuración general
-    fetch('/api/configuracion')
+    authFetch('/api/configuracion')
       .then(r => r.json())
       .then(d => {
         if (d.config) {
@@ -177,7 +178,7 @@ export default function Configuracion() {
         whatsapp: waConfig,
         apariencia,
       };
-      const res = await fetch('/api/configuracion', {
+      const res = await authFetch('/api/configuracion', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

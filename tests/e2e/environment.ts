@@ -16,7 +16,12 @@ export interface IsolatedE2EEnvironment {
 export function configureIsolatedE2EEnvironment(): IsolatedE2EEnvironment {
   loadEnv({ path: resolve(process.cwd(), '.env'), quiet: true });
   loadEnv({ path: resolve(process.cwd(), '.env.local'), override: true, quiet: true });
-  const applicationDatabaseUrl = process.env.DATABASE_URL;
+  const currentDatabaseUrl = process.env.DATABASE_URL;
+  const applicationDatabaseUrl =
+    process.env.APPLICATION_DATABASE_URL ||
+    (currentDatabaseUrl && currentDatabaseUrl !== process.env.E2E_DATABASE_URL
+      ? currentDatabaseUrl
+      : undefined);
   loadEnv({
     path: resolve(process.cwd(), '.env.e2e.local'),
     override: true,
@@ -39,6 +44,8 @@ export function configureIsolatedE2EEnvironment(): IsolatedE2EEnvironment {
   process.env.DISABLE_NOTIFICATIONS = 'true';
   process.env.DISABLE_REMINDER_JOBS = 'true';
   process.env.DISABLE_WHATSAPP = 'true';
+  process.env.SEED_ADMIN_EMAIL = 'admin.e2e@sistema.test';
+  process.env.SEED_ADMIN_PASSWORD = 'E2E-Only-Admin-Password-123!';
 
   const port = Number(process.env.E2E_PORT || 3100);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) {
@@ -58,6 +65,8 @@ export function configureIsolatedE2EEnvironment(): IsolatedE2EEnvironment {
       DISABLE_NOTIFICATIONS: 'true',
       DISABLE_REMINDER_JOBS: 'true',
       DISABLE_WHATSAPP: 'true',
+      SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL,
+      SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD,
     },
   };
 }
