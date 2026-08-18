@@ -86,3 +86,22 @@ npm run dev
 ```
 
 La aplicación se desplegará localmente en `http://localhost:3000`.
+
+## ☁️ Despliegue en Vercel con Neon
+
+La integración Neon-Vercel configura `DATABASE_URL` automáticamente. `JWT_SECRET` no forma parte de esa integración: debe existir en los entornos **Production** y **Preview** de Vercel para que las rutas protegidas funcionen.
+
+Este repositorio ahora conserva las migraciones de Prisma. Antes de activar la ejecución automática de migraciones en una base de datos de Neon que ya contiene datos, se debe registrar la migración inicial como ya aplicada. Esto registra el estado en el historial de Prisma sin modificar las tablas de la aplicación:
+
+```bash
+npx vercel@latest link
+npx vercel@latest env run -e production -- npm run db:baseline
+```
+
+Después, configure el **Build Command** de Vercel como:
+
+```bash
+npm run build:vercel
+```
+
+`build:vercel` aplica las migraciones pendientes antes de compilar. Para bases de datos nuevas no se ejecuta el paso de línea base: el primer despliegue aplicará la migración inicial automáticamente.

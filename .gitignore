@@ -42,6 +42,7 @@ pnpm-debug.log*
 
 # Database and local backups
 *.sql
+!prisma/migrations/**/migration.sql
 *.backup
 *.sql.bak
 *.bak
@@ -74,3 +75,5 @@ tasks/
 playwright-report/
 test-results/
 *.trace.zip
+.vercel
+.env*
