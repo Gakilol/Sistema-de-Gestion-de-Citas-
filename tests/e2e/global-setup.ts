@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import {
@@ -7,16 +8,16 @@ import {
 } from './database-safety';
 
 function runPrisma(args: string[]) {
-  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const result = spawnSync(command, ['prisma', ...args], {
+  const prismaCli = resolve(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
+  const result = spawnSync(process.execPath, [prismaCli, ...args], {
     cwd: process.cwd(),
     env: process.env,
     stdio: 'inherit',
-    shell: process.platform === 'win32',
   });
 
   if (result.status !== 0) {
-    throw new Error(`Falló "prisma ${args.join(' ')}" para la base E2E.`);
+    const detail = result.error ? `: ${result.error.message}` : '';
+    throw new Error(`Falló "prisma ${args.join(' ')}" para la base E2E${detail}.`);
   }
 }
 
@@ -106,7 +107,9 @@ export default async function globalSetup() {
   }
 
   console.log(`Preparando base E2E aislada: ${identity.host}/${identity.database}`);
-  runPrisma(['migrate', 'deploy']);
+  // El repositorio no mantiene migraciones históricas. En una base validada como
+  // E2E, db push crea el esquema actual sin depender de producción.
+  runPrisma(['db', 'push', '--skip-generate']);
   runPrisma(['db', 'seed']);
   await seedResponsiveTestData();
 }

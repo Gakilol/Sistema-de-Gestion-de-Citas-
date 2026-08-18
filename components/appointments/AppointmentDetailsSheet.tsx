@@ -30,6 +30,7 @@ import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/l
 import { buildSharePayload } from '@/lib/calendar-share';
 import { toast } from 'sonner';
 import type { CalendarAppointment, CalendarUser } from './appointment-calendar-types';
+import { authFetch } from '@/lib/api-client';
 
 const ESTADOS_BLOQUEADOS = ['CANCELADA'];
 
@@ -85,7 +86,7 @@ export function AppointmentDetailsSheet({
     }
     setEnviando(true);
     try {
-      const res = await fetch(`/api/citas/${cita.id}/calendario`);
+      const res = await authFetch(`/api/citas/${cita.id}/calendario`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -117,7 +118,7 @@ export function AppointmentDetailsSheet({
     try {
       let textoACopiar = mensajeBase;
       if (cita?.id) {
-        const res = await fetch(`/api/citas/${cita.id}/calendario`);
+        const res = await authFetch(`/api/citas/${cita.id}/calendario`);
         if (res.ok) {
           const data = await res.json();
           if (data.mensaje) textoACopiar = data.mensaje;

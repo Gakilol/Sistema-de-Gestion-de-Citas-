@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
+import { authFetch } from '@/lib/api-client';
 
 const TIME_OPTIONS = Array.from({ length: 96 }).map((_, i) => {
   const h = Math.floor(i / 4);
@@ -86,16 +87,16 @@ export default function HorariosEmpleado() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res  = await fetch(`/api/empleados/${id}`);
+        const res  = await authFetch(`/api/empleados/${id}`);
         const data = await res.json();
         if (!res.ok) throw new Error();
         setEmpleado(data.empleado);
         if (data.empleado.horario) setHorario(data.empleado.horario);
 
         const [dR, bR, vR] = await Promise.all([
-          fetch(`/api/empleados/${id}/descansos`),
-          fetch(`/api/empleados/${id}/bloqueos`),
-          fetch(`/api/empleados/${id}/vacaciones`),
+          authFetch(`/api/empleados/${id}/descansos`),
+          authFetch(`/api/empleados/${id}/bloqueos`),
+          authFetch(`/api/empleados/${id}/vacaciones`),
         ]);
         if (dR.ok) { const d = await dR.json(); setDescansos(d.descansos ?? []); }
         if (bR.ok) { const d = await bR.json(); setBloqueos(d.bloqueos ?? []); }
@@ -126,7 +127,7 @@ export default function HorariosEmpleado() {
   const saveHorario = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/empleados/${id}`, {
+      const res = await authFetch(`/api/empleados/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ horario }),
@@ -145,7 +146,7 @@ export default function HorariosEmpleado() {
   const saveDescansos = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/empleados/${id}/descansos`, {
+      const res = await authFetch(`/api/empleados/${id}/descansos`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ descansos }),
@@ -164,7 +165,7 @@ export default function HorariosEmpleado() {
   const saveBloqueos = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/empleados/${id}/bloqueos`, {
+      const res = await authFetch(`/api/empleados/${id}/bloqueos`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bloqueos }),
@@ -183,7 +184,7 @@ export default function HorariosEmpleado() {
   const saveVacaciones = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/empleados/${id}/vacaciones`, {
+      const res = await authFetch(`/api/empleados/${id}/vacaciones`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vacaciones }),

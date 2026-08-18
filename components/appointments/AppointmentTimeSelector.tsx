@@ -12,6 +12,7 @@ import {
   formatTime12Hour,
   resolveAutoPeriod,
 } from '@/lib/time-utils';
+import { authFetch } from '@/lib/api-client';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function AppointmentTimeSelector({
         if (duracionTotal) query.append('duracion_total', duracionTotal.toString());
         if (excludeCitaId) query.append('exclude_cita_id', excludeCitaId);
 
-        const res = await fetch(`/api/empleados/${empleadoId}/disponibilidad?${query.toString()}`);
+        const res = await authFetch(`/api/empleados/${empleadoId}/disponibilidad?${query.toString()}`);
         const data = await res.json();
 
         if (!res.ok) {

@@ -9,6 +9,7 @@ import { formatTime12Hour } from '@/lib/time-utils';
 import { calcularFinCita } from '@/lib/calendar-event';
 import { toast } from 'sonner';
 import type { CalendarAppointment } from './appointment-calendar-types';
+import { authFetch } from '@/lib/api-client';
 
 interface AppointmentCreatedConfirmationProps {
   cita: CalendarAppointment | null;
@@ -43,7 +44,7 @@ export function AppointmentCreatedConfirmation({ cita, open, onClose, onEdit }: 
   const estado = cita.estado === 'CONFIRMADA' ? 'CONFIRMADA' : 'AGENDADA';
 
   const loadCalendarActions = async (): Promise<CalendarActions | null> => {
-    const response = await fetch(`/api/citas/${cita.id}/calendario`);
+    const response = await authFetch(`/api/citas/${cita.id}/calendario`);
     const data = await response.json();
     if (!response.ok) {
       toast.error(data.error || 'No se pudo preparar el calendario');

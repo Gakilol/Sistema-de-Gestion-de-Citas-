@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { authFetch } from '@/lib/api-client';
 
 const emptyForm = { nombre: '', descripcion: '', duracion: '', categoria_id: '' };
 
@@ -28,7 +29,7 @@ export default function Servicios() {
       return;
     }
     try {
-      const res = await fetch(`/api/servicios/${serv.id}`, {
+      const res = await authFetch(`/api/servicios/${serv.id}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -44,7 +45,7 @@ export default function Servicios() {
 
   const fetchServicios = async () => {
     try {
-      const res = await fetch('/api/servicios');
+      const res = await authFetch('/api/servicios');
       const data = await res.json();
       if (res.ok) setServicios(data.servicios || []);
     } catch {
@@ -56,7 +57,7 @@ export default function Servicios() {
 
   const fetchCategorias = async () => {
     try {
-      const res = await fetch('/api/categorias');
+      const res = await authFetch('/api/categorias');
       const data = await res.json();
       if (res.ok) setCategorias(data.categorias || []);
     } catch {
@@ -89,7 +90,7 @@ export default function Servicios() {
   const toggleActivo = async (serv: any) => {
     setServicios(ss => ss.map(s => s.id === serv.id ? { ...s, activo: !serv.activo } : s));
     try {
-      const res = await fetch(`/api/servicios/${serv.id}`, {
+      const res = await authFetch(`/api/servicios/${serv.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activo: !serv.activo }),
@@ -113,7 +114,7 @@ export default function Servicios() {
     try {
       const url = editingId ? `/api/servicios/${editingId}` : '/api/servicios';
       const meth = editingId ? 'PATCH' : 'POST';
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method: meth,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

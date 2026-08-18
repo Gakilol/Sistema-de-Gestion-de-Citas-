@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { authFetch } from '@/lib/api-client';
 
 const emptyForm = { nombre:'',correo:'',telefono:'',password:'',especialidad:'',tituloCliente:'',rol:'EMPLEADO' };
 
@@ -39,7 +40,7 @@ export default function Empleados() {
       return;
     }
     try {
-      const res = await fetch(`/api/empleados/${emp.id}`, {
+      const res = await authFetch(`/api/empleados/${emp.id}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -55,7 +56,7 @@ export default function Empleados() {
 
   const fetchEmpleados = async () => {
     try {
-      const res  = await fetch('/api/empleados');
+      const res  = await authFetch('/api/empleados');
       const data = await res.json();
       if (res.ok) setEmpleados(data.empleados||[]);
     } catch { toast.error('Error al cargar empleados'); }
@@ -74,7 +75,7 @@ export default function Empleados() {
     const prev = emp.activo;
     setEmpleados(es=>es.map(e=>e.id===emp.id?{...e,activo:!prev}:e));
     try {
-      const res = await fetch(`/api/empleados/${emp.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({activo:!prev})});
+      const res = await authFetch(`/api/empleados/${emp.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({activo:!prev})});
       if (!res.ok) throw new Error();
       toast.success(prev?'Empleado desactivado':'Empleado activado');
     } catch { fetchEmpleados(); toast.error('Error al cambiar estado'); }
@@ -91,7 +92,7 @@ export default function Empleados() {
 
       const url  = editingId ? `/api/empleados/${editingId}` : '/api/empleados';
       const meth = editingId ? 'PATCH' : 'POST';
-      const res  = await fetch(url,{method:meth,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const res  = await authFetch(url,{method:meth,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if (!res.ok) {
         const d = await res.json();
         if (d.detalles) {

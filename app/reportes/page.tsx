@@ -18,6 +18,7 @@ import {
   UserX, Star, Briefcase, Activity, RefreshCw, ChevronDown,
   CheckCircle, XCircle, AlertTriangle, Info,
 } from 'lucide-react';
+import { authFetch } from '@/lib/api-client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'resumen' | 'demanda' | 'asistencia' | 'cancelaciones' | 'clientes' | 'fidelizacion' | 'profesionales';
@@ -216,8 +217,8 @@ function ReportesContent() {
 
   // ── Load filter options
   useEffect(() => {
-    fetch('/api/empleados').then(r => r.json()).then(d => setEmpleados(d.empleados || []));
-    fetch('/api/servicios').then(r => r.json()).then(d => setServicios(d.servicios || []));
+    authFetch('/api/empleados').then(r => r.json()).then(d => setEmpleados(d.empleados || []));
+    authFetch('/api/servicios').then(r => r.json()).then(d => setServicios(d.servicios || []));
   }, []);
 
   const buildUrl = useCallback((currentTab: Tab) => {
@@ -245,7 +246,7 @@ function ReportesContent() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(buildUrl(currentTab), { signal: abortRef.current.signal });
+      const res  = await authFetch(buildUrl(currentTab), { signal: abortRef.current.signal });
       const json = await res.json();
       if (!res.ok) { setError(json.error || 'Error al cargar datos'); return; }
       setData(json);
