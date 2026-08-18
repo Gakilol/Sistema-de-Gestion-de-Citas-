@@ -5,6 +5,7 @@ import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { checkLoginRateLimit } from '@/lib/audit/rate-limiter';
 import { prisma } from '@/lib/db';
 import { cleanupRememberedDevicesForUser, generateRememberToken, hashRememberToken, parseUserAgent } from '@/lib/remember-device';
+import { ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS } from '@/lib/jwt';
 
 // ─── Schema de validación Zod ────────────────────────────────────────────────
 const LoginInputSchema = z.object({
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24, // 24 horas
+      maxAge: ACCESS_TOKEN_TTL_SECONDS,
       path: '/',
     });
 
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 7, // 7 días
+      maxAge: REFRESH_TOKEN_TTL_SECONDS,
       path: '/api/auth/refresh',
     });
 

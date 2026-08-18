@@ -2,7 +2,11 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { parseLocalDateToUTC } from '@/lib/timezone';
-import { getUserContext, getScopedAppointmentWhere } from '@/lib/auth-helpers';
+import {
+  getDefaultAppointmentScope,
+  getUserContext,
+  getScopedAppointmentWhere,
+} from '@/lib/auth-helpers';
 
 const ServicioSeleccionadoSchema = z.object({
   id: z.string().uuid(),
@@ -42,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     const estado   = req.nextUrl.searchParams.get('estado') || '';
     const busqueda = req.nextUrl.searchParams.get('q') || '';
-    const scope    = req.nextUrl.searchParams.get('scope') || (userRole === 'ADMIN' ? 'all' : 'mine');
+    const scope    = req.nextUrl.searchParams.get('scope') || getDefaultAppointmentScope(userRole);
     const filterEmp = req.nextUrl.searchParams.get('empleado_id') || '';
     const from = req.nextUrl.searchParams.get('from');
     const to = req.nextUrl.searchParams.get('to');

@@ -8,6 +8,9 @@ export interface CustomJWTPayload extends JWTPayload {
   rol: string;
 }
 
+export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24;
+export const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+
 function requireSecret(secret: string | null, name: string): string {
   if (!secret) throw new Error(`${name}_NOT_CONFIGURED`);
   return secret;
@@ -20,7 +23,7 @@ export const signToken = async (payload: CustomJWTPayload): Promise<string> => {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('24h')
+    .setExpirationTime(`${ACCESS_TOKEN_TTL_SECONDS}s`)
     .sign(getJwtSecretKey(secret));
 };
 
@@ -29,7 +32,7 @@ export const signRefreshToken = async (payload: { id: string }): Promise<string>
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(`${REFRESH_TOKEN_TTL_SECONDS}s`)
     .sign(getJwtSecretKey(secret));
 };
 
