@@ -68,6 +68,8 @@ skills-lock.json
 *.md
 **/*.md
 !README.md
+!.interface-design/
+!.interface-design/system.md
 tasks/
 
 # Test artifacts

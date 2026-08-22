@@ -1,24 +1,18 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from 'next-themes'
 import { AuthProvider } from '@/components/providers/auth-provider'
+import { BRAND } from '@/lib/brand'
 import './globals.css'
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: {
-    template: '%s — HAIR STYLE Salón & Barber',
-    default: 'HAIR STYLE Salón & Barber — Sistema de Gestión',
+    template: `%s — ${BRAND.productName}`,
+    default: `${BRAND.productName} — ${BRAND.businessName}`,
   },
   description:
-    'Plataforma de gestión profesional para HAIR STYLE Salón & Barber. Citas, clientes, empleados y reportes en un solo lugar.',
+    `Agenda y gestión profesional para ${BRAND.businessName} ${BRAND.descriptor}.`,
   keywords: ['barbería', 'salón', 'gestión de citas', 'barbero', 'estilista'],
   authors: [{ name: 'HAIR STYLE Salón & Barber' }],
   icons: {
@@ -36,7 +30,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es" suppressHydrationWarning className="h-full">
-      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground h-full`}>
+      <body className="h-full bg-background font-sans text-foreground antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
