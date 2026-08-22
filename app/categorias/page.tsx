@@ -11,6 +11,8 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api-client';
+import { PageHeader } from '@/components/shared/page-header';
+import { getErrorMessage } from '@/lib/errors';
 
 const emptyForm = { nombre: '', color: '#6366f1', orden: '0', activo: true };
 
@@ -27,15 +29,23 @@ const PRESET_COLORS = [
   '#64748b', // Slate
 ];
 
+interface ServiceCategory {
+  id: string;
+  nombre: string;
+  color?: string | null;
+  orden: number;
+  activo: boolean;
+}
+
 export default function Categorias() {
   const { user } = useAuth();
   const router = useRouter();
   
-  const [categorias, setCategorias] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<ServiceCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<any>(emptyForm);
+  const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   
   // Filtros
@@ -73,7 +83,7 @@ export default function Categorias() {
     setShowModal(true);
   };
 
-  const openEdit = (cat: any) => {
+  const openEdit = (cat: ServiceCategory) => {
     setForm({
       nombre: cat.nombre,
       color: cat.color || '#6366f1',
@@ -84,7 +94,7 @@ export default function Categorias() {
     setShowModal(true);
   };
 
-  const toggleActivo = async (cat: any) => {
+  const toggleActivo = async (cat: ServiceCategory) => {
     // Optimistic UI update
     setCategorias(prev => prev.map(c => c.id === cat.id ? { ...c, activo: !cat.activo } : c));
     try {
@@ -99,13 +109,13 @@ export default function Categorias() {
       }
       toast.success(cat.activo ? 'Categoría desactivada' : 'Categoría activada');
       fetchCategorias();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al actualizar categoría');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al actualizar categoría'));
       fetchCategorias(); // rollback
     }
   };
 
-  const handleEliminarCategoria = async (cat: any) => {
+  const handleEliminarCategoria = async (cat: ServiceCategory) => {
     if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente la categoría "${cat.nombre}"?`)) {
       return;
     }
@@ -119,8 +129,8 @@ export default function Categorias() {
       }
       toast.success('Categoría eliminada exitosamente');
       fetchCategorias();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar la categoría');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al eliminar la categoría'));
     }
   };
 
@@ -142,10 +152,7 @@ export default function Categorias() {
       const meth = editingId ? 'PATCH' : 'POST';
       const res = await authFetch(url, {
         method: meth,
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-role': 'ADMIN'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const d = await res.json();
@@ -155,8 +162,8 @@ export default function Categorias() {
       toast.success(editingId ? 'Categoría actualizada exitosamente' : 'Categoría creada exitosamente');
       setShowModal(false);
       fetchCategorias();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al guardar');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al guardar'));
     } finally {
       setSaving(false);
     }
@@ -214,18 +221,16 @@ export default function Categorias() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page space-y-5 page-enter">
           
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Categorías de Servicios</h1>
-              <p className="text-sm text-muted-foreground">
-                {categorias.filter(c => c.activo).length} activas de {categorias.length} en total
-              </p>
-            </div>
-            <Button onClick={openCreate} className="gap-2 glow-gold shrink-0 px-3.5 sm:px-4">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva categoría</span><span className="sm:hidden">Nueva</span>
-            </Button>
-          </div>
+          <PageHeader
+            eyebrow="Organización del menú"
+            title="Categorías de servicios"
+            description={`${categorias.filter(c => c.activo).length} activas de ${categorias.length} registradas`}
+            actions={(
+              <Button onClick={openCreate} className="gap-2 px-3.5 sm:px-4">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva categoría</span><span className="sm:hidden">Nueva</span>
+              </Button>
+            )}
+          />
 
           {/* Buscador y Filtros */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -265,17 +270,14 @@ export default function Categorias() {
             </div>
           ) : filteredCategorias.length === 0 ? (
             <div className="empty-state surface-panel text-muted-foreground">
-              <Layers className="w-10 h-10 mx-auto mb-3 opacity-20 animate-bounce" />
+              <Layers className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p className="font-medium text-sm">No se encontraron categorías</p>
               <p className="text-xs text-muted-foreground mt-1">Intenta ajustando el filtro de búsqueda o crea una nueva.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredCategorias.map(cat => {
-                const glassStyle = {
-                  backgroundColor: cat.color ? `${cat.color}12` : '#6366f112',
-                  borderColor: cat.color ? `${cat.color}25` : '#6366f125',
-                };
+                const glassStyle = { borderColor: cat.color ? `${cat.color}45` : 'hsl(var(--border))' };
                 const badgeStyle = {
                   backgroundColor: cat.color ? `${cat.color}20` : '#6366f120',
                   color: cat.color || '#6366f1',
@@ -286,10 +288,11 @@ export default function Categorias() {
                     key={cat.id} 
                     style={glassStyle}
                     className={cn(
-                      'rounded-xl border p-5 transition-all duration-300 hover-lift flex flex-col justify-between backdrop-blur-[2px]',
+                      'surface-panel relative flex flex-col justify-between overflow-hidden p-5',
                       !cat.activo && 'opacity-65 border-border bg-card'
                     )}
                   >
+                    <span className="absolute inset-y-4 left-0 w-px" style={{ backgroundColor: cat.color || 'hsl(var(--primary))' }} />
                     <div>
                       {/* Name & Active Badge */}
                       <div className="flex items-start justify-between mb-4">

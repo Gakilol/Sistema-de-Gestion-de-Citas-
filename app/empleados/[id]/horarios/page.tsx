@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { authFetch } from '@/lib/api-client';
+import { PageHeader } from '@/components/shared/page-header';
 
 const TIME_OPTIONS = Array.from({ length: 96 }).map((_, i) => {
   const h = Math.floor(i / 4);
@@ -38,6 +39,8 @@ type HorarioSemana = Record<string, Turno[]>;
 interface Descanso { id?: string; dia_semana: number; hora_inicio: string; hora_fin: string }
 interface Bloqueo  { id?: string; fecha: string; hora_inicio: string; hora_fin: string; motivo: string }
 interface Vacacion { id?: string; fecha_inicio: string; fecha_fin: string; estado: string }
+interface ScheduleEmployee { id: string; nombre: string; especialidad?: string | null; horario?: HorarioSemana | null }
+type ScheduleTab = 'horario' | 'descansos' | 'bloqueos' | 'vacaciones';
 
 const defaultHorario: HorarioSemana = {
   lunes: [{ inicio: '08:00', fin: '17:00' }],
@@ -70,14 +73,14 @@ export default function HorariosEmpleado() {
   const router  = useRouter();
   const id      = params.id as string;
 
-  const [empleado, setEmpleado]     = useState<any>(null);
+  const [empleado, setEmpleado]     = useState<ScheduleEmployee | null>(null);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [saved, setSaved]           = useState(false);
   const [savedDescansos, setSavedDescansos] = useState(false);
   const [savedBloqueos, setSavedBloqueos]   = useState(false);
   const [savedVacaciones, setSavedVacaciones] = useState(false);
-  const [tab, setTab]               = useState<'horario'|'descansos'|'bloqueos'|'vacaciones'>('horario');
+  const [tab, setTab]               = useState<ScheduleTab>('horario');
 
   const [horario, setHorario]       = useState<HorarioSemana>(defaultHorario);
   const [descansos, setDescansos]   = useState<Descanso[]>([]);
@@ -115,12 +118,12 @@ export default function HorariosEmpleado() {
     setHorario(h => ({ ...h, [dia]: [...(h[dia] ?? []), { inicio: '08:00', fin: '17:00' }] }));
 
   const removeTurno = (dia: string, idx: number) =>
-    setHorario(h => ({ ...h, [dia]: h[dia].filter((_:any, i:number) => i !== idx) }));
+    setHorario(h => ({ ...h, [dia]: h[dia].filter((_, i) => i !== idx) }));
 
   const updateTurno = (dia: string, idx: number, field: 'inicio'|'fin', val: string) =>
     setHorario(h => ({
       ...h,
-      [dia]: h[dia].map((t:Turno, i:number) => i === idx ? { ...t, [field]: val } : t),
+      [dia]: h[dia].map((t, i) => i === idx ? { ...t, [field]: val } : t),
     }));
 
   // ── Guardar horario ─────────────────────────────────────────────────
@@ -200,6 +203,14 @@ export default function HorariosEmpleado() {
     }
   };
 
+  const saveConfig: Record<ScheduleTab, { action: () => Promise<void>; saved: boolean }> = {
+    horario: { action: saveHorario, saved },
+    descansos: { action: saveDescansos, saved: savedDescansos },
+    bloqueos: { action: saveBloqueos, saved: savedBloqueos },
+    vacaciones: { action: saveVacaciones, saved: savedVacaciones },
+  };
+  const currentSave = saveConfig[tab];
+
   if (loading) {
     return (
       <div className="flex min-h-screen bg-background">
@@ -220,52 +231,35 @@ export default function HorariosEmpleado() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page !max-w-3xl space-y-5 page-enter">
 
-          {/* Header */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-2 sm:gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.push('/empleados')} className="shrink-0" aria-label="Volver a personal">
               <ArrowLeft className="w-4 h-4"/>
             </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="page-heading text-foreground">Horarios — {empleado?.nombre}</h1>
-              <p className="text-sm text-muted-foreground">{empleado?.especialidad || 'General'}</p>
-            </div>
-            {tab === 'horario' && (
-              <Button onClick={saveHorario} disabled={saving} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
-                {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                <span className="hidden sm:inline">{saved ? 'Guardado' : 'Guardar'}</span>
-              </Button>
-            )}
-            {tab === 'descansos' && (
-              <Button onClick={saveDescansos} disabled={saving} className={cn('gap-1.5', savedDescansos ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
-                {savedDescansos ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                <span className="hidden sm:inline">{savedDescansos ? 'Guardado' : 'Guardar'}</span>
-              </Button>
-            )}
-            {tab === 'bloqueos' && (
-              <Button onClick={saveBloqueos} disabled={saving} className={cn('gap-1.5', savedBloqueos ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
-                {savedBloqueos ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                <span className="hidden sm:inline">{savedBloqueos ? 'Guardado' : 'Guardar'}</span>
-              </Button>
-            )}
-            {tab === 'vacaciones' && (
-              <Button onClick={saveVacaciones} disabled={saving} className={cn('gap-1.5', savedVacaciones ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
-                {savedVacaciones ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                <span className="hidden sm:inline">{savedVacaciones ? 'Guardado' : 'Guardar'}</span>
-              </Button>
-            )}
+            <PageHeader
+              className="min-w-0 flex-1"
+              eyebrow="Disponibilidad del equipo"
+              title={<>Horarios — {empleado?.nombre}</>}
+              description={empleado?.especialidad || 'Especialidad general'}
+              actions={(
+                <Button onClick={currentSave.action} disabled={saving} className={cn('gap-1.5', currentSave.saved && 'bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]')}>
+                  {currentSave.saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
+                  <span className="hidden sm:inline">{currentSave.saved ? 'Guardado' : 'Guardar'}</span>
+                </Button>
+              )}
+            />
           </div>
 
           {/* Sub-tabs */}
-          <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl w-full sm:w-fit overflow-x-auto no-scrollbar">
+          <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1 no-scrollbar sm:w-fit">
             {[
               { id: 'horario',    label: 'Horario semanal', icon: Clock },
               { id: 'descansos',  label: 'Descansos',       icon: Clock },
               { id: 'bloqueos',   label: 'Bloqueos',        icon: ShieldX },
               { id: 'vacaciones', label: 'Vacaciones',      icon: Calendar },
             ].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id as any)}
-                className={cn('flex shrink-0 items-center gap-1.5 min-h-10 px-3 py-2 rounded-lg text-xs font-medium transition-all',
-                  tab === t.id ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+              <button key={t.id} onClick={() => setTab(t.id as ScheduleTab)}
+                className={cn('relative flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
+                  tab === t.id ? 'bg-card text-foreground shadow-sm ring-1 ring-border/70 after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-primary' : 'text-muted-foreground hover:bg-card/50 hover:text-foreground')}>
                 <t.icon className="w-3 h-3"/>{t.label}
               </button>
             ))}

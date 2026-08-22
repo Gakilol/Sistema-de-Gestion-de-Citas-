@@ -10,21 +10,39 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/errors';
+import { PageHeader } from '@/components/shared/page-header';
 
 const emptyForm = { nombre: '', descripcion: '', duracion: '', categoria_id: '' };
 
+interface ServiceCategory {
+  id: string;
+  nombre: string;
+  color?: string | null;
+}
+
+interface CatalogService {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  duracion: number;
+  activo: boolean;
+  categoria_id?: string | null;
+  categoriaRel?: ServiceCategory | null;
+}
+
 export default function Servicios() {
   const { user } = useAuth();
-  const [servicios, setServicios]   = useState<any[]>([]);
+  const [servicios, setServicios]   = useState<CatalogService[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [showModal, setShowModal]   = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
-  const [form, setForm]             = useState<any>(emptyForm);
+  const [form, setForm]             = useState(emptyForm);
   const [saving, setSaving]         = useState(false);
   const [tabCat, setTabCat]         = useState('Todos');
-  const [categorias, setCategorias] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<ServiceCategory[]>([]);
 
-  const handleEliminarServicio = async (serv: any) => {
+  const handleEliminarServicio = async (serv: CatalogService) => {
     if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el servicio "${serv.nombre}"? Esto también eliminará todas las citas asociadas a él.`)) {
       return;
     }
@@ -38,8 +56,8 @@ export default function Servicios() {
       }
       toast.success('Servicio eliminado exitosamente');
       fetchServicios();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar el servicio');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al eliminar el servicio'));
     }
   };
 
@@ -76,7 +94,7 @@ export default function Servicios() {
     setShowModal(true);
   };
 
-  const openEdit = (s: any) => {
+  const openEdit = (s: CatalogService) => {
     setForm({
       nombre: s.nombre,
       descripcion: s.descripcion || '',
@@ -87,7 +105,7 @@ export default function Servicios() {
     setShowModal(true);
   };
 
-  const toggleActivo = async (serv: any) => {
+  const toggleActivo = async (serv: CatalogService) => {
     setServicios(ss => ss.map(s => s.id === serv.id ? { ...s, activo: !serv.activo } : s));
     try {
       const res = await authFetch(`/api/servicios/${serv.id}`, {
@@ -126,8 +144,8 @@ export default function Servicios() {
       toast.success(editingId ? 'Servicio actualizado' : 'Servicio creado');
       setShowModal(false);
       fetchServicios();
-    } catch (err: any) {
-      toast.error(err.message || 'Error');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al guardar el servicio'));
     } finally {
       setSaving(false);
     }
@@ -144,15 +162,16 @@ export default function Servicios() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page space-y-5 page-enter">
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Catálogo de Servicios</h1>
-              <p className="text-sm text-muted-foreground">{servicios.filter(s => s.activo).length} activos de {servicios.length}</p>
-            </div>
-            <Button onClick={openCreate} className="gap-2 glow-gold shrink-0 px-3.5 sm:px-4">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuevo servicio</span><span className="sm:hidden">Nuevo</span>
-            </Button>
-          </div>
+          <PageHeader
+            eyebrow="Menú del salón"
+            title="Catálogo de servicios"
+            description={`${servicios.filter(s => s.activo).length} activos de ${servicios.length} registrados`}
+            actions={(
+              <Button onClick={openCreate} className="gap-2 px-3.5 sm:px-4">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuevo servicio</span><span className="sm:hidden">Nuevo</span>
+              </Button>
+            )}
+          />
 
           {/* Tabs por categoría */}
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -161,8 +180,10 @@ export default function Servicios() {
                 key={c}
                 onClick={() => setTabCat(c)}
                 className={cn(
-                  'shrink-0 min-h-10 px-3 py-1.5 rounded-full text-xs font-medium transition-all border',
-                  tabCat === c ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:text-foreground'
+                  'relative min-h-10 shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors',
+                  tabCat === c
+                    ? 'border-primary/30 bg-primary/10 text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-primary'
+                    : 'border-border bg-card text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
                 )}
               >
                 {c}
@@ -189,7 +210,8 @@ export default function Servicios() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filtered.map(serv => (
-                <div key={serv.id} className={cn('surface-panel p-4 sm:p-5 hover-lift transition-all flex flex-col justify-between', !serv.activo && 'opacity-60')}>
+                <div key={serv.id} className={cn('surface-panel relative flex flex-col justify-between overflow-hidden p-4 sm:p-5', !serv.activo && 'opacity-60')}>
+                  <span className="absolute inset-y-4 left-0 w-px" style={{ backgroundColor: serv.categoriaRel?.color || 'hsl(var(--primary))' }} />
                   <div>
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -207,7 +229,7 @@ export default function Servicios() {
                       </button>
                     </div>
 
-                    <div className="bg-secondary/50 rounded-lg p-2.5 flex items-center justify-center mb-3">
+                    <div className="mb-3 flex items-center justify-start rounded-lg border border-border/50 bg-secondary/35 p-2.5">
                       <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
                         <Clock className="w-3.5 h-3.5" />
                         <span className="text-xs font-semibold">{serv.duracion} min</span>
