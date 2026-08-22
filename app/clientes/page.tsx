@@ -382,7 +382,7 @@ function AgregarClienteModal({ onClose, onCreated }: { onClose: () => void; onCr
           </p>
           <div className="sticky bottom-0 flex justify-end gap-2 pt-3 pb-1 border-t border-border/50 bg-card shrink-0">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Cancelar</Button>
-            <Button type="submit" disabled={saving} className="glow-gold flex-1 sm:flex-none">
+            <Button type="submit" disabled={saving} className="flex-1 sm:flex-none">
               {saving ? 'Guardando...' : 'Registrar Cliente'}
             </Button>
           </div>
@@ -482,7 +482,7 @@ function EditarClienteModal({ cliente, onClose, onUpdated }: { cliente: Cliente;
           </div>
           <div className="sticky bottom-0 flex justify-end gap-2 pt-3 pb-1 border-t border-border/50 bg-card shrink-0">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Cancelar</Button>
-            <Button type="submit" disabled={saving} className="glow-gold flex-1 sm:flex-none">
+            <Button type="submit" disabled={saving} className="flex-1 sm:flex-none">
               {saving ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>

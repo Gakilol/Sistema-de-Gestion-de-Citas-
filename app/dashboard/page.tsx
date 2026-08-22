@@ -405,7 +405,7 @@ export default function Dashboard() {
               <div className="divide-y divide-border/50">
                 {actividad.slice(0, 6).map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-primary">
+                    <div className="flex size-7 flex-shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[10px] font-bold text-primary">
                       {item.cliente_nombre.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">

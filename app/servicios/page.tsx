@@ -313,7 +313,7 @@ export default function Servicios() {
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-                <Button type="submit" disabled={saving} className="glow-gold">
+                <Button type="submit" disabled={saving}>
                   {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Servicio')}
                 </Button>
               </div>

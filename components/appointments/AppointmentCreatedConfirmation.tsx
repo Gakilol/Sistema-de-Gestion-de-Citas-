@@ -91,7 +91,7 @@ export function AppointmentCreatedConfirmation({ cita, open, onClose, onEdit }: 
                 </span>
               </DrawerDescription>
             </div>
-            <Button variant="ghost" size="icon" className="size-11 shrink-0" onClick={onClose} aria-label="Cerrar confirmaciÃ³n">
+            <Button variant="ghost" size="icon" className="size-11 shrink-0" onClick={onClose} aria-label="Cerrar confirmación">
               <X />
             </Button>
           </div>

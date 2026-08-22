@@ -301,7 +301,7 @@ function ReportesContent() {
             <p className="text-sm text-muted-foreground">
               El módulo de Reportes y Analítica está disponible únicamente para roles de Administrador y Soporte Técnico.
             </p>
-            <Button onClick={() => router.push('/dashboard')} className="w-full glow-gold">
+            <Button onClick={() => router.push('/dashboard')} className="w-full">
               Volver al Dashboard
             </Button>
           </Card>
@@ -336,7 +336,7 @@ function ReportesContent() {
         </div>
 
         {kpis.empleadoTop && kpis.empleadoTop !== 'N/A' && (
-          <Card className="p-4 border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
+          <Card className="border-primary/20 bg-primary/5 p-4">
             <p className="text-xs text-muted-foreground mb-1">Profesional con más citas completadas</p>
             <p className="text-lg font-bold text-primary">{kpis.empleadoTop}</p>
           </Card>
@@ -360,7 +360,7 @@ function ReportesContent() {
                   <XAxis dataKey="dia" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTip />} />
-                  <Bar dataKey="total" name="Citas" fill="#d4a017" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                  <Bar dataKey="total" name="Citas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} maxBarSize={50} />
                 </BarChart>
               </ResponsiveContainer>
             ) : <EmptyState />}
@@ -653,7 +653,7 @@ function ReportesContent() {
     const { resumen, distribucionFrecuencia, tasaRetorno, topClientes } = data;
     const freqData = [
       { name: 'Frecuente (< 30d)',  value: distribucionFrecuencia?.frecuente  || 0, color: '#10b981' },
-      { name: 'Regular (30-90d)',   value: distribucionFrecuencia?.regular    || 0, color: '#d4a017' },
+      { name: 'Regular (30-90d)',   value: distribucionFrecuencia?.regular    || 0, color: 'hsl(var(--chart-1))' },
       { name: 'En riesgo (> 90d)',  value: distribucionFrecuencia?.enRiesgo   || 0, color: '#ef4444' },
     ];
     return (

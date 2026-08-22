@@ -1739,7 +1739,7 @@ function CitasContent() {
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="h-11 px-4 text-sm font-semibold cursor-pointer">
                   Cancelar
                 </Button>
-                <Button type="submit" form="cita-form" disabled={saving} className="glow-gold h-11 px-5 text-sm font-bold cursor-pointer">
+                <Button type="submit" form="cita-form" disabled={saving} className="h-11 px-5 text-sm font-bold cursor-pointer">
                   {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Cita')}
                 </Button>
               </div>
@@ -1843,7 +1843,7 @@ function CitasContent() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={savingCliente} className="glow-gold gap-1.5">
+                <Button type="submit" disabled={savingCliente} className="gap-1.5">
                   <UserPlus className="w-4 h-4" />
                   {savingCliente ? 'Creando...' : 'Crear y Seleccionar'}
                 </Button>

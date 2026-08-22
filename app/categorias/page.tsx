@@ -206,7 +206,7 @@ export default function Categorias() {
             <p className="text-sm text-muted-foreground">
               Esta sección es exclusiva para administradores y soporte técnico. Si eres parte del personal, puedes gestionar las citas en el panel correspondiente.
             </p>
-            <Button onClick={() => router.push('/dashboard')} className="w-full glow-gold">
+            <Button onClick={() => router.push('/dashboard')} className="w-full">
               Volver al Dashboard
             </Button>
           </Card>
@@ -466,7 +466,7 @@ export default function Categorias() {
 
               <div className="flex justify-end gap-2 pt-4 border-t border-border/30">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-                <Button type="submit" disabled={saving} className="glow-gold">
+                <Button type="submit" disabled={saving}>
                   {saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Categoría')}
                 </Button>
               </div>

@@ -542,11 +542,11 @@ export default function OlvideContrasena() {
                 </p>
               </div>
               <div className="pt-4 border-t border-border/50">
-                <Link href="/login" className="block w-full">
-                  <Button className="h-11 w-full text-sm font-semibold">
+                <Button asChild className="h-11 w-full text-sm font-semibold">
+                  <Link href="/login">
                     Ir al inicio de sesión inmediatamente
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
           )}

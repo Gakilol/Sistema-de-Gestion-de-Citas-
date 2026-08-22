@@ -509,7 +509,7 @@ export default function ClientesInactivos() {
                           variant="default"
                           size="sm"
                           onClick={() => handleScheduleNew(c)}
-                          className="gap-1.5 h-9 px-3 text-xs glow-gold flex-1 min-h-[40px] justify-center"
+                          className="gap-1.5 h-9 px-3 text-xs flex-1 min-h-[40px] justify-center"
                         >
                           <Calendar className="w-3.5 h-3.5" />
                           <span>Agendar</span>
@@ -612,7 +612,7 @@ export default function ClientesInactivos() {
                                   variant="default"
                                   size="sm"
                                   onClick={() => handleScheduleNew(c)}
-                                  className="gap-1 h-8 px-2.5 text-xs glow-gold"
+                                  className="gap-1 h-8 px-2.5 text-xs"
                                 >
                                   <Calendar className="w-3.5 h-3.5" />
                                   <span>Agendar</span>

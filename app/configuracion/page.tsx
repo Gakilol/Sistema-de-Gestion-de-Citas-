@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { authFetch } from '@/lib/api-client';
 import { PageHeader } from '@/components/shared/page-header';
+import { BrandMark } from '@/components/shared/brand-mark';
 
 const TABS = [
   { id: 'negocio',     label: 'Negocio',      icon: Store, roles: ['ADMIN', 'TECH_SUPPORT'] },
@@ -493,15 +494,7 @@ export default function Configuracion() {
               </div>
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
                 <p className="text-sm font-medium text-foreground mb-1">Branding activo</p>
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center">
-                    <span className="text-white text-lg">✂️</span>
-                  </div>
-                  <div>
-                    <p className="font-bold text-foreground">HAIR STYLE</p>
-                    <p className="text-xs text-primary">Salón & Barber</p>
-                  </div>
-                </div>
+                <BrandMark className="mt-3" />
               </div>
               </fieldset>
             </Card>
