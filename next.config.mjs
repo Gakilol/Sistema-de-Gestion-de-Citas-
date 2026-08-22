@@ -66,10 +66,11 @@ const securityHeaders = [
     key: 'Strict-Transport-Security',
     value: 'max-age=15552000; includeSubDomains',
   },
-  // Limitar acceso a la cámara, micrófono y geolocalización
+  // El dictado de citas puede usar el micrófono, pero únicamente desde este mismo origen.
+  // Cámara, geolocalización, pagos y USB permanecen totalmente bloqueados.
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    value: 'camera=(), microphone=(self), geolocation=(), payment=(), usb=()',
   },
   // Protección XSS legacy (navegadores sin CSP)
   {
