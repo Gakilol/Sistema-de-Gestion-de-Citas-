@@ -23,6 +23,34 @@ export interface IAPendingAction {
   details: Array<{ label: string; value: string }>;
 }
 
+export type IAAppointmentDraftField = 'cliente' | 'servicio' | 'profesional' | 'fecha' | 'hora';
+
+export interface IAAppointmentDraft {
+  cliente?: string;
+  telefono?: string;
+  servicio?: string;
+  profesional?: string;
+  fecha?: string;
+  hora?: string;
+  notas?: string;
+  awaitingField?: IAAppointmentDraftField;
+}
+
+export interface IAClientDraft {
+  nombre?: string;
+  telefono?: string;
+  email?: string;
+  notas?: string;
+  awaitingField?: 'nombre';
+}
+
+export interface IAConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  appointmentDraft?: IAAppointmentDraft;
+  clientDraft?: IAClientDraft;
+}
+
 export type IAToolResult =
   | { ok: true; data: unknown; meta: { fuenteDatos: string }; pendingAction?: IAPendingAction }
   | { ok: false; error: string; code: 'ACCESS_DENIED' | 'INVALID_PARAMS' | 'INTERNAL_ERROR' };

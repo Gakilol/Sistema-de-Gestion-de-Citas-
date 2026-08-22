@@ -89,16 +89,16 @@ export default function Login() {
   return (
     <AuthShell>
         <div className={cn('transition-transform', shake && 'translate-x-1')}>
-          <div className="mb-8 border-l-2 border-primary pl-4">
+          <div className="mb-7">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Portal del equipo</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Bienvenido de nuevo</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Ingresa tus datos para abrir la agenda.</p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground">Entra a tu agenda</h2>
+            <p className="mt-2 text-base leading-6 text-muted-foreground">Escribe tu correo y contraseña para continuar.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
             <div>
-              <label htmlFor="login-email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+              <label htmlFor="login-email" className="mb-2 block text-sm font-semibold text-foreground">
                 Correo electrónico
               </label>
               <div className="relative">
@@ -107,7 +107,7 @@ export default function Login() {
                   id="login-email"
                   type="email"
                   placeholder="admin@hairstyle.com"
-                  className="pl-10 h-11 bg-card border-border/60 focus:border-primary"
+                  className="h-12 border-border bg-background pl-10 text-base focus:border-primary"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   required
@@ -118,7 +118,7 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label htmlFor="login-password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+              <label htmlFor="login-password" className="mb-2 block text-sm font-semibold text-foreground">
                 Contraseña
               </label>
               <div className="relative">
@@ -127,7 +127,7 @@ export default function Login() {
                   id="login-password"
                   type={showPass ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="pl-10 pr-10 h-11 bg-card border-border/60 focus:border-primary"
+                  className="h-12 border-border bg-background pl-10 pr-12 text-base focus:border-primary"
                   value={form.password}
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   required
@@ -137,13 +137,13 @@ export default function Login() {
                   type="button"
                   onClick={() => setShowPass(p => !p)}
                   aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="absolute right-0 top-1/2 size-11 -translate-y-1/2 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  className="absolute right-0 top-1/2 flex size-12 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 >
                   {showPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
                 </button>
               </div>
               <div className="flex justify-end mt-2">
-                <Link href="/olvide-contrasena" className="text-xs font-medium text-primary hover:underline">
+                <Link href="/olvide-contrasena" className="text-sm font-semibold text-primary hover:underline">
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
@@ -164,7 +164,7 @@ export default function Login() {
               </label>
             </div>
 
-            <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={isLoading}>
+            <Button type="submit" className="h-12 w-full text-base font-bold" disabled={isLoading}>
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"/>

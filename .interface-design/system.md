@@ -56,4 +56,7 @@ Surfaces use subtle tonal shifts. Light mode adds a quiet layered shadow to rais
 - Mobile bottom navigation: 72px plus safe area, 44px hit zones, active rail at the top edge.
 - Task card: icon, verb-led 18–20px title and one short explanation. Never put metrics, menus or tertiary actions inside it.
 - AI mutation confirmation: the assistant may prepare an operation, but the user sees a bordered summary with every material field and a 48px explicit confirmation button before any write.
+- AI task bar: “Crear cita con IA” and the manual form fallback remain visible above the conversation; voice dictation is an optional adjacent input, never the only path.
+- Guided conversation: ask for one missing appointment field at a time, preserve the draft between turns, accept ordinary Spanish date/time phrases, and never expose database identifiers or serialized objects.
+- Authentication: keep the sign-in form and brand together in one centered panel; supporting copy stays secondary and fabricated operational data is not shown.
 - Progressive disclosure: operational summaries can use `<details>` or a dedicated report page; advanced information never competes with the primary task.

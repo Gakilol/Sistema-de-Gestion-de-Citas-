@@ -16,10 +16,31 @@ export const maxDuration = 45;
 const MODEL = 'gemini-2.5-flash';
 const MAX_TOOL_CALLS = 5;
 
+const appointmentDraftSchema = z.object({
+  cliente: z.string().trim().max(150).optional(),
+  telefono: z.string().trim().max(30).optional(),
+  servicio: z.string().trim().max(100).optional(),
+  profesional: z.string().trim().max(100).optional(),
+  fecha: z.string().trim().max(20).optional(),
+  hora: z.string().trim().max(20).optional(),
+  notas: z.string().trim().max(500).optional(),
+  awaitingField: z.enum(['cliente', 'servicio', 'profesional', 'fecha', 'hora']).optional(),
+});
+
+const clientDraftSchema = z.object({
+  nombre: z.string().trim().max(150).optional(),
+  telefono: z.string().trim().max(30).optional(),
+  email: z.string().trim().max(254).optional(),
+  notas: z.string().trim().max(500).optional(),
+  awaitingField: z.literal('nombre').optional(),
+});
+
 const requestSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string().trim().min(1).max(2500),
+    appointmentDraft: appointmentDraftSchema.optional(),
+    clientDraft: clientDraftSchema.optional(),
   })).min(1).max(20),
 });
 
@@ -82,7 +103,7 @@ export async function POST(req: NextRequest) {
   await audit(req, context, 'IA_CHAT_QUERY', { messageLength: latestMessage.length });
 
   const apiKey = process.env.VERTEX_AI_API_KEY;
-  if (!apiKey) return NextResponse.json(await runLocalAssistant(latestMessage, context));
+  if (!apiKey) return NextResponse.json(await runLocalAssistant(parsed.data.messages, context));
 
   const contents: Array<Record<string, unknown>> = [
     { role: 'user', parts: [{ text: buildSystemPrompt(context) }] },
@@ -169,5 +190,5 @@ export async function POST(req: NextRequest) {
     clearTimeout(timeout);
   }
 
-  return NextResponse.json(await runLocalAssistant(latestMessage, context));
+  return NextResponse.json(await runLocalAssistant(parsed.data.messages, context));
 }

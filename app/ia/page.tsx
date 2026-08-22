@@ -1,12 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Bot, CalendarPlus, Check, CheckCircle2, Loader2, Search, Send, Sparkles, UserPlus, UserRound, X } from 'lucide-react';
+import { ArrowRight, Bot, CalendarPlus, Check, CheckCircle2, Loader2, Mic, MicOff, Search, Send, Sparkles, UserPlus, UserRound, X } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { BRAND } from '@/lib/brand';
 import { authFetch } from '@/lib/api-client';
-import type { IAPendingAction } from '@/lib/ia/types';
+import type { IAAppointmentDraft, IAClientDraft, IAPendingAction } from '@/lib/ia/types';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -16,7 +17,35 @@ interface Message {
   pendingAction?: IAPendingAction;
   actionStatus?: 'confirming' | 'completed' | 'cancelled' | 'error';
   actionError?: string;
+  appointmentDraft?: IAAppointmentDraft;
+  clientDraft?: IAClientDraft;
 }
+
+interface SpeechResultLike {
+  isFinal: boolean;
+  [index: number]: { transcript: string };
+}
+
+interface SpeechEventLike {
+  results: ArrayLike<SpeechResultLike>;
+}
+
+interface SpeechController {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechConstructor = new () => SpeechController;
+type SpeechWindow = Window & {
+  SpeechRecognition?: SpeechConstructor;
+  webkitSpeechRecognition?: SpeechConstructor;
+};
 
 const welcome: Message = {
   role: 'assistant',
@@ -94,8 +123,12 @@ export default function IAPage() {
   const [messages, setMessages] = useState<Message[]>([welcome]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speechError, setSpeechError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechController | null>(null);
 
   useEffect(() => {
     const suggestedPrompt = new URLSearchParams(window.location.search).get('prompt');
@@ -107,21 +140,68 @@ export default function IAPage() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
-  const send = async (text: string) => {
+  useEffect(() => {
+    const speechWindow = window as SpeechWindow;
+    setSpeechSupported(Boolean(speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition));
+    return () => recognitionRef.current?.stop();
+  }, []);
+
+  const toggleVoice = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Recognition) return;
+
+    const recognition = new Recognition();
+    const initialInput = input.trim();
+    recognition.lang = 'es-NI';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let index = 0; index < event.results.length; index += 1) {
+        transcript += event.results[index][0]?.transcript ?? '';
+      }
+      setInput([initialInput, transcript.trim()].filter(Boolean).join(' '));
+    };
+    recognition.onerror = (event) => {
+      setListening(false);
+      if (event.error !== 'aborted') {
+        setSpeechError(event.error === 'not-allowed'
+          ? 'Permite el acceso al micrófono en el navegador para poder dictar.'
+          : 'No pude escuchar con claridad. Intenta hablar de nuevo.');
+      }
+    };
+    recognition.onend = () => {
+      setListening(false);
+      inputRef.current?.focus();
+    };
+    recognitionRef.current = recognition;
+    setSpeechError('');
+    setListening(true);
+    recognition.start();
+  };
+
+  const send = async (text: string, resetConversation = false) => {
     const content = text.trim();
     if (!content || loading) return;
-    const nextMessages = [...messages, { role: 'user' as const, content }];
+    recognitionRef.current?.stop();
+    const nextMessages = [...(resetConversation ? [welcome] : messages), { role: 'user' as const, content }];
     setMessages(nextMessages);
     setInput('');
     setLoading(true);
     try {
       const response = await authFetch('/api/ia/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages.map(({ role, content: messageContent }) => ({ role, content: messageContent })) }),
+        body: JSON.stringify({ messages: nextMessages.map(({ role, content: messageContent, appointmentDraft, clientDraft }) => ({ role, content: messageContent, appointmentDraft, clientDraft })) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'No pude completar la consulta.');
-      setMessages((current) => [...current, { role: 'assistant', content: data.text, toolsUsed: data.toolsUsed, pendingAction: data.pendingAction }]);
+      setMessages((current) => [...current, { role: 'assistant', content: data.text, toolsUsed: data.toolsUsed, pendingAction: data.pendingAction, appointmentDraft: data.appointmentDraft, clientDraft: data.clientDraft }]);
     } catch (error) {
       setMessages((current) => [...current, { role: 'assistant', content: error instanceof Error ? error.message : 'No pude completar la consulta.' }]);
     } finally {
@@ -162,18 +242,28 @@ export default function IAPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <main className="min-w-0 flex-1 overflow-y-auto pb-20 pt-16 lg:pb-0 lg:pt-0">
+      <main className="min-w-0 flex-1 overflow-y-auto pb-20 pt-20 lg:pb-0 lg:pt-0">
         <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-5xl flex-col px-3 py-5 sm:px-6 sm:py-7 lg:min-h-dvh lg:px-8">
-          <header className="mb-5">
-            <p className="text-sm font-bold uppercase tracking-[0.12em] text-primary">Asistente del salón</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">¿Qué necesitas hacer?</h1>
-            <p className="mt-2 max-w-2xl text-base leading-6 text-muted-foreground">Escríbelo como lo dirías normalmente. {BRAND.assistantName} te guiará paso a paso.</p>
+          <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.12em] text-primary">Asistente del salón</p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">¿Qué necesitas hacer?</h1>
+              <p className="mt-2 max-w-2xl text-base leading-6 text-muted-foreground">Habla o escribe con naturalidad. Te preguntaré un dato a la vez.</p>
+            </div>
+            <div className="flex flex-col gap-2 min-[430px]:flex-row sm:shrink-0">
+              <Button type="button" size="lg" className="min-h-12 text-base" onClick={() => void send('Quiero crear una cita guiada', true)} disabled={loading}>
+                <CalendarPlus className="size-5" /> Crear cita con IA
+              </Button>
+              <Button asChild type="button" size="lg" variant="outline" className="min-h-12 text-base">
+                <Link href="/citas?nueva=1">Abrir formulario</Link>
+              </Button>
+            </div>
           </header>
 
           {messages.length === 1 && (
             <section className="mb-5 grid gap-3 sm:grid-cols-3" aria-label="Acciones rápidas">
               {quickTasks.map(({ title, example, description, icon: Icon }) => (
-                <button key={title} type="button" onClick={() => void send(example)} disabled={loading} className="group flex min-h-32 flex-col items-start rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:opacity-50">
+                <button key={title} type="button" onClick={() => void send(example, title === 'Crear una cita')} disabled={loading} className="group flex min-h-32 flex-col items-start rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:opacity-50">
                   <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary"><Icon className="size-5" /></span>
                   <span className="mt-3 flex w-full items-center justify-between gap-2 text-base font-bold text-foreground">{title}<ArrowRight className="size-4 text-primary transition-transform group-hover:translate-x-1" /></span>
                   <span className="mt-1 text-sm leading-5 text-muted-foreground">{description}</span>
@@ -182,7 +272,7 @@ export default function IAPage() {
             </section>
           )}
 
-          <section className="flex min-h-[34rem] flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <section className="mb-20 flex min-h-[34rem] flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:mb-0">
             <div aria-live="polite" className="flex-1 space-y-5 overflow-y-auto p-3 sm:p-5">
               {messages.map((message, index) => {
                 const assistant = message.role === 'assistant';
@@ -207,8 +297,14 @@ export default function IAPage() {
               <div className="flex items-end gap-2">
                 <label className="sr-only" htmlFor="ia-message">Mensaje para el asistente</label>
                 <textarea ref={inputRef} id="ia-message" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(input); } }} maxLength={2500} rows={1} placeholder="Ejemplo: crea una cita para Ana mañana…" className="min-h-12 max-h-32 flex-1 resize-none rounded-xl border border-input bg-card px-4 py-3 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                {speechSupported && (
+                  <Button type="button" size="icon" variant={listening ? 'default' : 'outline'} className="size-12 shrink-0 rounded-xl" onClick={toggleVoice} aria-label={listening ? 'Detener dictado' : 'Dictar mensaje con el micrófono'} aria-pressed={listening}>
+                    {listening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                  </Button>
+                )}
                 <Button type="submit" size="icon" className="size-12 shrink-0 rounded-xl" disabled={loading || !input.trim()} aria-label="Enviar mensaje"><Send className="size-5" /></Button>
               </div>
+              {speechError && <p role="alert" className="mt-2 text-sm font-medium text-destructive">{speechError}</p>}
               <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="size-3.5 text-primary" /> Ningún cambio se guarda sin tu confirmación.</p>
             </form>
           </section>
