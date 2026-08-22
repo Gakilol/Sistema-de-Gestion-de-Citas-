@@ -7,7 +7,6 @@ import {
   Scissors, X, RefreshCcw, UserPlus, ChevronRight, Trash2, Edit
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { urlWhatsAppConfirmacion } from '@/lib/whatsapp';
@@ -16,8 +15,18 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
+import { PageHeader } from '@/components/shared/page-header';
+import { MetricStrip } from '@/components/shared/metric-strip';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
+interface ClienteAppointment {
+  id: string;
+  fecha: string;
+  estado: string;
+  servicio: { nombre: string };
+  empleado: { nombre: string };
+}
+
 interface Cliente {
   id: string;
   nombre: string;
@@ -31,7 +40,8 @@ interface Cliente {
   primeraCita: string;
   esRecurrente: boolean;
   servicioFavorito: string | null;
-  historial: any[];
+  historial: ClienteAppointment[];
+  createdByUserId?: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -42,14 +52,9 @@ function fmtDate(d: string) {
 // ─── Avatar con iniciales ─────────────────────────────────────────────────
 function Avatar({ nombre, size = 'md' }: { nombre: string; size?: 'sm' | 'md' | 'lg' }) {
   const initials = nombre.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
-  const colors = [
-    'bg-amber-500', 'bg-emerald-500', 'bg-blue-500',
-    'bg-purple-500', 'bg-rose-500', 'bg-cyan-500',
-  ];
-  const color = colors[nombre.charCodeAt(0) % colors.length];
   const sz = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' }[size];
   return (
-    <div className={cn('rounded-xl flex items-center justify-center font-bold text-white flex-shrink-0', color, sz)}>
+    <div className={cn('flex flex-shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 font-semibold text-primary', sz)}>
       {initials}
     </div>
   );
@@ -79,7 +84,7 @@ function Skeleton() {
 }
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
-function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: any; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: any) => void }) {
+function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: Cliente) => void }) {
   const { user } = useAuth();
   const canEdit = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
   const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
@@ -137,7 +142,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: any; 
         <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Historial de citas</p>
           {cliente.historial && cliente.historial.length > 0 ? (
-            cliente.historial.map((cita: any) => (
+            cliente.historial.map((cita) => (
               <div key={cita.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Scissors className="w-3.5 h-3.5 text-primary" />
@@ -224,7 +229,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: any; 
 }
 
 // ─── Cliente Card ─────────────────────────────────────────────────────────────
-function ClienteCard({ cliente, onSelect }: { cliente: any; onSelect: () => void }) {
+function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => void }) {
   return (
     <button
       type="button"
@@ -557,38 +562,29 @@ export default function Clientes() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
-          {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Clientes</h1>
-              <p className="page-description truncate sm:whitespace-normal">Historial y estadísticas de tus clientes</p>
-            </div>
-            <div className="flex gap-2 shrink-0">
+          <PageHeader
+            eyebrow="Directorio"
+            title="Clientes"
+            description="Historial, preferencias y relación con cada cliente"
+            actions={(
+              <>
               <Button variant="outline" size="icon" onClick={() => fetchClientes(busqueda)} aria-label="Actualizar clientes" title="Actualizar clientes">
                 <RefreshCcw className="w-4 h-4" />
               </Button>
-              <Button onClick={() => setShowAgregar(true)} className="gap-2 glow-gold px-3.5 sm:px-4">
+              <Button onClick={() => setShowAgregar(true)} className="gap-2 px-3.5 sm:px-4">
                 <UserPlus className="w-4 h-4" /> <span className="hidden sm:inline">Registrar cliente</span><span className="sm:hidden">Registrar</span>
               </Button>
-            </div>
-          </div>
+              </>
+            )}
+          />
 
-
-          {/* ── KPI mini ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <Card className="surface-panel p-2.5 sm:p-4 text-center">
-              <p className="text-xl font-bold text-foreground">{total}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Clientes únicos</p>
-            </Card>
-            <Card className="surface-panel p-2.5 sm:p-4 text-center">
-              <p className="text-xl font-bold text-amber-500">{recurrentes}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Recurrentes</p>
-            </Card>
-            <Card className="surface-panel p-2.5 sm:p-4 text-center">
-              <p className="text-xl font-bold text-emerald-500">{totalCitasCompletadas}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 leading-tight">Completadas</p>
-            </Card>
-          </div>
+          <MetricStrip
+            items={[
+              { label: 'Clientes únicos', value: total, icon: Users, tone: 'copper' },
+              { label: 'Recurrentes', value: recurrentes, detail: 'Con visitas frecuentes', icon: Star, tone: 'info' },
+              { label: 'Citas completadas', value: totalCitasCompletadas, detail: 'En el directorio visible', icon: Calendar, tone: 'success' },
+            ]}
+          />
 
           {/* ── Búsqueda ─────────────────────────────────────────── */}
           <div className="sticky top-14 lg:top-0 z-20 -mx-1 px-1 py-2 bg-background/90 backdrop-blur-xl">
@@ -632,7 +628,7 @@ export default function Clientes() {
               {totalPages > 1 && (
                 <div className="surface-panel flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    PÃ¡gina {page} de {totalPages} Â· {total} clientes
+                    Página {page} de {totalPages} · {total} clientes
                   </p>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => fetchClientes(busqueda, page - 1)} disabled={page <= 1} className="min-h-11 flex-1 sm:flex-none">

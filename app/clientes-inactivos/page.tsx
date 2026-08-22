@@ -11,10 +11,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { mensajeReactivacion, urlWhatsAppReactivacion } from '@/lib/whatsapp';
 import { authFetch } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/errors';
+import { PageHeader } from '@/components/shared/page-header';
+import { MetricStrip } from '@/components/shared/metric-strip';
 import {
   UserX, Phone, Calendar, RefreshCcw, Loader2,
   MessageSquare, Star, Search, ShieldAlert, CheckCircle,
-  XCircle, HelpCircle
+  XCircle
 } from 'lucide-react';
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
@@ -27,22 +30,48 @@ function fmtDate(d: string | null) {
   });
 }
 
-// ─── Stat Card Component ─────────────────────────────────────────────────────
-function StatCard({ title, value, icon: Icon, colorClass, description }: { title: string; value: string | number; icon: any; colorClass: string; description?: string }) {
-  return (
-    <Card className="p-4 border-border/50 flex items-center justify-between hover:shadow-md transition-all duration-200">
-      <div className="space-y-0.5">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
-        <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
-        {description && (
-          <p className="text-[10px] text-muted-foreground">{description}</p>
-        )}
-      </div>
-      <div className={cn("p-3 rounded-xl flex-shrink-0", colorClass)}>
-        <Icon className="w-5 h-5" />
-      </div>
-    </Card>
-  );
+interface CatalogEmployee {
+  id: string;
+  nombre: string;
+  rol: string;
+}
+
+interface CatalogService {
+  id: string;
+  nombre: string;
+}
+
+interface InactiveClient {
+  id: string;
+  nombre: string;
+  telefono?: string | null;
+  telefonoRaw?: string | null;
+  diasSinVisita: number;
+  ultimaCita: string | null;
+  ultimoServicioNombre: string;
+  ultimoServicioId?: string | null;
+  ultimoProfesionalNombre: string;
+  ultimoProfesionalId?: string | null;
+  ultimoRecordatorioFecha: string | null;
+  ultimoRecordatorioEstado: string | null;
+  diasDesdeUltimoRecordatorio: number | null;
+  completadas: number;
+  canceladas: number;
+  noShows: number;
+  _privado?: boolean;
+}
+
+interface InactivePagination {
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+interface InactiveStats {
+  totalInactivos: number;
+  sinRecordatorio: number;
+  enviadosEsteMes: number;
+  reagendados: number;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -61,18 +90,18 @@ export default function ClientesInactivos() {
   const [empleadoId, setEmpleadoId] = useState('');
 
   // Loaded catalogs
-  const [empleados, setEmpleados] = useState<any[]>([]);
-  const [servicios, setServicios] = useState<any[]>([]);
+  const [empleados, setEmpleados] = useState<CatalogEmployee[]>([]);
+  const [servicios, setServicios] = useState<CatalogService[]>([]);
 
   // Module data
-  const [clientes, setClientes] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({ page: 1, totalPages: 1, total: 0 });
-  const [stats, setStats] = useState<any>({ totalInactivos: 0, sinRecordatorio: 0, enviadosEsteMes: 0, reagendados: 0 });
+  const [clientes, setClientes] = useState<InactiveClient[]>([]);
+  const [pagination, setPagination] = useState<InactivePagination>({ page: 1, totalPages: 1, total: 0 });
+  const [stats, setStats] = useState<InactiveStats>({ totalInactivos: 0, sinRecordatorio: 0, enviadosEsteMes: 0, reagendados: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
   // Warning modal for recent reminders
-  const [warningClient, setWarningClient] = useState<any>(null);
+  const [warningClient, setWarningClient] = useState<(InactiveClient & { diasDesdeUltimo: number }) | null>(null);
   const [submittingReminder, setSubmittingReminder] = useState(false);
 
   const isAdmin = user?.rol === 'ADMIN';
@@ -89,7 +118,7 @@ export default function ClientesInactivos() {
       .then(r => r.json())
       .then(d => {
         // Exclude Tech Support from the filter list (already done in API, but double check)
-        const activeSchedulable = (d.empleados || []).filter((e: any) => e.rol !== 'TECH_SUPPORT');
+        const activeSchedulable = (d.empleados || []).filter((e: CatalogEmployee) => e.rol !== 'TECH_SUPPORT');
         setEmpleados(activeSchedulable);
       });
     
@@ -122,8 +151,8 @@ export default function ClientesInactivos() {
       setClientes(data.clientes || []);
       setPagination(data.pagination || { page: 1, totalPages: 1, total: 0 });
       setStats(data.stats || { totalInactivos: 0, sinRecordatorio: 0, enviadosEsteMes: 0, reagendados: 0 });
-    } catch (err: any) {
-      toast.error(err.message || 'Error al cargar clientes inactivos');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al cargar clientes inactivos'));
     } finally {
       setLoading(false);
     }
@@ -146,7 +175,7 @@ export default function ClientesInactivos() {
   };
 
   // 3. Send/Log reminder action
-  const handleSendReminder = async (client: any, force = false) => {
+  const handleSendReminder = async (client: InactiveClient, force = false) => {
     const reminderParams = {
       cliente_nombre: client.nombre,
       cliente_telefono: client.telefonoRaw || client.telefono,
@@ -202,16 +231,16 @@ export default function ClientesInactivos() {
       whatsappWindow.location.href = waUrl;
       toast.success('Recordatorio registrado y WhatsApp abierto');
       await fetchClientesInactivos(); // Refresh table & stats
-    } catch (err: any) {
+    } catch (err: unknown) {
       whatsappWindow.close();
-      toast.error(err.message || 'Error al enviar recordatorio');
+      toast.error(getErrorMessage(err, 'Error al enviar recordatorio'));
     } finally {
       setSubmittingReminder(false);
     }
   };
 
   // Navigates to scheduler
-  const handleScheduleNew = (client: any) => {
+  const handleScheduleNew = (client: InactiveClient) => {
     const params = new URLSearchParams({
       clienteId: client.id,
       ...(client.ultimoServicioId ? { servicioId: client.ultimoServicioId } : {}),
@@ -238,82 +267,56 @@ export default function ClientesInactivos() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
-          {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Clientes Inactivos</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Identifica y reactiva clientes que llevan tiempo sin visitar la peluquería
-              </p>
-            </div>
-            <div className="flex w-full sm:w-auto gap-2 self-start sm:self-auto">
+          <PageHeader
+            eyebrow="Recuperación"
+            title="Clientes inactivos"
+            description="Identifica oportunidades de reactivación y vuelve a llenar la agenda"
+            actions={(
+              <>
               {canSeeAll && (
-                <div className="flex flex-1 sm:flex-none bg-secondary/30 p-1 rounded-xl border border-border/50 shadow-inner">
+                <div className="flex rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1">
                   <button
                     type="button"
                     onClick={() => { setScope('mine'); setEmpleadoId(''); setPage(1); }}
                     className={cn(
-                      "flex-1 sm:flex-none min-h-10 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                      "min-h-9 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                       scope === 'mine'
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border/70"
+                        : "text-muted-foreground hover:bg-card/55 hover:text-foreground"
                     )}
                   >
-                    Míos
+                    Mi cartera
                   </button>
                   <button
                     type="button"
                     onClick={() => { setScope('all'); setPage(1); }}
                     className={cn(
-                      "flex-1 sm:flex-none min-h-10 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                      "min-h-9 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                       scope === 'all'
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border/70"
+                        : "text-muted-foreground hover:bg-card/55 hover:text-foreground"
                     )}
                   >
-                    Todos
+                    Equipo
                   </button>
                 </div>
               )}
               <Button variant="outline" size="icon" onClick={fetchClientesInactivos} aria-label="Actualizar clientes inactivos" title="Actualizar">
                 <RefreshCcw className="w-4 h-4" />
               </Button>
-            </div>
-          </div>
+              </>
+            )}
+          />
 
-
-          {/* ── Resumen Cards ───────────────────────────────────── */}
           {!loading && stats.totalInactivos > 0 && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-              <StatCard
-                title="Inactivos"
-                value={stats.totalInactivos}
-                icon={UserX}
-                colorClass="bg-red-500/10 text-red-500"
-                description={`Sin visita +${diasInactividad} días`}
-              />
-              <StatCard
-                title="Sin Recordatorio"
-                value={stats.sinRecordatorio}
-                icon={HelpCircle}
-                colorClass="bg-amber-500/10 text-amber-500"
-                description="Nunca contactados"
-              />
-              <StatCard
-                title="Enviados Este Mes"
-                value={stats.enviadosEsteMes}
-                icon={MessageSquare}
-                colorClass="bg-blue-500/10 text-blue-500"
-                description="Recordatorios enviados"
-              />
-              <StatCard
-                title="Reagendados"
-                value={stats.reagendados}
-                icon={Star}
-                colorClass="bg-emerald-500/10 text-emerald-500"
-                description="Han vuelto a agendar"
-              />
-            </div>
+            <MetricStrip
+              items={[
+                { label: 'Inactivos', value: stats.totalInactivos, detail: `Sin visita +${diasInactividad} días`, icon: UserX, tone: 'danger' },
+                { label: 'Sin contacto', value: stats.sinRecordatorio, detail: 'Nunca contactados', icon: Phone, tone: 'copper' },
+                { label: 'Contactados', value: stats.enviadosEsteMes, detail: 'Este mes', icon: MessageSquare, tone: 'info' },
+                { label: 'Reagendados', value: stats.reagendados, detail: 'Volvieron a la agenda', icon: Star, tone: 'success' },
+              ]}
+            />
           )}
 
           {/* ── Filtros ─────────────────────────────────────────── */}

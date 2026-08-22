@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, TrendingUp, Users, CheckCircle2,
-  Clock, ArrowUpRight, ArrowDownRight, RefreshCcw,
+  Clock, RefreshCcw,
   Scissors, ChevronRight, Activity
 } from 'lucide-react';
 import {
@@ -19,8 +19,30 @@ import { formatTime12Hour } from '@/lib/time-utils';
 import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
 import Link from 'next/link';
 import { authFetch } from '@/lib/api-client';
+import { PageHeader } from '@/components/shared/page-header';
+import { MetricStrip, type MetricStripItem } from '@/components/shared/metric-strip';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
+interface DashboardAppointment {
+  id: string;
+  cliente_nombre: string;
+  fecha: string;
+  hora: string;
+  estado: string;
+  servicio?: { nombre?: string };
+  empleado?: { nombre?: string };
+}
+
+interface DashboardActivity {
+  id: string;
+  cliente_nombre: string;
+  fecha: string;
+  hora: string;
+  estado: string;
+  servicio: string;
+  empleado: string;
+}
+
 interface DashboardData {
   stats: {
     totalCitas: number;
@@ -33,16 +55,16 @@ interface DashboardData {
     tasaCompletadas: number;
     citasCanceladasTotales?: number;
   };
-  upcomingAppointments: any[];
-  citasHoy: any[];
+  upcomingAppointments: DashboardAppointment[];
+  citasHoy: DashboardAppointment[];
   serviciosPopulares: { nombre: string; cantidad: number }[];
   productividadEmpleados: { nombre: string; citas: number }[];
-  actividadReciente: any[];
+  actividadReciente: DashboardActivity[];
   citasChart: { fecha: string; dia: string; citas: number }[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
+const PIE_COLORS = ['#b86f3d', '#3f765f', '#4f7183', '#9d4655', '#ad7a26'];
 
 function fmtDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d;
@@ -65,59 +87,17 @@ function SkeletonCard() {
   );
 }
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-interface KpiCardProps {
-  title: string;
-  value: string;
-  sub?: string;
-  icon: React.ElementType;
-  accent: 'gold' | 'emerald' | 'blue' | 'wine';
-  trend?: number; // positivo=subida, negativo=bajada
-}
-
-function KpiCard({ title, value, sub, icon: Icon, accent, trend }: KpiCardProps) {
-  const accentClass = {
-    gold:    { card: 'card-accent-gold',    icon: 'metric-icon-gold',    text: 'text-amber-500' },
-    emerald: { card: 'card-accent-emerald', icon: 'metric-icon-emerald', text: 'text-emerald-500' },
-    blue:    { card: 'card-accent-blue',    icon: 'metric-icon-blue',    text: 'text-blue-500' },
-    wine:    { card: 'card-accent-wine',    icon: 'metric-icon-wine',    text: 'text-rose-600' },
-  }[accent];
-
-  return (
-    <div className={cn(
-      'surface-panel p-3 sm:p-5 hover-lift transition-all min-w-0',
-      accentClass.card
-    )}>
-      <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
-        <div className="min-w-0">
-          <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 leading-tight">{title}</p>
-          <p className="text-xl sm:text-2xl font-bold text-foreground">{value}</p>
-        </div>
-        <div className={cn('p-2 sm:p-2.5 rounded-xl shrink-0', accentClass.icon)}>
-          <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5', accentClass.text)} />
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5">
-        {trend !== undefined && (
-          trend >= 0
-            ? <ArrowUpRight className="w-3.5 h-3.5 trend-up" />
-            : <ArrowDownRight className="w-3.5 h-3.5 trend-down" />
-        )}
-        {sub && (
-          <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight line-clamp-2">{sub}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Custom Tooltip para gráficas ────────────────────────────────────────────
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ color?: string; name?: string; value?: string | number }>;
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="glass rounded-xl px-3 py-2.5 text-xs shadow-xl border border-border/50">
       <p className="font-semibold text-foreground mb-1.5">{label}</p>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <div key={i} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
           <span className="text-muted-foreground">{p.name}:</span>
@@ -185,6 +165,19 @@ export default function Dashboard() {
   const productividad = data?.productividadEmpleados ?? [];
   const actividad = data?.actividadReciente ?? [];
   const chartData = data?.citasChart ?? [];
+  const summaryItems: MetricStripItem[] = isAdmin
+    ? [
+        { label: 'Citas hoy', value: stats?.citasHoy ?? 0, detail: `${stats?.citasPendientes ?? 0} pendientes`, icon: Calendar, tone: 'copper' },
+        { label: 'Completadas hoy', value: stats?.citasCompletadasHoy ?? 0, detail: 'Finalizadas hoy', icon: CheckCircle2, tone: 'success' },
+        { label: 'Completadas mes', value: stats?.citasCompletadasMes ?? 0, detail: 'Mes actual', icon: TrendingUp, tone: 'info' },
+        { label: 'Personal activo', value: stats?.empleadosActivos ?? 0, detail: 'Profesionales disponibles', icon: Users, tone: 'neutral' },
+      ]
+    : [
+        { label: 'Mis citas hoy', value: stats?.citasHoy ?? 0, detail: `${stats?.citasPendientes ?? 0} pendientes`, icon: Calendar, tone: 'copper' },
+        { label: 'Completadas hoy', value: stats?.citasCompletadasHoy ?? 0, detail: `${stats?.tasaCompletadas ?? 0}% de cumplimiento`, icon: CheckCircle2, tone: 'success' },
+        { label: 'Completadas mes', value: stats?.citasCompletadasMes ?? 0, detail: 'Mis citas finalizadas', icon: TrendingUp, tone: 'info' },
+        { label: 'Canceladas', value: stats?.citasCanceladasTotales ?? 0, detail: 'Acumulado hasta hoy', icon: Clock, tone: 'danger' },
+      ];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -193,95 +186,18 @@ export default function Dashboard() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
-          {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">
-                Bienvenido, <span className="text-gold-gradient">{user?.nombre?.split(' ')[0]}</span> 👋
-              </h1>
-              <p className="page-description capitalize">
-                {new Date().toLocaleDateString('es-CR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => load(true)}
-              disabled={refreshing}
-              aria-label="Actualizar dashboard"
-              title="Actualizar dashboard"
-              className="flex shrink-0"
-            >
-              <RefreshCcw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
-            </Button>
-          </div>
-
-          {/* ── KPI Cards ──────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {isAdmin ? (
-              <>
-                <KpiCard
-                  title="Citas Hoy"
-                  value={String(stats?.citasHoy ?? 0)}
-                  sub={`${stats?.citasPendientes ?? 0} pendientes`}
-                  icon={Calendar}
-                  accent="gold"
-                />
-                <KpiCard
-                  title="Completadas Hoy"
-                  value={String(stats?.citasCompletadasHoy ?? 0)}
-                  sub="Citas finalizadas hoy"
-                  icon={CheckCircle2}
-                  accent="emerald"
-                />
-                <KpiCard
-                  title="Completadas Mes"
-                  value={String(stats?.citasCompletadasMes ?? 0)}
-                  sub="Citas finalizadas este mes"
-                  icon={Calendar}
-                  accent="blue"
-                />
-                <KpiCard
-                  title="Personal Activo"
-                  value={String(stats?.empleadosActivos ?? 0)}
-                  sub="Profesionales disponibles"
-                  icon={Users}
-                  accent="wine"
-                />
-              </>
-            ) : (
-              <>
-                <KpiCard
-                  title="Mis Citas de Hoy"
-                  value={String(stats?.citasHoy ?? 0)}
-                  sub={`${stats?.citasPendientes ?? 0} pendientes`}
-                  icon={Calendar}
-                  accent="gold"
-                />
-                <KpiCard
-                  title="Completadas Hoy"
-                  value={String(stats?.citasCompletadasHoy ?? 0)}
-                  sub={`${stats?.tasaCompletadas ?? 0}% tasa de éxito`}
-                  icon={CheckCircle2}
-                  accent="emerald"
-                />
-                <KpiCard
-                  title="Completadas del Mes"
-                  value={String(stats?.citasCompletadasMes ?? 0)}
-                  sub="Mis citas finalizadas este mes"
-                  icon={TrendingUp}
-                  accent="blue"
-                />
-                <KpiCard
-                  title="Citas Canceladas"
-                  value={String(stats?.citasCanceladasTotales ?? 0)}
-                  sub="Total canceladas hasta hoy"
-                  icon={Clock}
-                  accent="wine"
-                />
-              </>
+          <PageHeader
+            eyebrow="Pulso del negocio"
+            title={<>Bienvenido, <span className="text-primary">{user?.nombre?.split(' ')[0]}</span></>}
+            description={<span className="capitalize">{new Date().toLocaleDateString('es-CR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>}
+            actions={(
+              <Button variant="outline" size="icon" onClick={() => load(true)} disabled={refreshing} aria-label="Actualizar dashboard" title="Actualizar dashboard">
+                <RefreshCcw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
+              </Button>
             )}
-          </div>
+          />
+
+          <MetricStrip items={summaryItems} />
 
           {/* ── Gráficas ────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -304,16 +220,16 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#d4a017" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#d4a017" stopOpacity={0} />
+                    <linearGradient id="gradCopper" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#b86f3d" stopOpacity={0.24} />
+                      <stop offset="95%" stopColor="#b86f3d" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="citas"    name="Citas"    stroke="#d4a017" strokeWidth={2} fill="url(#gradGold)" dot={{ r: 3, fill: '#d4a017', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                  <Area type="monotone" dataKey="citas" name="Citas" stroke="#b86f3d" strokeWidth={2} fill="url(#gradCopper)" dot={{ r: 3, fill: '#b86f3d', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </Card>
@@ -382,7 +298,7 @@ export default function Dashboard() {
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="citas"    name="Citas"    fill="#d4a017" radius={[4,4,0,0]} maxBarSize={40} />
+                  <Bar dataKey="citas" name="Citas" fill="#b86f3d" radius={[4,4,0,0]} maxBarSize={40} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>
@@ -406,7 +322,7 @@ export default function Dashboard() {
               </div>
               {citasHoy.length > 0 ? (
                 <div className="space-y-2">
-                  {citasHoy.slice(0, 5).map((cita: any) => (
+                  {citasHoy.slice(0, 5).map((cita) => (
                     <div key={cita.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Clock className="w-3.5 h-3.5 text-primary" />
@@ -451,7 +367,7 @@ export default function Dashboard() {
               </div>
               {upcoming.length > 0 ? (
                 <div className="space-y-2">
-                  {upcoming.map((cita: any) => (
+                  {upcoming.map((cita) => (
                     <div key={cita.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                         <Scissors className="w-3.5 h-3.5 text-blue-500" />
@@ -487,7 +403,7 @@ export default function Dashboard() {
             </div>
             {actividad.length > 0 ? (
               <div className="divide-y divide-border/50">
-                {actividad.slice(0, 6).map((item: any) => (
+                {actividad.slice(0, 6).map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-primary">
                       {item.cliente_nombre.charAt(0).toUpperCase()}
