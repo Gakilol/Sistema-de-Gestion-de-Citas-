@@ -102,8 +102,12 @@ export async function POST(req: NextRequest) {
   const latestMessage = parsed.data.messages.at(-1)?.content ?? '';
   await audit(req, context, 'IA_CHAT_QUERY', { messageLength: latestMessage.length });
 
-  const apiKey = process.env.VERTEX_AI_API_KEY;
-  if (!apiKey) return NextResponse.json(await runLocalAssistant(parsed.data.messages, context));
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const vertexApiKey = process.env.VERTEX_AI_API_KEY;
+  if (!geminiApiKey && !vertexApiKey) {
+    return NextResponse.json(await runLocalAssistant(parsed.data.messages, context));
+  }
+  const providerMode = geminiApiKey ? 'gemini_developer_api' : 'vertex_ai';
 
   const contents: Array<Record<string, unknown>> = [
     { role: 'user', parts: [{ text: buildSystemPrompt(context) }] },
@@ -120,7 +124,9 @@ export async function POST(req: NextRequest) {
   let pendingAction: IAPendingAction | undefined;
 
   try {
-    const client = new GoogleGenAI({ vertexai: true, apiKey, apiVersion: 'v1' });
+    const client = geminiApiKey
+      ? new GoogleGenAI({ apiKey: geminiApiKey })
+      : new GoogleGenAI({ vertexai: true, apiKey: vertexApiKey, apiVersion: 'v1' });
     let toolCalls = 0;
 
     while (toolCalls < MAX_TOOL_CALLS) {
@@ -138,7 +144,7 @@ export async function POST(req: NextRequest) {
       const calls = parts.filter((part: any) => part.functionCall);
       if (calls.length === 0) {
         const text = parts.find((part: any) => typeof part.text === 'string')?.text;
-        if (text) return NextResponse.json({ text, toolsUsed, mode: 'vertex_ai', pendingAction });
+        if (text) return NextResponse.json({ text, toolsUsed, mode: providerMode, pendingAction });
         break;
       }
 
@@ -178,9 +184,9 @@ export async function POST(req: NextRequest) {
       config: { temperature: 0.2, maxOutputTokens: 1200, abortSignal: controller.signal },
     });
     const text = finalResponse.candidates?.[0]?.content?.parts?.find((part: any) => part.text)?.text;
-    if (text) return NextResponse.json({ text, toolsUsed, mode: 'vertex_ai', pendingAction });
+    if (text) return NextResponse.json({ text, toolsUsed, mode: providerMode, pendingAction });
   } catch (error) {
-    console.error('[IA_VERTEX_ERROR]', error);
+    console.error('[IA_PROVIDER_ERROR]', providerMode, error);
     await logAudit({
       action: 'IA_PROVIDER_ERROR', module: 'IA', status: 'FAILED', userId: context.userId,
       userRole: context.userRole, description: 'El proveedor de IA no respondió; se usó el modo local.',
