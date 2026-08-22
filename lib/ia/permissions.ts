@@ -1,17 +1,22 @@
 import type { IAToolName, IAUserRole } from './types';
 
-const ALL_READ_TOOLS = new Set<IAToolName>([
+const ALL_TOOLS = new Set<IAToolName>([
   'getTodayAppointments',
   'getAppointmentSummary',
   'searchClients',
+  'searchServices',
+  'getAvailableSlots',
   'getPopularServices',
   'getStaffWorkload',
+  'prepareCreateClient',
+  'prepareCreateAppointment',
+  'prepareUpdateAppointmentStatus',
 ]);
 
 const PERMISSIONS: Record<IAUserRole, Set<IAToolName>> = {
-  ADMIN: ALL_READ_TOOLS,
-  TECH_SUPPORT: ALL_READ_TOOLS,
-  EMPLEADO: ALL_READ_TOOLS,
+  ADMIN: ALL_TOOLS,
+  TECH_SUPPORT: ALL_TOOLS,
+  EMPLEADO: ALL_TOOLS,
 };
 
 export function isKnownRole(role: string | null): role is IAUserRole {

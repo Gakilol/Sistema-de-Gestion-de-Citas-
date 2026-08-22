@@ -3,11 +3,19 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { getScopedAppointmentWhere } from '@/lib/auth-helpers';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
+import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
+import { IAToolInputError, prepareCreateAppointment, prepareCreateClient, prepareUpdateAppointmentStatus } from './action-builders';
 import type { IAExecutionContext, IAToolName, IAToolResult } from './types';
 
 const emptySchema = z.object({}).optional().default({});
 const searchSchema = z.object({ query: z.string().trim().min(2).max(80), limit: z.number().int().min(1).max(15).optional().default(8) });
 const daysSchema = z.object({ dias: z.number().int().min(1).max(180).optional().default(30) });
+const catalogSearchSchema = z.object({ query: z.string().trim().max(80).optional().default('') });
+const slotsSchema = z.object({
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  servicio: z.string().trim().min(2).max(100),
+  profesional: z.string().trim().max(100).optional(),
+});
 
 function scopedWhere(context: IAExecutionContext) {
   return getScopedAppointmentWhere(context.userId, context.userRole);
@@ -26,6 +34,7 @@ async function getTodayAppointments(context: IAExecutionContext) {
   return prisma.cita.findMany({
     where: { fecha: today, ...scopedWhere(context) },
     select: {
+      id: true,
       cliente_nombre: true,
       hora: true,
       duracion: true,
@@ -36,6 +45,53 @@ async function getTodayAppointments(context: IAExecutionContext) {
     orderBy: { hora: 'asc' },
     take: 40,
   });
+}
+
+async function searchServices(args: unknown) {
+  const { query } = catalogSearchSchema.parse(args);
+  return prisma.servicio.findMany({
+    where: { activo: true, ...(query ? { nombre: { contains: query, mode: 'insensitive' } } : {}) },
+    select: { id: true, nombre: true, duracion: true, categoria: true },
+    orderBy: { nombre: 'asc' },
+    take: 12,
+  });
+}
+
+async function getAvailableSlots(args: unknown, context: IAExecutionContext) {
+  const data = slotsSchema.parse(args);
+  const services = await prisma.servicio.findMany({
+    where: { activo: true, nombre: { contains: data.servicio, mode: 'insensitive' } },
+    select: { id: true, nombre: true, duracion: true },
+    take: 3,
+  });
+  if (services.length !== 1) {
+    throw new IAToolInputError(services.length === 0
+      ? `No encontré el servicio “${data.servicio}”.`
+      : `Indica uno de estos servicios: ${services.map((item: { nombre: string }) => item.nombre).join(', ')}.`);
+  }
+  const employees = await prisma.empleado.findMany({
+    where: {
+      activo: true,
+      esAgendable: true,
+      ...(context.userRole === 'EMPLEADO'
+        ? { id: context.userId }
+        : data.profesional ? { nombre: { contains: data.profesional, mode: 'insensitive' } } : {}),
+    },
+    select: { id: true, nombre: true },
+    orderBy: { nombre: 'asc' },
+    take: 8,
+  });
+  if (employees.length === 0) throw new IAToolInputError('No encontré profesionales disponibles con ese criterio.');
+
+  return Promise.all(employees.map(async (employee: { id: string; nombre: string }) => {
+    const availability = await calculateAppointmentAvailability(employee.id, data.fecha, services[0].id, services[0].duracion);
+    return {
+      profesional: employee.nombre,
+      servicio: services[0].nombre,
+      fecha: data.fecha,
+      horas: (availability.bloques ?? []).filter((slot: { disponible: boolean }) => slot.disponible).slice(0, 12).map((slot: { hora: string }) => slot.hora),
+    };
+  }));
 }
 
 async function getAppointmentSummary(context: IAExecutionContext) {
@@ -119,13 +175,23 @@ export async function executeIATool(
 ): Promise<IAToolResult> {
   try {
     let data: unknown;
+    let pendingAction;
     if (name === 'getTodayAppointments') data = await getTodayAppointments(context);
     else if (name === 'getAppointmentSummary') data = await getAppointmentSummary(context);
     else if (name === 'searchClients') data = await searchClients(args);
+    else if (name === 'searchServices') data = await searchServices(args);
+    else if (name === 'getAvailableSlots') data = await getAvailableSlots(args, context);
     else if (name === 'getPopularServices') data = await getPopularServices(args, context);
-    else data = await getStaffWorkload(args, context);
-    return { ok: true, data, meta: { fuenteDatos: 'HAIR STYLE' } };
+    else if (name === 'getStaffWorkload') data = await getStaffWorkload(args, context);
+    else if (name === 'prepareCreateClient') pendingAction = await prepareCreateClient(args);
+    else if (name === 'prepareCreateAppointment') pendingAction = await prepareCreateAppointment(args, context);
+    else pendingAction = await prepareUpdateAppointmentStatus(args, context);
+    if (pendingAction) data = { readyForConfirmation: true, summary: pendingAction.details };
+    return { ok: true, data, meta: { fuenteDatos: 'HAIR STYLE' }, ...(pendingAction ? { pendingAction } : {}) };
   } catch (error) {
+    if (error instanceof IAToolInputError) {
+      return { ok: false, error: error.message, code: 'INVALID_PARAMS' };
+    }
     if (error instanceof z.ZodError) {
       return { ok: false, error: 'Los parámetros de la consulta no son válidos.', code: 'INVALID_PARAMS' };
     }

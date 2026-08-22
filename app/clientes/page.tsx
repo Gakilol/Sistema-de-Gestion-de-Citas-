@@ -506,6 +506,14 @@ export default function Clientes() {
   const [totalPages, setTotalPages] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('nuevo') === '1') {
+      setShowAgregar(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const fetchClientes = useCallback(async (q = '', targetPage = 1) => {
     setIsLoading(true);
     try {

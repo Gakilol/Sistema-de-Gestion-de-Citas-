@@ -2,7 +2,7 @@
 
 ## Direction
 
-HAIR STYLE is a high-contrast operational workbench for salon and barbershop staff who move between the counter, the chair, and a phone throughout the day. It should feel precise, confident and premium without becoming ornamental.
+HAIR STYLE is a high-contrast, task-first operational workbench for salon and barbershop staff who move between the counter, the chair, and a phone throughout the day. It must also work for older or low-confidence digital users: each screen leads with one plain-language question and exposes advanced information only when requested. It should feel precise, confident and premium without becoming ornamental.
 
 Domain vocabulary: appointment book, time slots, service menu, station, client card, shift, chair, confirmation.
 
@@ -16,6 +16,8 @@ Rejected defaults:
 - Gold gradients and glow: gold is flat, scarce, and reserved for selection or action.
 - Pastel-tinted canvases or cards: surfaces stay neutral and high contrast.
 - Identical KPI card grids: priority is expressed through scale, whitespace, and type rather than equal boxes.
+- Dashboards that lead with charts: Inicio leads with “¿Qué necesitas hacer?”, then today’s next actions; business analysis is secondary.
+- Dense mobile calendars as the default: mobile Agenda starts as a readable “Hoy” list and keeps the full calendar as an optional view.
 
 ## Tokens
 
@@ -39,9 +41,9 @@ Surfaces use subtle tonal shifts. Light mode adds a quiet layered shadow to rais
 ## Layout and density
 
 - Base spacing unit: 4px.
-- Desktop navigation: 272px; content remains the focal area.
+- Desktop navigation: 288px; the four common destinations remain clearly separated from secondary administration tools.
 - Page width: 1440px maximum, 20–32px page padding depending on viewport.
-- Controls: 40px desktop, 44px touch devices.
+- Controls: 44px desktop, 48px for primary tasks and touch confirmations.
 - Radius: 8px controls, 12px cards, 16px panels/drawers.
 - Motion: 120–240ms, transform and opacity only; reduced-motion always respected.
 
@@ -50,5 +52,8 @@ Surfaces use subtle tonal shifts. Light mode adds a quiet layered shadow to rais
 - Primary button: 40px high, 10px radius, 14px/700, flat gold fill with black text, restrained 1px ring and short shadow.
 - Input: 40px desktop / 44px mobile, 10px radius, inset control surface, 14px body.
 - Card: 12px radius, quiet ring, no decorative top border; hierarchy comes from content.
-- Navigation row: 40px high, 10px radius, 14px/600; active state uses the gold rail and node.
+- Navigation row: 48px high, 12px radius, 15px/600; active state uses the gold rail and node.
 - Mobile bottom navigation: 72px plus safe area, 44px hit zones, active rail at the top edge.
+- Task card: icon, verb-led 18–20px title and one short explanation. Never put metrics, menus or tertiary actions inside it.
+- AI mutation confirmation: the assistant may prepare an operation, but the user sees a bordered summary with every material field and a 48px explicit confirmation button before any write.
+- Progressive disclosure: operational summaries can use `<details>` or a dedicated report page; advanced information never competes with the primary task.

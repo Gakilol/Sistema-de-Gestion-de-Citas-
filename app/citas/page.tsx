@@ -61,12 +61,12 @@ function CitasContent() {
   const [busqueda, setBusqueda]   = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroEmpleado, setFiltroEmpleado] = useState('');
-  const [filtroSmart, setFiltroSmart] = useState<AppointmentSmartFilter>('activas');
+  const [filtroSmart, setFiltroSmart] = useState<AppointmentSmartFilter>('hoy');
   const [filtroHistorialPeriodo, setFiltroHistorialPeriodo] = useState<AppointmentHistoryPeriod>('todos');
   const [page, setPage]           = useState(1);
 
   // Modos de Vista y Scopes
-  const [vistaModo, setVistaModo] = useState<AppointmentWorkspaceView>('agenda');
+  const [vistaModo, setVistaModo] = useState<AppointmentWorkspaceView>('lista');
   const [scope, setScope] = useState<AppointmentWorkspaceScope>('mine');
   // La agenda siempre parte de hoy. El formulario de creación conserva por
   // separado la regla operativa que puede proponer mañana después del cierre.
@@ -346,6 +346,14 @@ function CitasContent() {
     setEditingId(null);
     setShowModal(true);
   };
+
+  const openedFromQueryRef = useRef(false);
+  useEffect(() => {
+    if (openedFromQueryRef.current || catalogosLoading || searchParams.get('nueva') !== '1') return;
+    openedFromQueryRef.current = true;
+    openCreate();
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [catalogosLoading, searchParams]);
 
   const openCreateFromSlot = ({ date, time, empleadoId, durationMinutes }: { date: string; time: string; empleadoId: string; durationMinutes: number }) => {
     const activeServs = servicios.filter(s => s.activo);

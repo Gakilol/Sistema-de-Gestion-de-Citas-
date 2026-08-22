@@ -94,7 +94,8 @@ test.describe('UI responsive autenticada', () => {
     test.setTimeout(120_000);
 
     const modules = [
-      { path: '/dashboard', heading: /Bienvenido/i },
+      { path: '/dashboard', heading: /Hola/i },
+      { path: '/ia', heading: /Qué necesitas hacer/i },
       { path: '/citas', heading: 'Agenda y citas' },
       { path: '/clientes', heading: 'Clientes' },
       { path: '/servicios', heading: /Catálogo de Servicios/i },

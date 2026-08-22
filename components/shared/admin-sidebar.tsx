@@ -43,27 +43,22 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   {
-    label: 'Vista general',
+    label: 'Lo más usado',
     items: [
-      { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
-    ],
-  },
-  {
-    label: 'Día a día',
-    items: [
+      { title: 'Inicio', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Agenda', href: '/citas', icon: Calendar, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
-      { title: 'Asistente IA', href: '/ia', icon: Sparkles, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
+      { title: 'Asistente', href: '/ia', icon: Sparkles, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Clientes', href: '/clientes', icon: Users, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
-      { title: 'Clientes inactivos', href: '/clientes-inactivos', icon: UserX, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
     ],
   },
   {
-    label: 'Administración',
+    label: 'Más herramientas',
     items: [
       { title: 'Servicios', href: '/servicios', icon: Scissors, roles: ['ADMIN', 'TECH_SUPPORT'] },
       { title: 'Categorías', href: '/categorias', icon: Tag, roles: ['ADMIN', 'TECH_SUPPORT'] },
       { title: 'Personal', href: '/empleados', icon: UserRound, roles: ['ADMIN', 'TECH_SUPPORT'] },
       { title: 'Reportes', href: '/reportes', icon: BarChart3, roles: ['ADMIN', 'TECH_SUPPORT'] },
+      { title: 'Clientes inactivos', href: '/clientes-inactivos', icon: UserX, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Configuración', href: '/configuracion', icon: Settings, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Auditoría', href: '/auditoria', icon: ShieldCheck, roles: ['ADMIN', 'TECH_SUPPORT'] },
     ],
@@ -71,7 +66,7 @@ const menuGroups: MenuGroup[] = [
 ];
 
 const pageNames: Record<string, string> = {
-  '/dashboard': 'Dashboard',
+  '/dashboard': 'Inicio',
   '/citas': 'Agenda',
   '/ia': 'Asistente IA',
   '/clientes': 'Clientes',
@@ -210,16 +205,14 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
-      {user && <UserCard nombre={user.nombre} rol={user.rol} />}
-
-      <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-3 pb-3 pt-5">
+      <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-3 pb-3 pt-3">
         {menuGroups.map((group) => {
           const visibleItems = group.items.filter((item) => item.roles.includes(user?.rol ?? 'EMPLEADO'));
           if (visibleItems.length === 0) return null;
 
           return (
             <section key={group.label} aria-labelledby={`nav-${group.label}`} className="mb-5">
-              <h2 id={`nav-${group.label}`} className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
+              <h2 id={`nav-${group.label}`} className="mb-2 px-3 text-xs font-bold text-muted-foreground/75">
                 {group.label}
               </h2>
               <div className="space-y-0.5">
@@ -232,7 +225,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                       onClick={onClose}
                       aria-current={active ? 'page' : undefined}
                       className={cn(
-                        'group relative flex h-10 items-center gap-3 rounded-[10px] px-3 text-[13px] font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sidebar-ring/45',
+                        'group relative flex h-12 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sidebar-ring/45',
                         active
                           ? 'bg-sidebar-accent text-sidebar-foreground'
                           : 'text-muted-foreground hover:bg-sidebar-accent/65 hover:text-sidebar-foreground',
@@ -255,6 +248,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border/70 px-3 pb-3 pt-2.5">
+        {user && <div className="-mx-3 mb-2"><UserCard nombre={user.nombre} rol={user.rol} /></div>}
         <ThemeToggle />
         <button
           type="button"
@@ -305,7 +299,7 @@ function MobileBottomNav({ onOpen }: { onOpen: () => void }) {
   const items = [
     { title: 'Inicio', href: '/dashboard', icon: LayoutDashboard },
     { title: 'Agenda', href: '/citas', icon: Calendar },
-    { title: 'Clientes', href: '/clientes', icon: Users },
+    { title: 'Asistente', href: '/ia', icon: Sparkles },
   ];
 
   return (
@@ -353,7 +347,7 @@ export function AdminSidebar() {
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-dvh w-[17rem] shrink-0 overflow-hidden border-r border-sidebar-border/70 bg-sidebar lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-[18rem] shrink-0 overflow-hidden border-r border-sidebar-border/70 bg-sidebar lg:flex">
         <SidebarContent />
       </aside>
 
