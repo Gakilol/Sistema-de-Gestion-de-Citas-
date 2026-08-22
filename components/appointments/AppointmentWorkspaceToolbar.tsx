@@ -16,13 +16,13 @@ interface AppointmentWorkspaceToolbarProps {
 }
 
 const viewOptions = [
-  { id: 'agenda' as const, label: 'Agenda', icon: CalendarDays },
-  { id: 'lista' as const, label: 'Lista', icon: List },
+  { id: 'agenda' as const, label: 'Agenda', compactLabel: 'Agenda', icon: CalendarDays },
+  { id: 'lista' as const, label: 'Lista', compactLabel: 'Lista', icon: List },
 ];
 
 const scopeOptions = [
-  { id: 'mine' as const, label: 'Mi agenda', icon: UserRound },
-  { id: 'all' as const, label: 'Equipo', icon: Users },
+  { id: 'mine' as const, label: 'Mi agenda', compactLabel: 'Mía', icon: UserRound },
+  { id: 'all' as const, label: 'Equipo', compactLabel: 'Equipo', icon: Users },
 ];
 
 export function AppointmentWorkspaceToolbar({
@@ -42,7 +42,7 @@ export function AppointmentWorkspaceToolbar({
       aria-label="Controles de la agenda"
     >
       <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex sm:flex-none">
-        {viewOptions.map(({ id, label, icon: Icon }) => {
+        {viewOptions.map(({ id, label, compactLabel, icon: Icon }) => {
           const active = view === id;
           return (
             <button
@@ -59,7 +59,7 @@ export function AppointmentWorkspaceToolbar({
             >
               {active && <span className="absolute inset-x-3 -bottom-1 h-px bg-primary" />}
               <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{label}</span>
+              <span className="truncate">{compact ? compactLabel : label}</span>
             </button>
           );
         })}
@@ -69,7 +69,7 @@ export function AppointmentWorkspaceToolbar({
         <>
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border/80" aria-hidden="true" />
           <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex sm:flex-none">
-            {scopeOptions.map(({ id, label, icon: Icon }) => {
+            {scopeOptions.map(({ id, label, compactLabel, icon: Icon }) => {
               const active = scope === id;
               return (
                 <button
@@ -85,7 +85,7 @@ export function AppointmentWorkspaceToolbar({
                   )}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{label}</span>
+                  <span className="truncate">{compact ? compactLabel : label}</span>
                 </button>
               );
             })}

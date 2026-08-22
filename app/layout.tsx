@@ -9,7 +9,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: {
     template: `%s — ${BRAND.productName}`,
-    default: `${BRAND.productName} — ${BRAND.businessName}`,
+    default: `${BRAND.productName} — ${BRAND.descriptor}`,
   },
   description:
     `Agenda y gestión profesional para ${BRAND.businessName} ${BRAND.descriptor}.`,

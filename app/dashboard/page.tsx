@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { authFetch } from '@/lib/api-client';
 import { PageHeader } from '@/components/shared/page-header';
 import { MetricStrip, type MetricStripItem } from '@/components/shared/metric-strip';
+import { useAppointmentStatusSync } from '@/lib/appointments/use-appointment-status-sync';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface DashboardAppointment {
@@ -64,7 +65,7 @@ interface DashboardData {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const PIE_COLORS = ['#b86f3d', '#3f765f', '#4f7183', '#9d4655', '#ad7a26'];
+const PIE_COLORS = ['#C8A646', '#24865A', '#3976B9', '#A40022', '#525252'];
 
 function fmtDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d;
@@ -133,6 +134,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { if (user) load(); }, [user, load]);
+  useAppointmentStatusSync(Boolean(user), () => load(true));
 
   const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT';
 
@@ -141,7 +143,7 @@ export default function Dashboard() {
     return (
       <div className="flex min-h-screen bg-background">
         <AdminSidebar />
-        <main className="flex-1 pt-14 lg:pt-0 overflow-y-auto">
+        <main className="flex-1 pt-16 lg:pt-0 overflow-y-auto">
           <div className="app-page space-y-6">
             <div className="skeleton h-8 w-48 mb-2" />
             <div className="skeleton h-4 w-64" />
@@ -183,7 +185,7 @@ export default function Dashboard() {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto pt-16 lg:pt-0">
         <div className="app-page space-y-5 sm:space-y-6 page-enter">
 
           <PageHeader
@@ -221,15 +223,15 @@ export default function Dashboard() {
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradCopper" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#b86f3d" stopOpacity={0.24} />
-                      <stop offset="95%" stopColor="#b86f3d" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#C8A646" stopOpacity={0.24} />
+                      <stop offset="95%" stopColor="#C8A646" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="citas" name="Citas" stroke="#b86f3d" strokeWidth={2} fill="url(#gradCopper)" dot={{ r: 3, fill: '#b86f3d', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                  <Area type="monotone" dataKey="citas" name="Citas" stroke="#C8A646" strokeWidth={2} fill="url(#gradCopper)" dot={{ r: 3, fill: '#C8A646', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </Card>
@@ -298,7 +300,7 @@ export default function Dashboard() {
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="citas" name="Citas" fill="#b86f3d" radius={[4,4,0,0]} maxBarSize={40} />
+                  <Bar dataKey="citas" name="Citas" fill="#C8A646" radius={[4,4,0,0]} maxBarSize={40} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>

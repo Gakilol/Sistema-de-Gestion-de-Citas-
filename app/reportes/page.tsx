@@ -34,7 +34,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   { id: 'profesionales', label: 'Rendimiento',     icon: Briefcase,    desc: 'Desempeño y carga de trabajo por profesional' },
 ];
 
-const PIE_COLORS = ['#b86f3d', '#3f765f', '#4f7183', '#9d4655', '#ad7a26', '#756e67', '#8c6347'];
+const PIE_COLORS = ['#C8A646', '#24865A', '#3976B9', '#A40022', '#525252', '#7A7A7A', '#9B7B28'];
 
 // ─── Date Presets ─────────────────────────────────────────────────────────────
 function getPreset(key: string): [string, string] {
@@ -864,7 +864,7 @@ function ReportesContent() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto pt-16 lg:pt-0">
         <div className="app-page space-y-5 page-enter">
 
           <PageHeader

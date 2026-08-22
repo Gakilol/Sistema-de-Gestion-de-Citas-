@@ -30,7 +30,7 @@ export function AuthShell({
         </div>
 
         <p className="mx-auto w-full max-w-md text-xs text-muted-foreground">
-          © {new Date().getFullYear()} {BRAND.businessName} · Acceso reservado al equipo
+          © {new Date().getFullYear()} {BRAND.productName} · Acceso reservado al equipo
         </p>
       </section>
 

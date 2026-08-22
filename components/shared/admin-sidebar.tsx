@@ -22,6 +22,7 @@ import {
   UserRound,
   Users,
   UserX,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -51,6 +52,7 @@ const menuGroups: MenuGroup[] = [
     label: 'Día a día',
     items: [
       { title: 'Agenda', href: '/citas', icon: Calendar, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
+      { title: 'Asistente IA', href: '/ia', icon: Sparkles, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Clientes', href: '/clientes', icon: Users, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Clientes inactivos', href: '/clientes-inactivos', icon: UserX, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
     ],
@@ -71,6 +73,7 @@ const menuGroups: MenuGroup[] = [
 const pageNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/citas': 'Agenda',
+  '/ia': 'Asistente IA',
   '/clientes': 'Clientes',
   '/clientes-inactivos': 'Clientes inactivos',
   '/servicios': 'Servicios',
@@ -108,11 +111,11 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
       </span>
       {!compact && (
         <span className="min-w-0">
-          <span className="block font-display text-[22px] font-semibold leading-none tracking-[-0.025em] text-sidebar-foreground">
+          <span className="block text-[19px] font-black leading-none tracking-[-0.045em] text-sidebar-foreground">
             {BRAND.productName}
           </span>
           <span className="mt-1 block truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            {BRAND.businessName} · {BRAND.descriptor}
+            {BRAND.descriptor}
           </span>
         </span>
       )}

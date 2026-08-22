@@ -4,104 +4,104 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* NovaCita — porcelain appointment book */
-  --background: 36 29% 96%;
-  --foreground: 28 16% 10%;
-  --card: 40 33% 99%;
-  --card-foreground: 28 16% 10%;
-  --popover: 40 33% 99%;
-  --popover-foreground: 28 16% 10%;
-  --primary: 25 49% 48%;
-  --primary-foreground: 36 35% 98%;
-  --secondary: 35 23% 92%;
-  --secondary-foreground: 28 13% 18%;
-  --muted: 34 20% 90%;
-  --muted-foreground: 28 8% 43%;
-  --accent: 28 32% 89%;
-  --accent-foreground: 25 42% 30%;
-  --destructive: 350 39% 45%;
-  --destructive-foreground: 36 35% 98%;
-  --border: 31 17% 83%;
-  --input: 32 20% 89%;
-  --ring: 25 49% 48%;
+  /* HAIR STYLE — optical white, lacquer, gold and burgundy */
+  --background: 60 11% 96%;
+  --foreground: 0 0% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 4%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 4%;
+  --primary: 44 55% 53%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 0 0% 92%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 0 0% 89%;
+  --muted-foreground: 0 0% 38%;
+  --accent: 348 100% 32%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 348 100% 32%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 79%;
+  --input: 0 0% 91%;
+  --ring: 44 55% 45%;
   --radius: 0.625rem;
 
-  --chart-1: 25 49% 48%;
-  --chart-2: 155 30% 36%;
-  --chart-3: 200 25% 41%;
-  --chart-4: 42 55% 48%;
-  --chart-5: 350 39% 45%;
+  --chart-1: 44 55% 45%;
+  --chart-2: 155 58% 33%;
+  --chart-3: 212 53% 47%;
+  --chart-4: 348 100% 32%;
+  --chart-5: 0 0% 22%;
 
-  --sidebar: 36 29% 96%;
-  --sidebar-foreground: 28 16% 10%;
-  --sidebar-primary: 25 49% 48%;
-  --sidebar-primary-foreground: 36 35% 98%;
-  --sidebar-accent: 34 24% 91%;
-  --sidebar-accent-foreground: 28 16% 10%;
-  --sidebar-border: 31 17% 84%;
-  --sidebar-ring: 25 49% 48%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 0 0% 4%;
+  --sidebar-primary: 44 55% 45%;
+  --sidebar-primary-foreground: 0 0% 4%;
+  --sidebar-accent: 0 0% 91%;
+  --sidebar-accent-foreground: 0 0% 4%;
+  --sidebar-border: 0 0% 81%;
+  --sidebar-ring: 44 55% 45%;
 
-  --copper: 25 49% 48%;
-  --copper-strong: 25 52% 40%;
-  --wine: 350 39% 45%;
-  --surface-raised: 40 33% 99%;
-  --surface-sunken: 34 20% 92%;
-  --control: 34 22% 92%;
-  --success: 155 30% 36%;
-  --warning: 37 65% 43%;
-  --info: 200 25% 41%;
-  --text-secondary: 28 9% 34%;
-  --text-tertiary: 28 7% 49%;
+  --copper: 44 55% 45%;
+  --copper-strong: 44 60% 37%;
+  --wine: 348 100% 32%;
+  --surface-raised: 0 0% 100%;
+  --surface-sunken: 0 0% 94%;
+  --control: 0 0% 92%;
+  --success: 155 58% 33%;
+  --warning: 38 78% 38%;
+  --info: 212 53% 47%;
+  --text-secondary: 0 0% 28%;
+  --text-tertiary: 0 0% 45%;
 }
 
 .dark {
-  /* NovaCita — warm ink appointment book */
-  --background: 28 14% 7%;
-  --foreground: 36 25% 91%;
-  --card: 28 12% 9.5%;
-  --card-foreground: 36 25% 91%;
-  --popover: 28 11% 12%;
-  --popover-foreground: 36 25% 91%;
-  --primary: 25 52% 56%;
-  --primary-foreground: 28 18% 7%;
-  --secondary: 28 10% 14%;
-  --secondary-foreground: 36 18% 87%;
-  --muted: 28 9% 15%;
-  --muted-foreground: 32 10% 59%;
-  --accent: 26 16% 16%;
-  --accent-foreground: 32 31% 82%;
-  --destructive: 350 43% 53%;
-  --destructive-foreground: 36 35% 98%;
-  --border: 30 10% 19%;
-  --input: 28 10% 13%;
-  --ring: 25 52% 56%;
+  /* HAIR STYLE — lacquer and graphite */
+  --background: 0 0% 3%;
+  --foreground: 60 11% 96%;
+  --card: 0 0% 7%;
+  --card-foreground: 60 11% 96%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 60 11% 96%;
+  --primary: 44 55% 53%;
+  --primary-foreground: 0 0% 3%;
+  --secondary: 0 0% 13%;
+  --secondary-foreground: 0 0% 92%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 64%;
+  --accent: 348 100% 32%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 348 72% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 22%;
+  --input: 0 0% 12%;
+  --ring: 44 58% 58%;
 
-  --chart-1: 25 52% 58%;
-  --chart-2: 155 31% 48%;
-  --chart-3: 200 29% 57%;
-  --chart-4: 42 58% 58%;
-  --chart-5: 350 45% 61%;
+  --chart-1: 44 55% 58%;
+  --chart-2: 155 57% 48%;
+  --chart-3: 212 63% 62%;
+  --chart-4: 348 68% 55%;
+  --chart-5: 0 0% 70%;
 
-  --sidebar: 28 14% 7%;
-  --sidebar-foreground: 36 25% 91%;
-  --sidebar-primary: 25 52% 56%;
-  --sidebar-primary-foreground: 28 18% 7%;
-  --sidebar-accent: 28 10% 13%;
-  --sidebar-accent-foreground: 36 25% 91%;
-  --sidebar-border: 30 10% 17%;
-  --sidebar-ring: 25 52% 56%;
+  --sidebar: 0 0% 3%;
+  --sidebar-foreground: 60 11% 96%;
+  --sidebar-primary: 44 55% 53%;
+  --sidebar-primary-foreground: 0 0% 3%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 60 11% 96%;
+  --sidebar-border: 0 0% 19%;
+  --sidebar-ring: 44 55% 53%;
 
-  --copper: 25 52% 56%;
-  --copper-strong: 25 56% 64%;
-  --wine: 350 43% 53%;
-  --surface-raised: 28 12% 10%;
-  --surface-sunken: 28 11% 6%;
-  --control: 28 10% 13%;
-  --success: 155 31% 48%;
-  --warning: 37 66% 57%;
-  --info: 200 29% 57%;
-  --text-secondary: 33 12% 72%;
-  --text-tertiary: 31 9% 55%;
+  --copper: 44 55% 53%;
+  --copper-strong: 44 64% 63%;
+  --wine: 348 68% 55%;
+  --surface-raised: 0 0% 7%;
+  --surface-sunken: 0 0% 2%;
+  --control: 0 0% 12%;
+  --success: 155 57% 48%;
+  --warning: 38 82% 58%;
+  --info: 212 63% 62%;
+  --text-secondary: 0 0% 75%;
+  --text-tertiary: 0 0% 57%;
 }
 
 @theme inline {
@@ -232,7 +232,7 @@
     width: 100%;
     max-width: 90rem;
     margin-inline: auto;
-    padding: 1.25rem 1rem 2.5rem;
+    padding: 1.25rem 1rem calc(6.25rem + env(safe-area-inset-bottom, 0px));
   }
 
   .page-heading {
@@ -277,8 +277,8 @@
 
   @media (max-width: 767px) {
     input:not([type='checkbox']):not([type='radio']), select, textarea { font-size: 16px !important; }
-    body:has([data-mobile-bottom-nav]) main { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
-    .app-page { padding: 1rem 0.75rem 1.75rem; }
+    body:has([data-mobile-bottom-nav]) main { padding-bottom: 0; }
+    .app-page { padding: 1rem 0.75rem calc(6.25rem + env(safe-area-inset-bottom, 0px)); }
     .page-heading { font-size: 1.375rem; }
     .surface-panel { border-radius: 0.75rem; box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.025); }
     .agenda-page { padding-inline: 0.75rem; }

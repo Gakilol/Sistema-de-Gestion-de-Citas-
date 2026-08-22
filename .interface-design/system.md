@@ -1,36 +1,37 @@
-# NovaCita interface system
+# HAIR STYLE interface system
 
 ## Direction
 
-NovaCita is a calm, editorial workbench for salon and barbershop staff who move between the counter, the chair, and a phone throughout the day. The interface should feel precise, warm, and composed: closer to a well-organized appointment book on a dark wood counter than a generic SaaS dashboard.
+HAIR STYLE is a high-contrast operational workbench for salon and barbershop staff who move between the counter, the chair, and a phone throughout the day. It should feel precise, confident and premium without becoming ornamental.
 
 Domain vocabulary: appointment book, time slots, service menu, station, client card, shift, chair, confirmation.
 
-Color world: warm ink, porcelain, tracing paper, aged brass/copper, bottle green, burgundy, steel blue.
+Color world: lacquer black, optical white, graphite, metallic gold and the logo's deep burgundy. Green and blue appear only as functional appointment states.
 
-Signature: the copper appointment rail. A thin line and a small node identify current navigation, selected time, and active schedule context. It is the one recurring expressive gesture; everything else stays quiet.
+Signature: the gold appointment rail. A thin line and a small node identify current navigation, selected time, and active schedule context. Burgundy appears as a secondary brand signal.
 
 Rejected defaults:
 
 - Separate dark sidebar on a light canvas: navigation and content share one continuous surface.
-- Gold gradients and glow: copper is flat, scarce, and reserved for selection or action.
+- Gold gradients and glow: gold is flat, scarce, and reserved for selection or action.
+- Pastel-tinted canvases or cards: surfaces stay neutral and high contrast.
 - Identical KPI card grids: priority is expressed through scale, whitespace, and type rather than equal boxes.
 
 ## Tokens
 
-- Ink `#171411`: primary dark canvas.
-- Porcelain `#f7f4ef`: primary light canvas.
-- Paper `#eee8df`: quiet light surface/control.
-- Copper `#b86f3d`: brand action and current-position marker.
-- Bottle `#3f765f`: success/completed.
-- Burgundy `#9d4655`: destructive/cancelled.
-- Steel `#4f7183`: informational/in-progress.
+- Lacquer `#080808`: primary dark canvas.
+- Optical white `#F7F7F5`: primary light canvas.
+- Graphite `#1B1B1B`: raised dark surface.
+- Metallic gold `#C8A646`: brand action and current-position marker.
+- Burgundy `#A40022`: secondary brand signature and destructive emphasis.
+- Emerald `#24865A`: success/completed.
+- Cobalt `#3976B9`: informational/in-progress.
 
 Surfaces use subtle tonal shifts. Light mode adds a quiet layered shadow to raised elements; dark mode relies on low-opacity borders. Inputs are inset and slightly darker than their surrounding surface.
 
 ## Typography
 
-- Display/brand: Bodoni/Didot editorial stack, used only for the product mark and high-level editorial moments.
+- Display/brand: the interface sans stack in an extra-black, tightly tracked treatment for HAIR STYLE; editorial serif remains limited to selected campaign-scale headings.
 - Interface/body: Avenir/Aptos variable system stack, 14–16px with weight and color doing most hierarchy work. The local stack keeps the application deterministic and offline-safe.
 - Data: tabular numerals through the existing sans face.
 - Type scale: 11, 14, 16, 18, 22, 28, 44.
@@ -46,8 +47,8 @@ Surfaces use subtle tonal shifts. Light mode adds a quiet layered shadow to rais
 
 ## Reusable patterns
 
-- Primary button: 40px high, 10px radius, 14px/650, copper fill, restrained 1px ring and short shadow.
+- Primary button: 40px high, 10px radius, 14px/700, flat gold fill with black text, restrained 1px ring and short shadow.
 - Input: 40px desktop / 44px mobile, 10px radius, inset control surface, 14px body.
 - Card: 12px radius, quiet ring, no decorative top border; hierarchy comes from content.
-- Navigation row: 40px high, 10px radius, 14px/600; active state uses the copper rail and node.
+- Navigation row: 40px high, 10px radius, 14px/600; active state uses the gold rail and node.
 - Mobile bottom navigation: 72px plus safe area, 44px hit zones, active rail at the top edge.

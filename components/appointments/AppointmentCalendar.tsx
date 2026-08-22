@@ -1783,7 +1783,7 @@ export function AppointmentCalendar({
                 className="h-11 shrink-0 gap-1 rounded-xl px-2.5 text-[10px] font-semibold sm:hidden"
               >
                 <Plus className="h-4 w-4" />
-                <span>Nueva cita</span>
+                <span className="hidden min-[360px]:inline">Nueva cita</span>
               </Button>
             )}
 
@@ -2200,10 +2200,10 @@ export function AppointmentCalendar({
                             const statusVisual: Record<string, { accent: string; surfaceMix: number }> = {
                               PENDIENTE: { accent: '#ad7a26', surfaceMix: 12 },
                               CONFIRMADA: { accent: '#4f7183', surfaceMix: 12 },
-                              EN_PROGRESO: { accent: '#b86f3d', surfaceMix: 13 },
+                              EN_PROGRESO: { accent: '#3976B9', surfaceMix: 13 },
                               COMPLETADA: { accent: '#3f765f', surfaceMix: 11 },
                               CANCELADA: { accent: '#756e67', surfaceMix: 8 },
-                              NO_SHOW: { accent: '#9d4655', surfaceMix: 10 },
+                              NO_SHOW: { accent: '#A40022', surfaceMix: 10 },
                               REPROGRAMADA: { accent: '#8c6347', surfaceMix: 11 },
                             };
                             const appointmentVisual = statusVisual[cita.estado] ?? { accent: catColor, surfaceMix: 14 };

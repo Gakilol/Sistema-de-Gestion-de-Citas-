@@ -215,7 +215,7 @@ export default function HorariosEmpleado() {
     return (
       <div className="flex min-h-screen bg-background">
         <AdminSidebar />
-        <main className="flex-1 flex items-center justify-center pt-14 lg:pt-0">
+        <main className="flex-1 flex items-center justify-center pt-16 lg:pt-0">
           <div className="text-center space-y-3">
             <div className="skeleton h-8 w-48 mx-auto"/>
             <div className="skeleton h-4 w-32 mx-auto"/>
@@ -228,7 +228,7 @@ export default function HorariosEmpleado() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto pt-16 lg:pt-0">
         <div className="app-page !max-w-3xl space-y-5 page-enter">
 
           <div className="flex items-start gap-2 sm:gap-3">

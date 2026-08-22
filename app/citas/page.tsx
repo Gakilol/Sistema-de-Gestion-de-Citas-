@@ -45,6 +45,7 @@ import {
 import type { CalendarAppointment, CalendarEmployee } from '@/components/appointments/appointment-calendar-types';
 import type { AppointmentConflict } from '@/lib/appointments/appointment-availability';
 import { getErrorMessage } from '@/lib/errors';
+import { useAppointmentStatusSync } from '@/lib/appointments/use-appointment-status-sync';
 
 function CitasContent() {
   const [citas, setCitas]         = useState<CalendarAppointment[]>([]);
@@ -289,6 +290,8 @@ function CitasContent() {
       setCatalogosLoading(false);
     }
   };
+
+  useAppointmentStatusSync(Boolean(user), () => fetchCitas(scope, filtroEmpleado));
 
   useEffect(() => {
     if (user?.rol === 'TECH_SUPPORT') {
@@ -839,7 +842,7 @@ function CitasContent() {
   const mainContent = (
     <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-0">
         <div className="app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
 
           <header className={cn('items-end justify-between gap-4', vistaModo === 'agenda' ? 'hidden sm:flex' : 'flex')}>

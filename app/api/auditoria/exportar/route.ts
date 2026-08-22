@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
     if (formato === 'pdf') {
       return NextResponse.json({
         meta: {
-          sistema: 'NovaCita - Gestión de Citas',
+          sistema: 'HAIR STYLE - Gestión de Citas',
           reporte: 'Historial de Auditoría del Sistema',
           fechaGeneracion: new Date().toISOString(),
           usuario: auth.email,
