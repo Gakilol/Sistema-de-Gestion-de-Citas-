@@ -12,6 +12,17 @@ export const APPOINTMENT_STATUS_OPTIONS = [
 
 export const APPOINTMENTS_PER_PAGE = 15;
 
+export type AppointmentSmartFilter =
+  | 'activas'
+  | 'hoy'
+  | 'manana'
+  | 'semana'
+  | 'mes'
+  | 'historial'
+  | 'todas';
+
+export type AppointmentHistoryPeriod = 'todos' | 'diario' | 'semanal' | 'quincenal' | 'mensual';
+
 export interface AppointmentServiceOption {
   id: string;
   nombre: string;

@@ -3,7 +3,7 @@
 import { authFetch } from '@/lib/api-client';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck, Calendar as CalendarIcon, List as ListIcon, UserRound, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { AppointmentTimeSelector } from '@/components/appointments/AppointmentTimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -18,6 +18,12 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { AppointmentCalendar } from '@/components/appointments/AppointmentCalendar';
 import { AppointmentDetailsSheet } from '@/components/appointments/AppointmentDetailsSheet';
 import { AppointmentCreatedConfirmation } from '@/components/appointments/AppointmentCreatedConfirmation';
+import {
+  AppointmentWorkspaceToolbar,
+  type AppointmentWorkspaceScope,
+  type AppointmentWorkspaceView,
+} from '@/components/appointments/AppointmentWorkspaceToolbar';
+import { AppointmentListFilters } from '@/components/appointments/AppointmentListFilters';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
 import {
@@ -30,6 +36,8 @@ import {
   isInCurrentBusinessWeek,
   isInRecentBusinessFortnight,
   sortAppointmentsByDate,
+  type AppointmentHistoryPeriod,
+  type AppointmentSmartFilter,
   type AppointmentClientOption,
   type AppointmentForm,
   type AppointmentServiceOption,
@@ -52,13 +60,13 @@ function CitasContent() {
   const [busqueda, setBusqueda]   = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroEmpleado, setFiltroEmpleado] = useState('');
-  const [filtroSmart, setFiltroSmart] = useState('activas');
-  const [filtroHistorialPeriodo, setFiltroHistorialPeriodo] = useState('todos');
+  const [filtroSmart, setFiltroSmart] = useState<AppointmentSmartFilter>('activas');
+  const [filtroHistorialPeriodo, setFiltroHistorialPeriodo] = useState<AppointmentHistoryPeriod>('todos');
   const [page, setPage]           = useState(1);
 
   // Modos de Vista y Scopes
-  const [vistaModo, setVistaModo] = useState<'lista' | 'agenda'>('agenda');
-  const [scope, setScope] = useState<'mine' | 'all'>('mine');
+  const [vistaModo, setVistaModo] = useState<AppointmentWorkspaceView>('agenda');
+  const [scope, setScope] = useState<AppointmentWorkspaceScope>('mine');
   // La agenda siempre parte de hoy. El formulario de creación conserva por
   // separado la regla operativa que puede proponer mañana después del cierre.
   const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
@@ -812,80 +820,20 @@ function CitasContent() {
   const totalPages = Math.ceil(filteredAndSortedCitas.length / APPOINTMENTS_PER_PAGE);
   const paginated  = filteredAndSortedCitas.slice((page - 1) * APPOINTMENTS_PER_PAGE, page * APPOINTMENTS_PER_PAGE);
 
-  const renderAgendaNavigation = (compact = false) => (
-    <div className={cn(
-      'border border-border/60 bg-card/80 p-1 shadow-sm',
-      compact
-        ? cn('grid w-full gap-1 rounded-xl', canSeeAll ? 'grid-cols-4' : 'grid-cols-2')
-        : 'flex w-full flex-nowrap items-center justify-between gap-1 overflow-x-auto rounded-xl sm:gap-2.5'
-    )}>
-      <div className={cn('contents', !compact && 'sm:flex sm:shrink-0 sm:gap-1')}>
-        <button
-          type="button"
-          onClick={() => setVistaModo('lista')}
-          aria-pressed={vistaModo === 'lista'}
-          className={cn(
-            'flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all sm:min-h-9 sm:px-3.5 sm:text-xs',
-            vistaModo === 'lista'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-          )}
-        >
-          <ListIcon className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">Lista</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setVistaModo('agenda')}
-          aria-pressed={vistaModo === 'agenda'}
-          className={cn(
-            'flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all sm:min-h-9 sm:px-3.5 sm:text-xs',
-            vistaModo === 'agenda'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-          )}
-        >
-          <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">Agenda</span>
-        </button>
-      </div>
+  const handleScopeChange = (nextScope: AppointmentWorkspaceScope) => {
+    setScope(nextScope);
+    if (nextScope === 'mine') setFiltroEmpleado('');
+  };
 
-      {canSeeAll && (
-        <div className={cn('contents', !compact && 'sm:ml-auto sm:flex sm:shrink-0 sm:gap-1')}>
-          <button
-            type="button"
-            onClick={() => {
-              setScope('mine');
-              setFiltroEmpleado('');
-            }}
-            aria-pressed={scope === 'mine'}
-            className={cn(
-              'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 text-[10px] font-bold transition-all sm:min-h-9 sm:px-3 sm:text-xs',
-              scope === 'mine'
-                ? 'border border-primary/35 bg-primary/12 text-primary shadow-sm'
-                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-            )}
-          >
-            <UserRound className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Mi agenda</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setScope('all')}
-            aria-pressed={scope === 'all'}
-            className={cn(
-              'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 text-[10px] font-bold transition-all sm:min-h-9 sm:px-3 sm:text-xs',
-              scope === 'all'
-                ? 'border border-primary/35 bg-primary/12 text-primary shadow-sm'
-                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-            )}
-          >
-            <Users className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Todos</span>
-          </button>
-        </div>
-      )}
-    </div>
+  const renderAgendaNavigation = (compact = false) => (
+    <AppointmentWorkspaceToolbar
+      view={vistaModo}
+      scope={scope}
+      canSeeAll={canSeeAll}
+      compact={compact}
+      onViewChange={setVistaModo}
+      onScopeChange={handleScopeChange}
+    />
   );
 
   const mainContent = (
@@ -894,24 +842,24 @@ function CitasContent() {
       <main className="flex-1 overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
         <div className="app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
 
-          {/* Header */}
-          <div className={cn('items-center justify-between gap-3', vistaModo === 'agenda' ? 'hidden sm:flex' : 'flex')}>
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Agenda y citas</h1>
+          <header className={cn('items-end justify-between gap-4', vistaModo === 'agenda' ? 'hidden sm:flex' : 'flex')}>
+            <div className="min-w-0 border-l border-primary/70 pl-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Libro de citas</p>
+              <h1 className="page-heading">Agenda y citas</h1>
               <p className="page-description truncate sm:whitespace-normal">
-                {vistaModo === 'lista' && `${filteredAndSortedCitas.length} de `}
-                {citas.length} cita{citas.length !== 1 ? 's' : ''} en total
+                {vistaModo === 'lista' ? `${filteredAndSortedCitas.length} visibles · ` : ''}
+                {citas.length} cita{citas.length !== 1 ? 's' : ''} cargada{citas.length !== 1 ? 's' : ''}
               </p>
             </div>
             <Button
               onClick={openCreate}
               disabled={catalogosLoading}
               aria-busy={catalogosLoading}
-              className="gap-2 glow-gold h-11 px-3.5 sm:px-4 text-sm shrink-0"
+              className="h-11 shrink-0 gap-2 px-3.5 text-sm sm:px-4"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva cita</span><span className="sm:hidden">Nueva</span>
             </Button>
-          </div>
+          </header>
 
           {vistaModo === 'lista' && renderAgendaNavigation(false)}
           {vistaModo === 'agenda' && <div className="hidden sm:block">{renderAgendaNavigation(false)}</div>}
@@ -919,114 +867,35 @@ function CitasContent() {
           {/* VISTA DE LISTADO TRADICIONAL */}
           {vistaModo === 'lista' && (
             <div className="space-y-5">
-              {/* Filtros Inteligentes (Tabs) */}
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-1.5 overflow-x-auto no-scrollbar p-1 bg-secondary/30 rounded-xl border border-border/50 w-full md:w-auto self-start">
-                  {[
-                    { id: 'activas', label: 'Activas' },
-                    { id: 'hoy', label: 'Hoy' },
-                    { id: 'manana', label: 'Mañana' },
-                    { id: 'semana', label: 'Esta Semana' },
-                    { id: 'mes', label: 'Este Mes' },
-                    { id: 'historial', label: 'Historial' },
-                    { id: 'todas', label: 'Todas' },
-                  ].map(f => {
-                    const isActive = filtroSmart === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => {
-                          setFiltroSmart(f.id);
-                          sessionStorage.setItem('citas_filtro_smart', f.id);
-                          setFiltroEstado(''); // reset manual state filter
-                          setPage(1);
-                        }}
-                        className={cn(
-                            "shrink-0 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-10",
-                          isActive
-                            ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                        )}
-                      >
-                        {f.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Sub-filtros para el Historial de Citas Completadas */}
-                {filtroSmart === 'historial' && (
-                  <div className="flex flex-wrap gap-1 p-1 bg-secondary/15 rounded-lg border border-border/30 w-full md:w-auto self-start">
-                    {[
-                      { id: 'todos', label: 'Todos' },
-                      { id: 'diario', label: 'Diario (Hoy)' },
-                      { id: 'semanal', label: 'Semanal' },
-                      { id: 'quincenal', label: 'Quincenal (15 días)' },
-                      { id: 'mensual', label: 'Mensual' },
-                    ].map(p => {
-                      const isActive = filtroHistorialPeriodo === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            setFiltroHistorialPeriodo(p.id);
-                            setPage(1);
-                          }}
-                          className={cn(
-                            "px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer",
-                            isActive
-                              ? "bg-card text-foreground shadow-sm border border-border/30"
-                              : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
-                          )}
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="hidden flex-col gap-3 sm:flex sm:flex-row">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar cliente, servicio..."
-                      value={busqueda}
-                      onChange={e => handleSearch(e.target.value)}
-                      className="pl-10 bg-card"
-                    />
-                  </div>
-                  <select
-                    value={filtroEstado}
-                    onChange={e => {
-                      setFiltroEstado(e.target.value);
-                      setFiltroSmart('todas');
-                      setPage(1);
-                    }}
-                    className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
-                  >
-                    <option value="">Filtrar por estado</option>
-                    {APPOINTMENT_STATUS_OPTIONS.map(e => <option key={e} value={e}>{APPOINTMENT_STATUS_LABELS[e]}</option>)}
-                  </select>
-                  
-                  {/* Filtro por empleado sólo visible para Admin/Tech y si el scope es 'all' */}
-                  {(user?.rol !== 'EMPLEADO' && scope === 'all') && (
-                    <select
-                      value={filtroEmpleado}
-                      onChange={e => {
-                        setFiltroEmpleado(e.target.value);
-                        setPage(1);
-                      }}
-                      className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm min-w-[150px] cursor-pointer"
-                    >
-                      <option value="">Todos los empleados</option>
-                      {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                    </select>
-                  )}
-                </div>
-              </div>
+              <AppointmentListFilters
+                smartFilter={filtroSmart}
+                historyPeriod={filtroHistorialPeriodo}
+                search={busqueda}
+                status={filtroEstado}
+                employeeId={filtroEmpleado}
+                employees={empleados}
+                showEmployeeFilter={user?.rol !== 'EMPLEADO' && scope === 'all'}
+                onSmartFilterChange={(filter) => {
+                  setFiltroSmart(filter);
+                  sessionStorage.setItem('citas_filtro_smart', filter);
+                  setFiltroEstado('');
+                  setPage(1);
+                }}
+                onHistoryPeriodChange={(period) => {
+                  setFiltroHistorialPeriodo(period);
+                  setPage(1);
+                }}
+                onSearchChange={handleSearch}
+                onStatusChange={(status) => {
+                  setFiltroEstado(status);
+                  setFiltroSmart('todas');
+                  setPage(1);
+                }}
+                onEmployeeChange={(employeeId) => {
+                  setFiltroEmpleado(employeeId);
+                  setPage(1);
+                }}
+              />
 
               {/* Listado */}
               <div className="space-y-4">

@@ -1753,7 +1753,7 @@ export function AppointmentCalendar({
     <div className="surface-panel relative flex h-[calc(100dvh-8.75rem)] min-h-[32rem] max-h-none select-none flex-col overflow-hidden sm:h-[calc(100dvh-13.5rem)] sm:max-h-[58rem] lg:h-[calc(100dvh-10rem)]">
       
       {/* CABECERA DEL CALENDARIO */}
-      <div className="flex flex-col gap-2 p-2.5 sm:p-4 border-b border-border/50 bg-card/95 z-30 shrink-0 sticky top-0 backdrop-blur-xl">
+      <div className="z-30 flex shrink-0 flex-col gap-2 border-b border-border/60 bg-card/95 p-2.5 backdrop-blur-xl sm:p-4">
         <div
           className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between"
           onTouchStart={handleDateSwipeStart}
@@ -1761,14 +1761,14 @@ export function AppointmentCalendar({
         >
           {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
           <div className="order-1 flex w-full items-center gap-1.5 sm:w-auto">
-            <Button variant="outline" size="sm" onClick={irAHoy} className="h-11 shrink-0 cursor-pointer gap-1 px-2.5 text-[11px] font-bold sm:h-9 sm:px-3 sm:text-xs">
+            <Button variant="outline" size="sm" onClick={irAHoy} className="h-11 shrink-0 cursor-pointer gap-1 px-2.5 text-[11px] font-semibold sm:h-9 sm:px-3 sm:text-xs">
               <CalendarIcon className="w-3.5 h-3.5" /> Hoy
             </Button>
-            <div className="flex h-11 min-w-0 flex-1 items-center rounded-xl border border-border bg-background shadow-xs sm:h-9 sm:flex-none">
+            <div className="flex h-11 min-w-0 flex-1 items-center rounded-xl border border-border/80 bg-[hsl(var(--control))] sm:h-9 sm:flex-none">
               <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="min-w-0 flex-1 truncate border-x border-border px-1 py-1 text-center text-[10px] font-bold text-foreground sm:min-w-[130px] sm:px-3 sm:text-sm sm:font-extrabold">
+              <span className="min-w-0 flex-1 truncate border-x border-border/70 px-1 py-1 text-center text-[11px] font-semibold text-foreground sm:min-w-[142px] sm:px-3 sm:text-sm">
                 {tituloCabecera}
               </span>
               <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
@@ -1780,7 +1780,7 @@ export function AppointmentCalendar({
               <Button
                 type="button"
                 onClick={onCreateCita}
-                className="h-11 shrink-0 gap-1 rounded-xl px-2 text-[10px] font-extrabold shadow-md sm:hidden"
+                className="h-11 shrink-0 gap-1 rounded-xl px-2.5 text-[10px] font-semibold sm:hidden"
               >
                 <Plus className="h-4 w-4" />
                 <span>Nueva cita</span>
@@ -1820,8 +1820,8 @@ export function AppointmentCalendar({
             </div>
 
             {scope === 'all' && (
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
-                <Users className="w-3 h-3 shrink-0" /> Global
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+                <Users className="w-3 h-3 shrink-0" /> Equipo completo
               </span>
             )}
           </div>
@@ -1829,7 +1829,7 @@ export function AppointmentCalendar({
           {mobileToolbar && <div className="order-2 sm:hidden">{mobileToolbar}</div>}
 
           {/* Toggles de Vista */}
-          <div className="order-3 flex h-11 w-full items-center rounded-xl border border-border/50 bg-secondary/40 p-0.5 shadow-inner sm:order-none sm:h-9 sm:w-auto">
+          <div className="order-3 flex h-11 w-full items-center rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1 sm:order-none sm:h-9 sm:w-auto">
             {[
               { id: 'dia', label: 'Día' },
               { id: '3dias', label: '3 Días' },
@@ -1839,10 +1839,10 @@ export function AppointmentCalendar({
                 key={tab.id}
                 onClick={() => setVista(tab.id as 'dia' | '3dias' | 'semana')}
                 className={cn(
-                  "flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer h-10 sm:h-7 flex items-center justify-center min-w-[42px]",
+                  "relative flex h-9 min-w-[42px] flex-1 cursor-pointer items-center justify-center rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors sm:h-7 sm:flex-none sm:px-3",
                   vista === tab.id
-                    ? "bg-primary text-primary-foreground shadow-xs scale-[1.02]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                    ? "bg-card text-foreground shadow-sm ring-1 ring-border/70 after:absolute after:inset-x-3 after:-bottom-1 after:h-px after:bg-primary"
+                    : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
                 )}
               >
                 {tab.label}
@@ -1854,14 +1854,14 @@ export function AppointmentCalendar({
         {/* SELECTOR MÓVIL DE PROFESIONAL (Pestañas horizontales amplias) */}
         {empleadosBase.length > 1 && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar pt-2 border-t border-border/30 touch-pan-x">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">Estilista:</span>
+            <span className="mr-1 hidden shrink-0 text-[10px] font-semibold text-muted-foreground sm:inline">Profesional</span>
             <button
               onClick={() => setActiveMobileEmpId('all')}
               className={cn(
-                "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-11 sm:h-8 flex items-center gap-1.5 border",
+                "flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:h-8",
                 activeMobileEmpId === 'all'
-                  ? "bg-primary/15 text-primary border-primary/50 font-black shadow-xs"
-                  : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
+                  ? "border-primary/35 bg-primary/10 text-primary"
+                  : "border-border/60 bg-background/80 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
               )}
             >
               <Users className="w-3.5 h-3.5" /> Todos ({empleadosBase.length})
@@ -1873,10 +1873,10 @@ export function AppointmentCalendar({
                   key={emp.id}
                   onClick={() => setActiveMobileEmpId(emp.id)}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-extrabold rounded-full transition-all shrink-0 cursor-pointer h-11 sm:h-8 flex items-center gap-1.5 border",
+                    "flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:h-8",
                     isActive
-                      ? "bg-primary text-primary-foreground border-primary font-black shadow-xs"
-                      : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground hover:bg-secondary/40"
+                      ? "border-primary/35 bg-primary/10 text-primary"
+                      : "border-border/60 bg-background/80 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
                   )}
                 >
                   <User className="w-3.5 h-3.5" /> {emp.nombre.split(' ')[0]}
@@ -1923,18 +1923,18 @@ export function AppointmentCalendar({
                     key={dIdx}
                     className={cn(
                       "flex-1 flex flex-col border-r border-border/20 last:border-r-0",
-                      esHoy && "bg-primary/[0.02] text-primary"
+                      esHoy && "bg-primary/[0.035] text-primary"
                     )}
                   >
                     {/* Header del Día */}
                     <div className="py-1.5 sm:py-2 text-center border-b border-border/20 bg-secondary/10 flex flex-col items-center justify-center min-w-[85px]">
-                      <span className="text-[10px] sm:text-[9px] uppercase font-extrabold text-muted-foreground tracking-wider">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-[9px]">
                         {DIAS_SEMANA_ABR[dia.getDay()]}
                       </span>
                       <span
                         className={cn(
-                          "text-xs font-black w-6 h-6 flex items-center justify-center rounded-full mt-0.5 transition-all",
-                          esHoy && "bg-primary text-primary-foreground shadow-md scale-105"
+                          "mt-0.5 flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                          esHoy && "bg-primary text-primary-foreground"
                         )}
                       >
                         {dia.getDate()}
@@ -2198,13 +2198,13 @@ export function AppointmentCalendar({
                             const { topPx, heightPx, colIndex, totalColumns } = cita;
                             const catColor = cita.servicio?.categoriaRel?.color || '#3b82f6';
                             const statusVisual: Record<string, { accent: string; surfaceMix: number }> = {
-                              PENDIENTE: { accent: '#f5b800', surfaceMix: 17 },
-                              CONFIRMADA: { accent: '#3b82f6', surfaceMix: 18 },
-                              EN_PROGRESO: { accent: '#06b6d4', surfaceMix: 18 },
-                              COMPLETADA: { accent: '#10b981', surfaceMix: 14 },
-                              CANCELADA: { accent: '#64748b', surfaceMix: 10 },
-                              NO_SHOW: { accent: '#ef4444', surfaceMix: 12 },
-                              REPROGRAMADA: { accent: '#8b5cf6', surfaceMix: 16 },
+                              PENDIENTE: { accent: '#ad7a26', surfaceMix: 12 },
+                              CONFIRMADA: { accent: '#4f7183', surfaceMix: 12 },
+                              EN_PROGRESO: { accent: '#b86f3d', surfaceMix: 13 },
+                              COMPLETADA: { accent: '#3f765f', surfaceMix: 11 },
+                              CANCELADA: { accent: '#756e67', surfaceMix: 8 },
+                              NO_SHOW: { accent: '#9d4655', surfaceMix: 10 },
+                              REPROGRAMADA: { accent: '#8c6347', surfaceMix: 11 },
                             };
                             const appointmentVisual = statusVisual[cita.estado] ?? { accent: catColor, surfaceMix: 14 };
                             
@@ -2256,11 +2256,11 @@ export function AppointmentCalendar({
                                 key={cita.id}
                                 title={tooltipText}
                                 className={cn(
-                                  "booking-card absolute rounded-xl border text-left transition-all duration-150 overflow-hidden flex flex-col group select-none shadow-sm",
+                                  "booking-card group absolute flex select-none flex-col overflow-hidden rounded-lg border text-left shadow-sm transition-[box-shadow,opacity] duration-150",
                                   isBeingMoved || isBeingResized
                                     ? "opacity-35 shadow-none"
-                                    : "hover:shadow-xl hover:-translate-y-px hover:z-30",
-                                  isSelected && editable && "ring-2 ring-primary ring-offset-2 ring-offset-card z-20 shadow-xl",
+                                    : "hover:z-30 hover:shadow-md",
+                                  isSelected && editable && "z-20 ring-2 ring-primary ring-offset-1 ring-offset-card shadow-md",
                                   editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                                 )}
                                 style={{
@@ -2301,7 +2301,7 @@ export function AppointmentCalendar({
 
                                 {/* Indicador lateral de categoría */}
                                 <div
-                                  className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl transition-all group-hover:w-2 shrink-0"
+                                  className="absolute bottom-0 left-0 top-0 w-1 shrink-0 transition-[width] group-hover:w-1.5"
                                   style={{ backgroundColor: appointmentVisual.accent }}
                                 />
 
