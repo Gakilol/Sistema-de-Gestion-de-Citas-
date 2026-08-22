@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { authFetch } from '@/lib/api-client';
+import { PageHeader } from '@/components/shared/page-header';
 
 const TABS = [
   { id: 'negocio',     label: 'Negocio',      icon: Store, roles: ['ADMIN', 'TECH_SUPPORT'] },
@@ -243,29 +244,27 @@ export default function Configuracion() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <div className="app-page !max-w-3xl space-y-5 page-enter">
 
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">{headerInfo.title}</h1>
-              <p className="text-sm text-muted-foreground">{headerInfo.desc}</p>
-            </div>
-            {tab !== 'dispositivos' && (
+          <PageHeader
+            eyebrow="Preferencias del sistema"
+            title={headerInfo.title}
+            description={headerInfo.desc}
+            actions={tab !== 'dispositivos' ? (
               isTechSupport ? (
                 <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
                   Modo Solo Lectura
                 </span>
               ) : (
-                <Button onClick={handleSave} className={cn('gap-1.5', saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'glow-gold')}>
+                <Button onClick={handleSave} className={cn('gap-1.5', saved && 'bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]')}>
                   {saved ? <CheckCircle2 className="w-4 h-4"/> : <Save className="w-4 h-4"/>}
                   {saved ? 'Guardado' : 'Guardar cambios'}
                 </Button>
               )
-            )}
-          </div>
+            ) : undefined}
+          />
 
           {/* Selector de pestañas */}
           {visibleTabs.length > 1 && (
-            <div className="flex border-b border-border/50 overflow-x-auto gap-2 pb-1 scrollbar-none mb-2">
+            <div className="flex gap-1 overflow-x-auto rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1 scrollbar-none mb-2">
               {visibleTabs.map((t) => {
                 const Icon = t.icon;
                 const isActive = tab === t.id;
@@ -274,10 +273,10 @@ export default function Configuracion() {
                     key={t.id}
                     onClick={() => setTab(t.id)}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer',
+                      'relative flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer',
                       isActive
-                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 dark:bg-amber-500/20'
-                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                        ? 'bg-card text-foreground shadow-sm ring-1 ring-border/70 after:absolute after:inset-x-4 after:bottom-0 after:h-px after:bg-primary'
+                        : 'text-muted-foreground hover:bg-card/50 hover:text-foreground'
                     )}
                   >
                     <Icon className="w-4 h-4" />
@@ -360,22 +359,23 @@ export default function Configuracion() {
                 {DIAS.map(({ key, label }) => {
                   const h = horarios[key];
                   return (
-                    <div key={key} className={cn('flex items-center gap-4 p-3 rounded-xl border transition-all',
+                    <div key={key} className={cn('flex flex-col gap-3 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:gap-4',
                       h.activo ? 'border-border/50 bg-card' : 'border-border/30 bg-secondary/20 opacity-60')}>
-                      <button onClick={() => toggleDia(key)}
-                        className={cn('w-10 h-5 rounded-full relative transition-all flex-shrink-0',
-                          h.activo ? 'bg-primary' : 'bg-border')}>
-                        <span className={cn('absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all shadow-sm',
-                          h.activo ? 'left-5' : 'left-0.5')}/>
-                      </button>
-                      <span className={cn('w-24 text-sm font-medium flex-shrink-0',
-                        h.activo ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
+                      <div className="flex items-center gap-4 sm:w-36 sm:shrink-0">
+                        <button onClick={() => toggleDia(key)} aria-label={`${h.activo ? 'Cerrar' : 'Abrir'} el ${label}`}
+                          className={cn('relative h-5 w-10 flex-shrink-0 rounded-full transition-colors',
+                            h.activo ? 'bg-primary' : 'bg-border')}>
+                          <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[left]',
+                            h.activo ? 'left-5' : 'left-0.5')}/>
+                        </button>
+                        <span className={cn('text-sm font-medium', h.activo ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
+                      </div>
                       {h.activo ? (
-                        <div className="flex items-center gap-2 flex-1">
+                        <div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:flex-1">
                           <select
                             value={h.inicio}
                             onChange={e => updateHorario(key, 'inicio', e.target.value)}
-                            className="h-11 sm:h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 sm:h-9 sm:w-36"
                           >
                             {TIME_OPTIONS.map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -385,13 +385,13 @@ export default function Configuracion() {
                           <select
                             value={h.fin}
                             onChange={e => updateHorario(key, 'fin', e.target.value)}
-                            className="h-11 sm:h-9 text-sm w-36 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 sm:h-9 sm:w-36"
                           >
                             {TIME_OPTIONS.map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
-                          <span className="text-xs text-muted-foreground ml-2 font-medium">
+                          <span className="col-span-3 text-xs font-medium text-muted-foreground sm:ml-2">
                             {(() => {
                               const [hi, mi] = h.inicio.split(':').map(Number);
                               const [hf, mf] = h.fin.split(':').map(Number);

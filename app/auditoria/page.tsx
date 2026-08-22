@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api-client';
+import { PageHeader } from '@/components/shared/page-header';
+import { MetricStrip } from '@/components/shared/metric-strip';
 
 // Tab definitions
 type AuditTab = 'resumen' | 'actividad' | 'seguridad' | 'cambios' | 'roles' | 'citas' | 'configuracion' | 'exportar';
@@ -338,15 +340,12 @@ export default function AuditoriaPage() {
       <AdminSidebar />
       <main className="flex-1 min-w-0 px-4 sm:px-6 xl:px-8 pt-20 pb-8 lg:pt-6 space-y-5 sm:space-y-6 overflow-x-hidden overflow-y-auto">
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/40 pb-4">
-          <div className="min-w-0">
-            <h1 className="page-heading">Auditoría del Sistema</h1>
-            <p className="page-description">
-              Historial completo de acciones administrativas, inicios de sesión y modificaciones de datos.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 self-stretch md:self-auto">
+        <PageHeader
+          eyebrow="Trazabilidad y seguridad"
+          title="Auditoría del sistema"
+          description="Historial de acciones administrativas, accesos y modificaciones de datos"
+          actions={(
+            <>
             {tab !== 'resumen' && tab !== 'seguridad' && (
               <Button
                 variant="outline"
@@ -359,8 +358,9 @@ export default function AuditoriaPage() {
                 Actualizar Logs
               </Button>
             )}
-          </div>
-        </div>
+            </>
+          )}
+        />
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-border/20 no-scrollbar">
@@ -369,9 +369,9 @@ export default function AuditoriaPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex items-center gap-2 min-h-10 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border border-transparent',
+                'relative flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-transparent px-3 py-2 text-xs font-semibold transition-colors',
                 tab === t.id
-                  ? 'bg-primary/10 text-primary border-primary/20 shadow-xs'
+                  ? 'border-primary/20 bg-primary/10 text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
               )}
             >
@@ -384,40 +384,14 @@ export default function AuditoriaPage() {
         {/* content panels */}
         {tab === 'resumen' && summaryData && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="p-4 border-border/50 bg-card shadow-xs relative group">
-                <div className="flex justify-between items-start">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Total Acciones</p>
-                  <Clock className="w-4 h-4 text-primary" />
-                </div>
-                <h3 className="text-3xl font-extrabold mt-2 tabular-nums">{summaryData.totalActions}</h3>
-                <p className="text-[10px] text-muted-foreground/60 mt-1">Registros totales guardados</p>
-              </Card>
-              <Card className="p-4 border-border/50 bg-card shadow-xs relative group">
-                <div className="flex justify-between items-start">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Usuarios Activos (7d)</p>
-                  <Users className="w-4 h-4 text-emerald-500" />
-                </div>
-                <h3 className="text-3xl font-extrabold mt-2 tabular-nums">{summaryData.activeUsersCount}</h3>
-                <p className="text-[10px] text-muted-foreground/60 mt-1">Usuarios que operaron en el sistema</p>
-              </Card>
-              <Card className="p-4 border-border/50 bg-card shadow-xs relative group">
-                <div className="flex justify-between items-start">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Logins Fallidos</p>
-                  <Key className="w-4 h-4 text-red-500" />
-                </div>
-                <h3 className="text-3xl font-extrabold mt-2 text-red-500 tabular-nums">{summaryData.loginFailedCount}</h3>
-                <p className="text-[10px] text-muted-foreground/60 mt-1">Intentos de login no autorizados</p>
-              </Card>
-              <Card className="p-4 border-border/50 bg-card shadow-xs relative group">
-                <div className="flex justify-between items-start">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Errores Críticos</p>
-                  <AlertCircle className="w-4 h-4 text-orange-500" />
-                </div>
-                <h3 className="text-3xl font-extrabold mt-2 text-orange-500 tabular-nums">{summaryData.criticalErrorsCount}</h3>
-                <p className="text-[10px] text-muted-foreground/60 mt-1">Acciones con estado fallido</p>
-              </Card>
-            </div>
+            <MetricStrip
+              items={[
+                { label: 'Total acciones', value: summaryData.totalActions, detail: 'Registros guardados', icon: Clock, tone: 'copper' },
+                { label: 'Usuarios activos', value: summaryData.activeUsersCount, detail: 'Últimos 7 días', icon: Users, tone: 'success' },
+                { label: 'Logins fallidos', value: summaryData.loginFailedCount, detail: 'Intentos no autorizados', icon: Key, tone: 'danger' },
+                { label: 'Errores críticos', value: summaryData.criticalErrorsCount, detail: 'Acciones fallidas', icon: AlertCircle, tone: 'danger' },
+              ]}
+            />
 
             {/* Sub-KPIs Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
