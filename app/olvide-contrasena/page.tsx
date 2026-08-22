@@ -2,12 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, ArrowLeft, Scissors, Send, Eye, EyeOff, Lock, CheckCircle2, ShieldCheck, Key } from 'lucide-react';
+import { Mail, ArrowLeft, Send, Eye, EyeOff, Lock, CheckCircle2, ShieldCheck, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { AuthShell } from '@/components/auth/auth-shell';
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function OlvideContrasena() {
   const router = useRouter();
@@ -100,8 +105,8 @@ export default function OlvideContrasena() {
       setOtp(['', '', '', '', '', '']);
       setTimeout(() => otpInputsRef.current[0]?.focus(), 100);
       toast.success('Código de verificación enviado');
-    } catch (err: any) {
-      toast.error(err.message || 'Error al enviar la solicitud');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al enviar la solicitud'));
     } finally {
       setIsLoading(false);
     }
@@ -126,8 +131,8 @@ export default function OlvideContrasena() {
       setOtp(['', '', '', '', '', '']);
       setTimeout(() => otpInputsRef.current[0]?.focus(), 100);
       toast.success('Código reenviado correctamente');
-    } catch (err: any) {
-      toast.error(err.message || 'Error al reenviar el código');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al reenviar el código'));
     } finally {
       setIsLoading(false);
     }
@@ -201,8 +206,8 @@ export default function OlvideContrasena() {
 
       toast.success('Código verificado correctamente');
       setStep(3);
-    } catch (err: any) {
-      toast.error(err.message || 'Código incorrecto o expirado');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Código incorrecto o expirado'));
     } finally {
       setIsLoading(false);
     }
@@ -229,69 +234,26 @@ export default function OlvideContrasena() {
 
       toast.success('Contraseña actualizada exitosamente');
       setStep(4);
-    } catch (err: any) {
-      toast.error(err.message || 'Error al restablecer contraseña');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al restablecer contraseña'));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
-      {/* Panel izquierdo — Branding */}
-      <div className="hidden lg:flex flex-col justify-between w-[42%] bg-[hsl(var(--sidebar))] p-12 relative overflow-hidden">
-        {/* Decoración de fondo */}
-        <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-primary/10 blur-3xl"/>
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-primary/5 blur-3xl"/>
-
-        {/* Logo */}
-        <div className="flex items-center gap-3 z-10">
-          <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-xl">
-            <Scissors className="w-5 h-5 text-white"/>
-          </div>
-          <div>
-            <p className="text-[hsl(var(--sidebar-foreground))] font-bold text-lg leading-tight">HAIR STYLE</p>
-            <p className="text-[hsl(var(--sidebar-primary))] text-xs tracking-widest uppercase">Salón & Barber</p>
-          </div>
-        </div>
-
-        {/* Copy central */}
-        <div className="z-10 space-y-4">
-          <h1 className="text-4xl font-bold text-[hsl(var(--sidebar-foreground))] leading-tight">
-            Acceso seguro<br/>
-            y <span className="text-[hsl(var(--sidebar-primary))]">protegido</span>
-          </h1>
-          <p className="text-[hsl(var(--sidebar-foreground)/0.6)] text-base leading-relaxed">
-            Hemos mejorado nuestra seguridad. Ahora recibirás un código OTP de 6 dígitos de corta duración en tu correo para validar de forma fehaciente tu identidad antes de cambiar la contraseña.
-          </p>
-        </div>
-
-        {/* Footer */}
-        <p className="text-[hsl(var(--sidebar-foreground)/0.3)] text-xs z-10">
-          &copy; {new Date().getFullYear()} HAIR STYLE Salón & Barber · Todos los derechos reservados
-        </p>
-      </div>
-
-      {/* Panel derecho — Formulario interactivo */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 relative overflow-hidden">
-        {/* Fondo decorativo */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"/>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/3 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"/>
-
-        <div className="w-full max-w-md z-10">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center">
-              <Scissors className="w-4 h-4 text-white"/>
-            </div>
-            <span className="font-bold text-foreground">HAIR STYLE</span>
-          </div>
+    <AuthShell
+      asideTitle="Recupera el acceso sin perder el ritmo."
+      asideDescription="Verificamos tu identidad con un código de corta duración antes de permitir cualquier cambio de contraseña."
+    >
+        <div className="w-full">
 
           {/* PASO 1: Solicitar Código */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold text-foreground">Recuperar contraseña</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Acceso seguro</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Recuperar contraseña</h2>
                 <p className="text-muted-foreground mt-1 text-sm">
                   Ingresa tu correo registrado para recibir un código de verificación de 6 dígitos.
                 </p>
@@ -299,12 +261,13 @@ export default function OlvideContrasena() {
 
               <form onSubmit={handleRequestCode} className="space-y-5">
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+                  <label htmlFor="recovery-email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
                     Correo electrónico de la cuenta
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
                     <Input
+                      id="recovery-email"
                       type="email"
                       placeholder="ejemplo@hairstyle.com"
                       className="pl-10 h-11 bg-card border-border/60 focus:border-primary"
@@ -317,7 +280,7 @@ export default function OlvideContrasena() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full h-11 text-sm font-semibold glow-gold" disabled={isLoading}>
+                <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={isLoading}>
                   {isLoading ? (
                     <span className="flex items-center gap-2">
                       <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"/>
@@ -368,9 +331,9 @@ export default function OlvideContrasena() {
 
               <form onSubmit={handleVerifyCode} className="space-y-6">
                 <div className="space-y-3">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block text-center">
+                  <p id="otp-label" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block text-center">
                     Código de 6 dígitos
-                  </label>
+                  </p>
                   <div className="flex justify-between gap-2.5">
                     {otp.map((digit, index) => (
                       <input
@@ -380,6 +343,8 @@ export default function OlvideContrasena() {
                         inputMode="numeric"
                         pattern="[0-9]*"
                         maxLength={1}
+                        aria-label={`Dígito ${index + 1} del código`}
+                        aria-describedby="otp-label"
                         value={digit}
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
@@ -422,7 +387,7 @@ export default function OlvideContrasena() {
 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 text-sm font-semibold glow-gold" 
+                  className="h-11 w-full text-sm font-semibold"
                   disabled={isLoading || otp.join('').length !== 6 || expireTimer === 0}
                 >
                   {isLoading ? (
@@ -451,12 +416,13 @@ export default function OlvideContrasena() {
               <form onSubmit={handleResetPassword} className="space-y-5">
                 {/* Nueva Contraseña */}
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+                  <label htmlFor="new-password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
                     Nueva contraseña
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
                     <Input
+                      id="new-password"
                       type={showPass ? 'text' : 'password'}
                       placeholder="Mínimo 6 caracteres"
                       className="pl-10 pr-10 h-11 bg-card border-border/60 focus:border-primary"
@@ -464,11 +430,13 @@ export default function OlvideContrasena() {
                       onChange={e => setPassword(e.target.value)}
                       required
                       disabled={isLoading}
+                      autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPass(p => !p)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       {showPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
                     </button>
@@ -477,12 +445,13 @@ export default function OlvideContrasena() {
 
                 {/* Confirmar Contraseña */}
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
+                  <label htmlFor="confirm-password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
                     Confirmar contraseña
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
                     <Input
+                      id="confirm-password"
                       type={showConfirmPass ? 'text' : 'password'}
                       placeholder="Repite la contraseña"
                       className="pl-10 pr-10 h-11 bg-card border-border/60 focus:border-primary"
@@ -490,11 +459,13 @@ export default function OlvideContrasena() {
                       onChange={e => setConfirmPassword(e.target.value)}
                       required
                       disabled={isLoading}
+                      autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPass(p => !p)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showConfirmPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       {showConfirmPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
                     </button>
@@ -530,7 +501,7 @@ export default function OlvideContrasena() {
 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 text-sm font-semibold glow-gold" 
+                  className="h-11 w-full text-sm font-semibold"
                   disabled={isLoading || !isPasswordValid}
                 >
                   {isLoading ? (
@@ -572,7 +543,7 @@ export default function OlvideContrasena() {
               </div>
               <div className="pt-4 border-t border-border/50">
                 <Link href="/login" className="block w-full">
-                  <Button className="w-full h-11 text-sm font-semibold glow-gold">
+                  <Button className="h-11 w-full text-sm font-semibold">
                     Ir al inicio de sesión inmediatamente
                   </Button>
                 </Link>
@@ -580,11 +551,10 @@ export default function OlvideContrasena() {
             </div>
           )}
 
-          <p className="text-center text-xs text-muted-foreground/50 mt-8">
-            Sistema de uso interno · Solo personal autorizado
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            El código de verificación expira automáticamente.
           </p>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }
