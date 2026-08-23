@@ -267,6 +267,28 @@ test.describe('UI responsive autenticada', () => {
     await expectNoDocumentOverflow(page);
   });
 
+  test('la plantilla rápida de IA exige cliente guardado y servicio exacto', async ({ page }) => {
+    const clientsReady = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/clientes' && response.request().method() === 'GET'
+    );
+
+    await page.goto('/ia');
+    await page.getByRole('button', { name: 'Crear cita con IA' }).click();
+    await expect(page.getByRole('heading', { name: 'Crear una cita sin adivinar datos' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Registrar un cliente que no aparece/i })).toBeVisible();
+
+    const clientInput = page.getByRole('textbox', { name: 'Busca por nombre o teléfono' });
+    await clientInput.fill('Cliente que no existe E2E');
+    const clientsResponse = await clientsReady;
+    expect(clientsResponse.ok()).toBeTruthy();
+    await expect(page.getByText(/No está guardado. Regístralo antes/i)).toBeVisible();
+
+    const serviceInput = page.getByRole('textbox', { name: 'Escribe el servicio' });
+    await serviceInput.fill('Corte');
+    await expect(page.getByRole('option', { name: /Corte E2E/i })).toBeVisible();
+    await expectNoDocumentOverflow(page);
+  });
+
   test('la navegación respeta los tres roles disponibles', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'Desktop 1440', 'La matriz de roles se valida una vez en escritorio.');
 

@@ -40,6 +40,17 @@ export interface IAAppointmentDraft {
   awaitingField?: IAAppointmentDraftField;
 }
 
+export interface IAQuickAppointmentInput {
+  clienteId: string;
+  cliente: string;
+  servicioId: string;
+  servicio: string;
+  profesional?: string;
+  fecha: string;
+  hora: string;
+  notas?: string;
+}
+
 export interface IAClientDraft {
   nombre?: string;
   telefono?: string;

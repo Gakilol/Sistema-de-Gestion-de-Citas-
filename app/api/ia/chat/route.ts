@@ -35,6 +35,17 @@ const clientDraftSchema = z.object({
   awaitingField: z.literal('nombre').optional(),
 });
 
+const quickAppointmentSchema = z.object({
+  clienteId: z.string().uuid(),
+  cliente: z.string().trim().min(2).max(150),
+  servicioId: z.string().uuid(),
+  servicio: z.string().trim().min(2).max(100),
+  profesional: z.string().trim().max(100).optional(),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  hora: z.string().regex(/^\d{2}:\d{2}$/),
+  notas: z.string().trim().max(500).optional(),
+});
+
 const requestSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
@@ -42,6 +53,7 @@ const requestSchema = z.object({
     appointmentDraft: appointmentDraftSchema.optional(),
     clientDraft: clientDraftSchema.optional(),
   })).min(1).max(20),
+  quickAppointment: quickAppointmentSchema.optional(),
 });
 
 const functionDeclarations = [
@@ -53,7 +65,7 @@ const functionDeclarations = [
   { name: 'getPopularServices', description: 'Muestra los servicios completados más solicitados en un período.', parameters: { type: 'OBJECT', properties: { dias: { type: 'NUMBER', description: 'Días a analizar, entre 1 y 180.' } } } },
   { name: 'getStaffWorkload', description: 'Muestra la cantidad de citas por profesional. Los empleados solo pueden consultar su propia carga.', parameters: { type: 'OBJECT', properties: { dias: { type: 'NUMBER', description: 'Días a analizar, entre 1 y 180.' } } } },
   { name: 'prepareCreateClient', description: 'Prepara el registro de un cliente y devuelve una tarjeta de confirmación. No guarda nada todavía.', parameters: { type: 'OBJECT', properties: { nombre: { type: 'STRING' }, telefono: { type: 'STRING' }, email: { type: 'STRING' }, notas: { type: 'STRING' } }, required: ['nombre'] } },
-  { name: 'prepareCreateAppointment', description: 'Valida disponibilidad y prepara una cita para confirmación humana. No guarda nada todavía.', parameters: { type: 'OBJECT', properties: { cliente: { type: 'STRING', description: 'Nombre del cliente.' }, telefono: { type: 'STRING', description: 'Teléfono del cliente, si lo proporcionó.' }, servicio: { type: 'STRING' }, profesional: { type: 'STRING' }, fecha: { type: 'STRING', description: 'Fecha exacta YYYY-MM-DD.' }, hora: { type: 'STRING', description: 'Hora HH:mm.' }, notas: { type: 'STRING' } }, required: ['cliente', 'servicio', 'fecha', 'hora'] } },
+  { name: 'prepareCreateAppointment', description: 'Valida disponibilidad y prepara una cita para un cliente que ya existe en Clientes. Nunca registra clientes. No guarda nada todavía.', parameters: { type: 'OBJECT', properties: { cliente: { type: 'STRING', description: 'Nombre o teléfono de un cliente existente.' }, telefono: { type: 'STRING', description: 'Teléfono del cliente, si lo proporcionó.' }, servicio: { type: 'STRING', description: 'Nombre exacto del servicio si existen opciones parecidas.' }, profesional: { type: 'STRING' }, fecha: { type: 'STRING', description: 'Fecha exacta YYYY-MM-DD.' }, hora: { type: 'STRING', description: 'Hora HH:mm.' }, notas: { type: 'STRING' } }, required: ['cliente', 'servicio', 'fecha', 'hora'] } },
   { name: 'prepareUpdateAppointmentStatus', description: 'Prepara un cambio de estado de una cita para confirmación humana. Requiere el identificador interno obtenido de una consulta previa.', parameters: { type: 'OBJECT', properties: { citaId: { type: 'STRING' }, estado: { type: 'STRING', enum: ['PENDIENTE', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA'] }, motivo: { type: 'STRING' } }, required: ['citaId', 'estado'] } },
   { name: 'prepareUpdateAppointmentStatusByQuery', description: 'Busca una cita por nombre o teléfono y prepara iniciar, completar o cancelar. Úsala para órdenes humanas como “inicia la cita de Ana”. No requiere identificadores.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nombre o teléfono del cliente, sin frases adicionales.' }, fecha: { type: 'STRING', description: 'Fecha YYYY-MM-DD; omitir significa hoy.' }, hora: { type: 'STRING', description: 'Hora HH:mm si hay más de una coincidencia.' }, estado: { type: 'STRING', enum: ['PENDIENTE', 'CONFIRMADA', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA', 'NO_SHOW'] }, motivo: { type: 'STRING' } }, required: ['query', 'estado'] } },
   { name: 'prepareAddWaitlist', description: 'Prepara agregar un cliente existente a la lista de espera para llenar cancelaciones.', parameters: { type: 'OBJECT', properties: { cliente: { type: 'STRING' }, servicio: { type: 'STRING' }, profesional: { type: 'STRING' }, fechaDesde: { type: 'STRING', description: 'YYYY-MM-DD' }, fechaHasta: { type: 'STRING', description: 'YYYY-MM-DD' }, jornadaPreferida: { type: 'STRING', enum: ['MANANA', 'TARDE', 'CUALQUIERA'] }, notas: { type: 'STRING' }, prioridad: { type: 'NUMBER', description: '0 normal, 1 alta, 2 urgente.' } }, required: ['cliente'] } },
@@ -69,6 +81,7 @@ El servidor aplica permisos por rol. El rol actual es ${context.userRole}.
 La fecha actual del negocio es ${getBusinessTodayString()}.
 Puedes consultar datos y preparar el registro de clientes, la creación de citas, cambios de estado, lista de espera, preferencias del cliente y recordatorios por WhatsApp. Preparar no significa guardar ni enviar: el usuario siempre debe revisar una tarjeta y pulsar el botón de confirmación.
 Antes de preparar una cita reúne, con preguntas cortas y de una en una cuando falten datos: cliente, servicio, fecha exacta y hora. El teléfono y las notas son opcionales. Consulta servicios y disponibilidad si existe ambigüedad.
+Para crear una cita, el cliente debe existir en Clientes. Busca y reutiliza el registro guardado; nunca prepares un cliente nuevo como parte de una cita. Si no existe, indica que debe registrarse primero. Si hay varios clientes o servicios parecidos, obliga a escoger uno exactamente.
 Antes de preparar un cliente confirma al menos su nombre. Teléfono, correo y notas son opcionales.
 Nunca afirmes que una operación ya se realizó cuando solo está preparada. Indica claramente que falta la confirmación en pantalla.
 No puedes eliminar registros ni cambiar otros campos fuera de las herramientas disponibles.
@@ -107,6 +120,23 @@ export async function POST(req: NextRequest) {
   const context: IAExecutionContext = { userId: user.userId, userRole: user.userRole };
   const latestMessage = parsed.data.messages.at(-1)?.content ?? '';
   await audit(req, context, 'IA_CHAT_QUERY', { messageLength: latestMessage.length });
+
+  if (parsed.data.quickAppointment) {
+    const tool = 'prepareCreateAppointment';
+    if (!checkToolPermission(tool, context.userRole)) {
+      await audit(req, context, 'IA_TOOL_ACCESS_DENIED', { tool });
+      return NextResponse.json({ error: 'No tienes permiso para preparar citas.' }, { status: 403 });
+    }
+    const result = await executeIATool(tool, parsed.data.quickAppointment, context);
+    await audit(req, context, result.ok ? 'IA_TOOL_PREPARE' : 'IA_TOOL_READ', { tool, result: result.ok ? 'OK' : 'ERROR', source: 'quick_template' });
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json({
+      text: 'Encontré el cliente guardado y el servicio exacto. Revisa el resumen antes de crear la cita.',
+      toolsUsed: [tool],
+      mode: 'quick_template',
+      pendingAction: result.pendingAction,
+    });
+  }
 
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const vertexApiKey = process.env.VERTEX_AI_API_KEY;

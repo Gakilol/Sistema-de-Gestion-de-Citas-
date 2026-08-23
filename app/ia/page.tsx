@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Bot, CalendarPlus, Check, CheckCircle2, ListPlus, Loader2, MessageCircle, Mic, MicOff, Search, Send, Sparkles, UserPlus, UserRound, X } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
+import { QuickAppointmentTemplate } from '@/components/ia/QuickAppointmentTemplate';
 import { Button } from '@/components/ui/button';
 import { BRAND } from '@/lib/brand';
 import { authFetch } from '@/lib/api-client';
-import type { IAAppointmentDraft, IAClientDraft, IAPendingAction } from '@/lib/ia/types';
+import type { IAAppointmentDraft, IAClientDraft, IAPendingAction, IAQuickAppointmentInput } from '@/lib/ia/types';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -128,6 +129,7 @@ export default function IAPage() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
+  const [showQuickAppointment, setShowQuickAppointment] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechController | null>(null);
@@ -211,6 +213,37 @@ export default function IAPage() {
     }
   };
 
+  const prepareQuickAppointment = async (quickAppointment: IAQuickAppointmentInput, summary: string) => {
+    if (loading) throw new Error('Espera a que termine la consulta actual.');
+    recognitionRef.current?.stop();
+    const nextMessages: Message[] = [welcome, { role: 'user', content: summary }];
+    setMessages(nextMessages);
+    setLoading(true);
+    try {
+      const response = await authFetch('/api/ia/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: nextMessages.map(({ role, content }) => ({ role, content })),
+          quickAppointment,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No pude preparar la cita.');
+      setMessages((current) => [...current, {
+        role: 'assistant',
+        content: data.text,
+        toolsUsed: data.toolsUsed,
+        pendingAction: data.pendingAction,
+      }]);
+    } catch (error) {
+      setMessages([welcome]);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateActionMessage = (index: number, patch: Partial<Message>) => {
     setMessages((current) => current.map((message, messageIndex) => messageIndex === index ? { ...message, ...patch } : message));
   };
@@ -264,7 +297,7 @@ export default function IAPage() {
               <p className="mt-2 max-w-2xl text-base leading-6 text-muted-foreground">Habla o escribe con naturalidad. Te preguntaré un dato a la vez.</p>
             </div>
             <div className="flex flex-col gap-2 min-[430px]:flex-row sm:shrink-0">
-              <Button type="button" size="lg" className="min-h-12 text-base" onClick={() => void send('Quiero crear una cita guiada', true)} disabled={loading}>
+              <Button type="button" size="lg" className="min-h-12 text-base" onClick={() => setShowQuickAppointment((current) => !current)} disabled={loading} aria-expanded={showQuickAppointment}>
                 <CalendarPlus className="size-5" /> Crear cita con IA
               </Button>
               <Button asChild type="button" size="lg" variant="outline" className="min-h-12 text-base">
@@ -273,10 +306,18 @@ export default function IAPage() {
             </div>
           </header>
 
-          {messages.length === 1 && (
+          {showQuickAppointment && (
+            <QuickAppointmentTemplate
+              disabled={loading}
+              onClose={() => setShowQuickAppointment(false)}
+              onPrepared={prepareQuickAppointment}
+            />
+          )}
+
+          {messages.length === 1 && !showQuickAppointment && (
             <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Acciones rápidas">
               {quickTasks.map(({ title, example, description, icon: Icon }) => (
-                <button key={title} type="button" onClick={() => void send(example, title === 'Crear una cita')} disabled={loading} className="group flex min-h-32 flex-col items-start rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:opacity-50">
+                <button key={title} type="button" onClick={() => title === 'Crear una cita' ? setShowQuickAppointment(true) : void send(example)} disabled={loading} className="group flex min-h-32 flex-col items-start rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:opacity-50">
                   <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary"><Icon className="size-5" /></span>
                   <span className="mt-3 flex w-full items-center justify-between gap-2 text-base font-bold text-foreground">{title}<ArrowRight className="size-4 text-primary transition-transform group-hover:translate-x-1" /></span>
                   <span className="mt-1 text-sm leading-5 text-muted-foreground">{description}</span>

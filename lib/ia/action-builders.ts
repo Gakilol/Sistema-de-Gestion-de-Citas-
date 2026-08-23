@@ -17,8 +17,10 @@ const createClientSchema = z.object({
 });
 
 const createAppointmentSchema = z.object({
+  clienteId: z.string().uuid().optional(),
   cliente: z.string().trim().min(2).max(150),
   telefono: optionalText(30),
+  servicioId: z.string().uuid().optional(),
   servicio: z.string().trim().min(2).max(100),
   profesional: optionalText(100),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -79,6 +81,16 @@ async function resolveService(query: string) {
   throw new IAToolInputError(`Encontré varios servicios: ${services.map((service: { nombre: string }) => service.nombre).join(', ')}. Indica uno exactamente.`);
 }
 
+async function resolveSelectedService(id: string | undefined, query: string) {
+  if (!id) return resolveService(query);
+  const service = await prisma.servicio.findFirst({
+    where: { id, activo: true },
+    select: { id: true, nombre: true, duracion: true },
+  });
+  if (!service) throw new IAToolInputError('El servicio seleccionado ya no está disponible. Elige otro servicio.');
+  return service;
+}
+
 async function resolveEmployee(query: string | undefined, context: IAExecutionContext) {
   if (context.userRole === 'EMPLEADO') {
     const own = await prisma.empleado.findUnique({ where: { id: context.userId }, select: { id: true, nombre: true, activo: true, esAgendable: true } });
@@ -114,11 +126,21 @@ async function resolveClient(query: string) {
     orderBy: { nombre: 'asc' },
     take: 6,
   });
-  const exact = clients.find((client: { nombre: string }) => client.nombre.localeCompare(query, 'es', { sensitivity: 'base' }) === 0);
-  if (exact) return exact;
+  const exact = clients.filter((client: { nombre: string }) => client.nombre.localeCompare(query, 'es', { sensitivity: 'base' }) === 0);
+  if (exact.length === 1) return exact[0];
   if (clients.length === 1) return clients[0];
-  if (clients.length === 0) throw new IAToolInputError(`No encontré un cliente llamado “${query}”.`);
-  throw new IAToolInputError(`Encontré varios clientes: ${clients.map((client: { nombre: string }) => client.nombre).join(', ')}. Indica el nombre completo.`);
+  if (clients.length === 0) throw new IAToolInputError(`No encontré a “${query}” en Clientes. Regístralo primero y vuelve a crear la cita. No se creó ningún cliente.`);
+  throw new IAToolInputError(`Encontré varios clientes: ${clients.map((client: { nombre: string; telefono: string | null }) => `${client.nombre}${client.telefono ? ` (${client.telefono})` : ''}`).join(', ')}. Elige el cliente exacto para no crear la cita a nombre de otra persona.`);
+}
+
+async function resolveSelectedClient(id: string | undefined, query: string) {
+  if (!id) return resolveClient(query);
+  const client = await prisma.cliente.findUnique({
+    where: { id },
+    select: { id: true, nombre: true, telefono: true },
+  });
+  if (!client) throw new IAToolInputError('El cliente seleccionado ya no existe. Búscalo de nuevo en Clientes.');
+  return client;
 }
 
 async function resolveAppointmentByQuery(args: unknown, context: IAExecutionContext) {
@@ -178,8 +200,9 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
   const data = createAppointmentSchema.parse(args);
   if (data.fecha < getBusinessTodayString()) throw new IAToolInputError('La fecha de la cita no puede estar en el pasado.');
 
-  const [service, employee] = await Promise.all([
-    resolveService(data.servicio),
+  const [client, service, employee] = await Promise.all([
+    resolveSelectedClient(data.clienteId, data.cliente),
+    resolveSelectedService(data.servicioId, data.servicio),
     resolveEmployee(clean(data.profesional), context),
   ]);
   const availability = await calculateAppointmentAvailability(employee.id, data.fecha, service.id, service.duracion, data.hora);
@@ -192,13 +215,6 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
     throw new IAToolInputError(`Ese horario no está disponible.${alternatives.length ? ` Horas disponibles: ${alternatives.join(', ')}.` : ''}`);
   }
 
-  const client = await prisma.cliente.findFirst({
-    where: clean(data.telefono)
-      ? { telefono: clean(data.telefono) }
-      : { nombre: { equals: data.cliente, mode: 'insensitive' } },
-    select: { id: true, nombre: true, telefono: true },
-  });
-
   return {
     type: 'CREATE_APPOINTMENT',
     title: 'Crear cita',
@@ -207,9 +223,9 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
     endpoint: '/api/citas',
     method: 'POST',
     body: {
-      cliente_id: client?.id,
-      cliente_nombre: client?.nombre ?? data.cliente,
-      cliente_telefono: client?.telefono ?? clean(data.telefono),
+      cliente_id: client.id,
+      cliente_nombre: client.nombre,
+      cliente_telefono: client.telefono,
       servicio_id: service.id,
       empleado_id: employee.id,
       fecha: data.fecha,
@@ -217,7 +233,7 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
       notas: clean(data.notas),
     },
     details: [
-      { label: 'Cliente', value: client?.nombre ?? data.cliente },
+      { label: 'Cliente', value: client.nombre },
       { label: 'Servicio', value: `${service.nombre} · ${service.duracion} min` },
       { label: 'Profesional', value: employee.nombre },
       { label: 'Fecha', value: data.fecha },
