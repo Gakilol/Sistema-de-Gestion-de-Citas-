@@ -19,6 +19,7 @@ import {
   CheckCircle, XCircle, AlertTriangle, Info,
 } from 'lucide-react';
 import { authFetch } from '@/lib/api-client';
+import { PageHeader } from '@/components/shared/page-header';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'resumen' | 'demanda' | 'asistencia' | 'cancelaciones' | 'clientes' | 'fidelizacion' | 'profesionales';
@@ -33,7 +34,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   { id: 'profesionales', label: 'Rendimiento',     icon: Briefcase,    desc: 'Desempeño y carga de trabajo por profesional' },
 ];
 
-const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316', '#ef4444', '#06b6d4'];
+const PIE_COLORS = ['#C8A646', '#24865A', '#3976B9', '#A40022', '#525252', '#7A7A7A', '#9B7B28'];
 
 // ─── Date Presets ─────────────────────────────────────────────────────────────
 function getPreset(key: string): [string, string] {
@@ -70,7 +71,7 @@ function KpiCard({
   const isNegative = delta && delta.absolute < 0;
 
   return (
-    <Card className="p-4 border-border/50 relative group hover:shadow-md transition-all duration-200">
+    <Card className="surface-panel relative p-4">
       {loading ? (
         <div className="space-y-3 animate-pulse">
           <div className="skeleton h-3 w-2/3" />
@@ -300,7 +301,7 @@ function ReportesContent() {
             <p className="text-sm text-muted-foreground">
               El módulo de Reportes y Analítica está disponible únicamente para roles de Administrador y Soporte Técnico.
             </p>
-            <Button onClick={() => router.push('/dashboard')} className="w-full glow-gold">
+            <Button onClick={() => router.push('/dashboard')} className="w-full">
               Volver al Dashboard
             </Button>
           </Card>
@@ -335,7 +336,7 @@ function ReportesContent() {
         </div>
 
         {kpis.empleadoTop && kpis.empleadoTop !== 'N/A' && (
-          <Card className="p-4 border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
+          <Card className="border-primary/20 bg-primary/5 p-4">
             <p className="text-xs text-muted-foreground mb-1">Profesional con más citas completadas</p>
             <p className="text-lg font-bold text-primary">{kpis.empleadoTop}</p>
           </Card>
@@ -359,7 +360,7 @@ function ReportesContent() {
                   <XAxis dataKey="dia" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTip />} />
-                  <Bar dataKey="total" name="Citas" fill="#d4a017" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                  <Bar dataKey="total" name="Citas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} maxBarSize={50} />
                 </BarChart>
               </ResponsiveContainer>
             ) : <EmptyState />}
@@ -652,7 +653,7 @@ function ReportesContent() {
     const { resumen, distribucionFrecuencia, tasaRetorno, topClientes } = data;
     const freqData = [
       { name: 'Frecuente (< 30d)',  value: distribucionFrecuencia?.frecuente  || 0, color: '#10b981' },
-      { name: 'Regular (30-90d)',   value: distribucionFrecuencia?.regular    || 0, color: '#d4a017' },
+      { name: 'Regular (30-90d)',   value: distribucionFrecuencia?.regular    || 0, color: 'hsl(var(--chart-1))' },
       { name: 'En riesgo (> 90d)',  value: distribucionFrecuencia?.enRiesgo   || 0, color: '#ef4444' },
     ];
     return (
@@ -863,21 +864,15 @@ function ReportesContent() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto pt-16 lg:pt-0">
         <div className="app-page space-y-5 page-enter">
 
-          {/* ─── Header ─────────────────────────────────────────────────── */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Reportes y Analítica</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Período: {desde} → {hasta}
-                {(empleadoId || servicioId) && (
-                  <span className="ml-2 text-primary font-medium">• Filtros activos</span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+          <PageHeader
+            eyebrow="Lectura del negocio"
+            title="Reportes y analítica"
+            description={<>Período: {desde} → {hasta}{(empleadoId || servicioId) && <span className="ml-2 font-medium text-primary">• Filtros activos</span>}</>}
+            actions={(
+              <>
               <Button variant="outline" size="icon" onClick={() => fetchData(tab)} aria-label="Actualizar reportes" title="Actualizar">
                 <RefreshCw className="w-4 h-4" />
               </Button>
@@ -896,8 +891,9 @@ function ReportesContent() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+              </>
+            )}
+          />
 
           {/* ─── Filter Bar ──────────────────────────────────────────────── */}
           <Card className="surface-panel p-4 space-y-3">
@@ -918,8 +914,10 @@ function ReportesContent() {
                 <button
                   key={p.k}
                   onClick={() => applyPreset(p.k)}
-                  className={cn('shrink-0 min-h-10 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                    preset === p.k ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground'
+                  className={cn('relative min-h-10 shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                    preset === p.k
+                      ? 'bg-primary/10 text-primary ring-1 ring-primary/25 after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-primary'
+                      : 'bg-secondary/70 text-muted-foreground hover:text-foreground'
                   )}
                 >
                   {p.l}

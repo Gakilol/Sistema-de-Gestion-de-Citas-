@@ -10,9 +10,9 @@ function isAuthorizedCron(req: NextRequest): boolean {
 export async function POST(req: NextRequest) {
   const { userId, userRole } = getUserContext(req);
   const cronAuthorized = isAuthorizedCron(req);
-  const privileged = userRole === 'ADMIN' || userRole === 'TECH_SUPPORT';
+  const authenticated = Boolean(userId && userRole);
 
-  if (!privileged && !cronAuthorized) {
+  if (!authenticated && !cronAuthorized) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 

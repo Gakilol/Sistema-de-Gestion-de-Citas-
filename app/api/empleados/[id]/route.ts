@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { getUserContext } from '@/lib/auth-helpers';
+import { deleteEmployeePermanently } from '@/lib/employees/delete-employee';
 
 // ─── Schemas Zod ─────────────────────────────────────────────────────────────
 const PatchEmpleadoSchema = z.object({
@@ -211,62 +212,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
 
-    // Verificar si el empleado tiene citas en su historial
-    const citasCount = await prisma.cita.count({
-      where: {
-        OR: [
-          { empleado_id: id },
-          { created_by: id }
-        ]
-      }
-    });
-
-    if (citasCount > 0) {
-      // Si tiene historial, desactivar en lugar de eliminar datos históricos
-      const empleadoDesactivado = await prisma.empleado.update({
-        where: { id },
-        data: { activo: false, esAgendable: false }
-      });
-
-      // Revocar sesiones/dispositivos recordados
-      try {
-        await prisma.dispositivoRecordado.updateMany({
-          where: { userId: id, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      } catch {}
-
-      const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
-      await logAudit({
-        action: 'USER_DEACTIVATED',
-        module: 'USUARIOS',
-        status: 'SUCCESS',
-        userId: userId || undefined,
-        userRole: userRole || undefined,
-        userEmail,
-        entityType: 'Empleado',
-        entityId: id,
-        entityName: empleado.nombre,
-        description: `Usuario ${empleado.nombre} desactivado automáticamente al intentar eliminarlo debido a su historial de citas.`,
-        beforeData: empleado,
-        afterData: empleadoDesactivado,
-        ipAddress: getClientIp(req.headers),
-        userAgent: req.headers.get('user-agent') || undefined
-      });
-
-      return NextResponse.json({
-        mensaje: 'El empleado tiene citas asociadas en el historial. Se ha desactivado y ocultado en la agenda para conservar el historial intacto.',
-        fueDesactivado: true,
-        empleado: empleadoDesactivado
-      }, { status: 200 });
+    if (!userId) {
+      return NextResponse.json({ error: 'No se pudo identificar al usuario que realiza la eliminación' }, { status: 401 });
     }
 
-    // Si NO tiene citas asociadas, proceder con eliminación limpia en transacción
-    await prisma.$transaction(async (tx: any) => {
-      await tx.empleado.delete({
-        where: { id }
-      });
-    });
+    const deletion = await deleteEmployeePermanently(id, userId);
 
     const { logAudit, getClientIp } = await import('@/lib/audit/audit-logger');
     await logAudit({
@@ -279,13 +229,17 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       entityType: 'Empleado',
       entityId: id,
       entityName: empleado.nombre,
-      description: `Usuario ${empleado.nombre} eliminado permanentemente.`,
+      description: `Usuario ${empleado.nombre} eliminado permanentemente junto con ${deletion.appointmentsDeleted} citas vinculadas. Los clientes se conservaron.`,
       beforeData: empleado,
+      metadata: deletion,
       ipAddress: getClientIp(req.headers),
       userAgent: req.headers.get('user-agent') || undefined
     });
 
-    return NextResponse.json({ mensaje: 'Empleado eliminado exitosamente' }, { status: 200 });
+    return NextResponse.json({
+      mensaje: `Empleado eliminado permanentemente. Se eliminaron ${deletion.appointmentsDeleted} citas vinculadas y se conservaron los clientes.`,
+      eliminacion: deletion,
+    }, { status: 200 });
   } catch (error: any) {
     console.error('[EMPLEADO_DELETE_ERROR]', error);
     return NextResponse.json({ error: 'Error al procesar la eliminación del empleado' }, { status: 500 });

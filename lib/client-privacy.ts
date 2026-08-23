@@ -18,6 +18,8 @@ export interface ClientResponseSource {
   esRecurrente?: boolean;
   servicioFavorito?: string | null;
   historial?: ClientAppointmentDto[];
+  creador?: { id: string; nombre: string } | null;
+  preferencias?: unknown[];
   [key: string]: unknown;
 }
 
@@ -62,6 +64,7 @@ export function buildClientResponse(
       esRecurrente: client.esRecurrente ?? false,
       servicioFavorito: client.servicioFavorito ?? null,
       historial: client.historial ?? [],
+      creador: client.creador ?? null,
       _privado: true,
     };
   }
@@ -81,6 +84,8 @@ export function buildClientResponse(
     esRecurrente: client.esRecurrente ?? false,
     servicioFavorito: client.servicioFavorito ?? null,
     historial: client.historial ?? [],
+    creador: client.creador ?? null,
+    preferencias: client.preferencias ?? [],
     _privado: false,
   };
 }

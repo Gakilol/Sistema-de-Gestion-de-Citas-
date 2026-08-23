@@ -1,12 +1,18 @@
-// app/cita/calendario/[token]/CalendarioClienteUI.tsx
-// Componente CLIENT del lado público para mostrar los detalles de la cita
-// y los botones de Google Calendar / descargar .ics.
-// No muestra: teléfono, IDs, notas, precios, botón editar/cancelar.
-// Responsive desde 320px. Botones táctiles grandes. Safe areas iPhone.
-
 'use client';
 
-import { CalendarPlus, Download, Clock, User, CalendarDays, Scissors, MapPin } from 'lucide-react';
+import type { ReactNode } from 'react';
+import {
+  CalendarDays,
+  CalendarPlus,
+  Clock,
+  Download,
+  MapPin,
+  Scissors,
+  UserRound,
+} from 'lucide-react';
+import { BrandMark } from '@/components/shared/brand-mark';
+import { Button } from '@/components/ui/button';
+import { BRAND } from '@/lib/brand';
 
 interface CalendarioClienteUIProps {
   clienteNombre: string;
@@ -19,6 +25,26 @@ interface CalendarioClienteUIProps {
   googleCalendarUrl: string;
   icsUrl: string;
   estado: string;
+}
+
+interface DetailRowProps {
+  icon: typeof CalendarDays;
+  label: string;
+  children: ReactNode;
+}
+
+function DetailRow({ icon: Icon, label, children }: DetailRowProps) {
+  return (
+    <div className="flex gap-3 border-t border-border/65 py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-secondary/55 text-primary">
+        <Icon className="size-4" aria-hidden="true" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
+        <div className="mt-1 text-sm font-medium leading-5 text-foreground">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 export default function CalendarioClienteUI({
@@ -36,169 +62,87 @@ export default function CalendarioClienteUI({
   const isCompletada = estado === 'COMPLETADA';
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-start px-4 py-8 pt-safe pb-safe">
-      <div className="w-full max-w-sm space-y-6">
+    <main className="min-h-dvh bg-background px-4 py-6 pb-safe pt-safe sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-3xl">
+        <header className="flex items-center justify-between border-b border-border/70 pb-5">
+          <BrandMark />
+          <p className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:block">
+            Invitación de calendario
+          </p>
+        </header>
 
-        {/* ── Logo y Título ── */}
-        <div className="text-center space-y-3">
-          <div className="flex justify-center">
-            <img
-              src="/logo.png"
-              alt="HAIR STYLE Salon & Barber"
-              className="h-16 w-auto object-contain"
-            />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">
-              Agregar cita al calendario
+        <section className="py-8 sm:py-12">
+          <div className="mb-7 max-w-xl border-l-2 border-primary pl-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Tu cita está lista</p>
+            <h1 className="mt-2 font-display text-4xl leading-none tracking-tight text-foreground sm:text-5xl">
+              Guarda la fecha.
             </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              HAIR STYLE Salon & Barber
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Hola, {clienteNombre}. Agrega esta cita a tu calendario para tener los detalles siempre a mano.
             </p>
           </div>
-        </div>
 
-        {/* ── Datos de la Cita ── */}
-        <div className="bg-card rounded-2xl border border-border/50 shadow-lg overflow-hidden">
-
-          {/* Encabezado con nombre del cliente */}
-          <div className="p-4 sm:p-5 border-b border-border/30 bg-primary/5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                <User className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cliente</p>
-                <p className="text-base font-bold text-foreground">{clienteNombre}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Detalles */}
-          <div className="p-4 sm:p-5 space-y-3.5">
-
-            {/* Fecha */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                <CalendarDays className="w-4 h-4 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Fecha</p>
-                <p className="text-sm font-semibold text-foreground mt-0.5">{fechaLegible}</p>
-              </div>
-            </div>
-
-            {/* Hora */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Clock className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Horario</p>
-                <p className="text-sm font-semibold text-foreground mt-0.5">
-                  {horaInicio} – {horaFin}
-                </p>
-              </div>
-            </div>
-
-            {/* Profesional */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Scissors className="w-4 h-4 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Profesional</p>
-                <p className="text-sm font-bold text-foreground mt-0.5">{profesional}</p>
-              </div>
-            </div>
-
-            {/* Servicios (solo si existen) */}
-            {servicios && servicios.length > 0 && (
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Scissors className="w-4 h-4 text-amber-500" />
-                </div>
+          <div className="surface-panel overflow-hidden">
+            <div className="grid sm:grid-cols-[13rem_1fr]">
+              <div className="flex flex-col justify-between border-b border-primary/25 bg-primary/8 p-6 sm:border-b-0 sm:border-r">
                 <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Servicios</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {servicios.map((nombre, i) => (
-                      <span
-                        key={i}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-secondary/30 text-foreground border border-border/30 font-medium"
-                      >
-                        {nombre}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-primary">Fecha reservada</p>
+                  <p className="mt-3 font-display text-3xl leading-tight text-foreground">{fechaLegible}</p>
+                </div>
+                <div className="mt-8 border-t border-primary/20 pt-5">
+                  <p className="text-2xl font-semibold tabular-nums text-foreground">{horaInicio}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">hasta las {horaFin}</p>
                 </div>
               </div>
-            )}
 
-            {/* Ubicación (solo si existe) */}
-            {ubicacion && (
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <MapPin className="w-4 h-4 text-rose-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Ubicación</p>
-                  <p className="text-sm font-medium text-foreground mt-0.5">{ubicacion}</p>
-                </div>
+              <div className="p-5 sm:p-6">
+                <DetailRow icon={UserRound} label="A nombre de">{clienteNombre}</DetailRow>
+                <DetailRow icon={Scissors} label="Profesional">{profesional || 'Equipo de atención'}</DetailRow>
+                {servicios && servicios.length > 0 && (
+                  <DetailRow icon={CalendarDays} label="Servicios">
+                    <div className="flex flex-wrap gap-1.5">
+                      {servicios.map((nombre) => (
+                        <span key={nombre} className="rounded-md border border-border/70 bg-secondary/45 px-2 py-1 text-xs">
+                          {nombre}
+                        </span>
+                      ))}
+                    </div>
+                  </DetailRow>
+                )}
+                {ubicacion && <DetailRow icon={MapPin} label="Ubicación">{ubicacion}</DetailRow>}
+                <DetailRow icon={Clock} label="Recomendación">
+                  Preséntate 5 minutos antes para comenzar a tiempo.
+                </DetailRow>
               </div>
-            )}
-          </div>
-
-          {/* Mensaje de 5 minutos */}
-          <div className="px-4 sm:px-5 pb-4 sm:pb-5">
-            <div className="rounded-xl bg-primary/5 border border-primary/15 p-3 text-center">
-              <p className="text-xs text-foreground/80 font-medium">
-                ⏰ Le agradecemos presentarse <strong>5 minutos antes</strong> de su cita.
-              </p>
             </div>
           </div>
-        </div>
 
-        {/* ── Botones de Calendario ── */}
-        <div className="space-y-2.5">
-          {/* Google Calendar */}
-          <a
-            href={googleCalendarUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2.5 w-full h-12 rounded-xl font-bold text-sm text-white shadow-lg transition-all active:scale-[0.98]"
-            style={{
-              background: 'linear-gradient(135deg, #4285F4 0%, #3367D6 100%)',
-              boxShadow: '0 4px 14px rgba(66, 133, 244, 0.3)',
-            }}
-          >
-            <CalendarPlus className="w-5 h-5" />
-            Agregar a Google Calendar
-          </a>
-
-          {/* Descargar .ics */}
-          <a
-            href={icsUrl}
-            download="cita-hair-style.ics"
-            className="flex items-center justify-center gap-2.5 w-full h-12 rounded-xl font-bold text-sm bg-card border border-border/50 text-foreground shadow-sm hover:bg-secondary/30 transition-all active:scale-[0.98]"
-          >
-            <Download className="w-5 h-5" />
-            Descargar para otro calendario
-          </a>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Button asChild size="lg" className="h-12">
+              <a href={googleCalendarUrl} target="_blank" rel="noopener noreferrer">
+                <CalendarPlus className="size-4.5" aria-hidden="true" />
+                Agregar a Google Calendar
+              </a>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="h-12">
+              <a href={icsUrl} download="cita-novacita.ics">
+                <Download className="size-4.5" aria-hidden="true" />
+                Descargar otro calendario
+              </a>
+            </Button>
+          </div>
 
           {isCompletada && (
-            <p className="text-center text-[10px] text-muted-foreground/60 mt-1">
-              Esta cita ya fue completada. Puede guardarla como referencia.
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              Esta cita ya fue completada; puedes guardarla como referencia.
             </p>
           )}
-        </div>
+        </section>
 
-        {/* ── Footer ── */}
-        <div className="text-center pt-2 pb-4">
-          <p className="text-[10px] text-muted-foreground/50">
-            © HAIR STYLE Salon & Barber
-          </p>
-        </div>
+        <footer className="border-t border-border/70 py-5 text-center text-xs text-muted-foreground">
+          {BRAND.businessName} · {BRAND.descriptor}
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }

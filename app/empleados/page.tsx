@@ -11,32 +11,43 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/errors';
+import { PageHeader } from '@/components/shared/page-header';
 
 const emptyForm = { nombre:'',correo:'',telefono:'',password:'',especialidad:'',tituloCliente:'',rol:'EMPLEADO' };
 
 function Avatar({ nombre }: { nombre: string }) {
   const initials = nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()||'?';
-  const colors = ['bg-amber-500','bg-emerald-500','bg-blue-500','bg-purple-500','bg-rose-500'];
-  const c = colors[nombre.charCodeAt(0)%colors.length];
   return (
-    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0',c)}>
+    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
       {initials}
     </div>
   );
 }
 
+interface EmployeeRecord {
+  id: string;
+  nombre: string;
+  correo: string;
+  telefono?: string | null;
+  especialidad?: string | null;
+  tituloCliente?: string | null;
+  rol: string;
+  activo: boolean;
+}
+
 export default function Empleados() {
   const { user } = useAuth();
   const router = useRouter();
-  const [empleados, setEmpleados] = useState<any[]>([]);
+  const [empleados, setEmpleados] = useState<EmployeeRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
   const [form, setForm]           = useState(emptyForm);
   const [saving, setSaving]       = useState(false);
 
-  const handleEliminarEmpleado = async (emp: any) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente al empleado/administrador "${emp.nombre}"? Esto eliminará también todas sus citas y horarios asociados.`)) {
+  const handleEliminarEmpleado = async (emp: EmployeeRecord) => {
+    if (!confirm(`¿Eliminar permanentemente a "${emp.nombre}"? Se borrarán sus citas, horarios y acceso al sistema. Los clientes se conservarán. Esta acción no se puede deshacer.`)) {
       return;
     }
     try {
@@ -47,10 +58,11 @@ export default function Empleados() {
         const d = await res.json();
         throw new Error(d.error || 'Error al eliminar empleado');
       }
-      toast.success('Empleado eliminado exitosamente');
+      const data = await res.json();
+      toast.success(data.mensaje || 'Empleado eliminado permanentemente');
       fetchEmpleados();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar empleado');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al eliminar empleado'));
     }
   };
 
@@ -66,12 +78,12 @@ export default function Empleados() {
   useEffect(()=>{ fetchEmpleados(); },[]);
 
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowModal(true); };
-  const openEdit   = (e:any) => {
+  const openEdit   = (e: EmployeeRecord) => {
     setForm({ nombre:e.nombre, correo:e.correo, telefono:e.telefono||'', password:'', especialidad:e.especialidad||'', tituloCliente:e.tituloCliente||'', rol:e.rol });
     setEditingId(e.id); setShowModal(true);
   };
 
-  const toggleActivo = async (emp:any) => {
+  const toggleActivo = async (emp: EmployeeRecord) => {
     const prev = emp.activo;
     setEmpleados(es=>es.map(e=>e.id===emp.id?{...e,activo:!prev}:e));
     try {
@@ -86,7 +98,7 @@ export default function Empleados() {
     if (saving) return; // Evitar clics concurrentes antes del re-render de desactivación
     setSaving(true);
     try {
-      const body:any = {...form};
+      const body: Partial<typeof form> = {...form};
       if (editingId && !body.password) delete body.password;
       if (!editingId && !form.password) { toast.error('La contraseña es obligatoria'); setSaving(false); return; }
 
@@ -103,7 +115,7 @@ export default function Empleados() {
       }
       toast.success(editingId?'Empleado actualizado':'Empleado creado exitosamente');
       setShowModal(false); fetchEmpleados();
-    } catch(err:any) { toast.error(err.message||'Error al guardar'); }
+    } catch(err: unknown) { toast.error(getErrorMessage(err, 'Error al guardar')); }
     finally { setSaving(false); }
   };
 
@@ -112,18 +124,19 @@ export default function Empleados() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar/>
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto pt-16 lg:pt-0">
         <div className="app-page space-y-5 page-enter">
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">Gestión de Personal</h1>
-              <p className="text-sm text-muted-foreground">{activos} activo{activos!==1?'s':''} de {empleados.length}</p>
-            </div>
-            <Button onClick={openCreate} className="gap-2 glow-gold shrink-0 px-3.5 sm:px-4">
-              <Plus className="w-4 h-4"/> <span className="hidden sm:inline">Nuevo empleado</span><span className="sm:hidden">Nuevo</span>
-            </Button>
-          </div>
+          <PageHeader
+            eyebrow="Equipo y estaciones"
+            title="Gestión de personal"
+            description={`${activos} activo${activos !== 1 ? 's' : ''} de ${empleados.length} integrantes`}
+            actions={(
+              <Button onClick={openCreate} className="gap-2 px-3.5 sm:px-4">
+                <Plus className="w-4 h-4"/> <span className="hidden sm:inline">Nuevo empleado</span><span className="sm:hidden">Nuevo</span>
+              </Button>
+            )}
+          />
 
           {/* Vista Móvil (Tarjetas) */}
           <div className="md:hidden space-y-3">
@@ -309,7 +322,7 @@ export default function Empleados() {
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-border/30 shrink-0">
                 <Button type="button" variant="outline" onClick={()=>setShowModal(false)}>Cancelar</Button>
-                <Button type="submit" disabled={saving} className="glow-gold">
+                <Button type="submit" disabled={saving}>
                   {saving?'Guardando...':(editingId?'Actualizar':'Crear Empleado')}
                 </Button>
               </div>

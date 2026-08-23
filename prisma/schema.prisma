@@ -8,81 +8,85 @@ datasource db {
 }
 
 model Empleado {
-  id            String   @id @default(dbgenerated("gen_random_uuid()"))
+  id            String     @id @default(dbgenerated("gen_random_uuid()"))
   nombre        String
-  correo        String   @unique
+  correo        String     @unique
   telefono      String?
   passwordHash  String
   especialidad  String?
   tituloCliente String?
   horario       Json?
   rol           RolUsuario @default(EMPLEADO)
-  activo        Boolean  @default(true)
-  esAgendable   Boolean  @default(true)
-  
-  citas        Cita[]   @relation("EmpleadoAsignado")
-  citasCreadas Cita[]   @relation("CreadorCita")
-  clientesCreados Cliente[] @relation("ClienteCreador")
-  descansos    DescansoEmpleado[]
-  bloqueos     BloqueoHorario[]
-  vacaciones   VacacionesEmpleado[]
-  resetTokens  PasswordResetToken[]
-  dispositivosRecordados DispositivoRecordado[]
+  activo        Boolean    @default(true)
+  esAgendable   Boolean    @default(true)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  citas                        Cita[]                 @relation("EmpleadoAsignado")
+  citasCreadas                 Cita[]                 @relation("CreadorCita")
+  clientesCreados              Cliente[]              @relation("ClienteCreador")
+  descansos                    DescansoEmpleado[]
+  bloqueos                     BloqueoHorario[]
+  vacaciones                   VacacionesEmpleado[]
+  resetTokens                  PasswordResetToken[]
+  dispositivosRecordados       DispositivoRecordado[]
+  preferenciasClienteCreadas   ClientePreferencia[]   @relation("PreferenciaClienteCreador")
+  entradasListaEsperaCreadas   ListaEspera[]          @relation("ListaEsperaCreador")
+  entradasListaEsperaAsignadas ListaEspera[]          @relation("ListaEsperaProfesional")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Servicio {
-  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  id           String  @id @default(dbgenerated("gen_random_uuid()"))
   nombre       String
   descripcion  String?
   duracion     Int
   categoria    String?
   categoria_id String?
-  activo       Boolean  @default(true)
+  activo       Boolean @default(true)
 
   citas         Cita[]
   categoriaRel  Categoria?     @relation(fields: [categoria_id], references: [id], onDelete: SetNull)
   citaServicios CitaServicio[]
+  listaEspera   ListaEspera[]
 }
 
 model Cita {
-  id               String   @id @default(dbgenerated("gen_random_uuid()"))
+  id               String     @id @default(dbgenerated("gen_random_uuid()"))
   cliente_id       String?
   cliente_nombre   String
   cliente_telefono String?
   servicio_id      String
   empleado_id      String
-  fecha            DateTime @db.Date
+  fecha            DateTime   @db.Date
   hora             String
   duracion         Int
   estado           EstadoCita @default(PENDIENTE)
   notas            String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
   created_by       String
 
   // Analytics tracking fields
-  cancelled_at     DateTime? // Set when estado changes to CANCELADA
-  completed_at     DateTime? // Set when estado changes to COMPLETADA
-  no_show_at       DateTime? // Set when estado changes to NO_SHOW
-  cancel_reason    String?   // Optional reason for cancellation
+  cancelled_at  DateTime? // Set when estado changes to CANCELADA
+  completed_at  DateTime? // Set when estado changes to COMPLETADA
+  no_show_at    DateTime? // Set when estado changes to NO_SHOW
+  cancel_reason String? // Optional reason for cancellation
 
-  cliente          Cliente? @relation(fields: [cliente_id], references: [id])
-  servicio         Servicio @relation(fields: [servicio_id], references: [id])
-  empleado         Empleado @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
-  creador          Empleado @relation("CreadorCita", fields: [created_by], references: [id])
-  citaServicios    CitaServicio[]
+  cliente       Cliente?       @relation(fields: [cliente_id], references: [id])
+  servicio      Servicio       @relation(fields: [servicio_id], references: [id])
+  empleado      Empleado       @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
+  creador       Empleado       @relation("CreadorCita", fields: [created_by], references: [id])
+  citaServicios CitaServicio[]
 
   whatsapp_reminder_sent    Boolean   @default(false)
   whatsapp_reminder_sent_at DateTime?
 
   // Traslape Controlado
-  allowOverlap          Boolean   @default(false)
-  overlapReason         String?
-  overlapConfirmedById  String?
-  overlapConfirmedAt    DateTime?
+  allowOverlap         Boolean   @default(false)
+  overlapReason        String?
+  overlapConfirmedById String?
+  overlapConfirmedAt   DateTime?
 
   @@index([empleado_id])
   @@index([estado])
@@ -114,9 +118,9 @@ enum EstadoCita {
 model DescansoEmpleado {
   id          String   @id @default(dbgenerated("gen_random_uuid()"))
   empleado_id String
-  dia_semana  Int      // 0=Domingo, 1=Lunes, ..., 6=Sábado
-  hora_inicio String   // e.g. "13:00"
-  hora_fin    String   // e.g. "14:00"
+  dia_semana  Int // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  hora_inicio String // e.g. "13:00"
+  hora_fin    String // e.g. "14:00"
   empleado    Empleado @relation(fields: [empleado_id], references: [id], onDelete: Cascade)
 
   @@index([empleado_id])
@@ -126,8 +130,8 @@ model BloqueoHorario {
   id          String   @id @default(dbgenerated("gen_random_uuid()"))
   empleado_id String
   fecha       DateTime @db.Date
-  hora_inicio String   // e.g. "10:00"
-  hora_fin    String   // e.g. "12:00"
+  hora_inicio String // e.g. "10:00"
+  hora_fin    String // e.g. "12:00"
   motivo      String?
   empleado    Empleado @relation(fields: [empleado_id], references: [id], onDelete: Cascade)
 
@@ -146,21 +150,21 @@ model VacacionesEmpleado {
 }
 
 model Configuracion {
-  id           String   @id @default("default")
-  negocio      Json?    // { nombre, subtitulo, telefono, whatsapp, direccion, web, zona_horaria }
-  horarios     Json?    // Default general schedule
-  whatsapp     Json?    // { numero, confirmar, recordatorio, cancelacion, msgExtra }
-  apariencia   Json?    // { tema, branding }
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default("default")
+  negocio    Json? // { nombre, subtitulo, telefono, whatsapp, direccion, web, zona_horaria }
+  horarios   Json? // Default general schedule
+  whatsapp   Json? // { numero, confirmar, recordatorio, cancelacion, msgExtra }
+  apariencia Json? // { tema, branding }
+  updatedAt  DateTime @updatedAt
 }
 
 model AuditLog {
   id           String   @id @default(dbgenerated("gen_random_uuid()"))
-  entidad      String   // Cita, Empleado, Servicio, Configuracion (kept for compatibility)
-  entidadId    String   // (kept for compatibility)
-  accion       String   // CREAR, ACTUALIZAR, ELIMINAR, CANCELAR (kept for compatibility)
-  detalles     Json?    // (kept for compatibility)
-  realizadoPor String?  // (kept for compatibility)
+  entidad      String // Cita, Empleado, Servicio, Configuracion (kept for compatibility)
+  entidadId    String // (kept for compatibility)
+  accion       String // CREAR, ACTUALIZAR, ELIMINAR, CANCELAR (kept for compatibility)
+  detalles     Json? // (kept for compatibility)
+  realizadoPor String? // (kept for compatibility)
   fecha        DateTime @default(now()) // (kept for compatibility)
 
   // Nuevos campos de auditoría avanzada (opcionales para no romper registros antiguos)
@@ -186,7 +190,6 @@ model AuditLog {
 
   @@index([entidad, entidadId])
   @@index([fecha])
-  
   // Nuevos índices
   @@index([createdAt])
   @@index([userId])
@@ -206,73 +209,129 @@ model Cliente {
   createdByUserId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
-  citas     Cita[]
-  creador   Empleado? @relation("ClienteCreador", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  citas        Cita[]
+  creador      Empleado?            @relation("ClienteCreador", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  preferencias ClientePreferencia[]
+  listaEspera  ListaEspera[]
 
   @@index([createdByUserId])
 }
 
+enum TipoPreferenciaCliente {
+  CORTE
+  TINTE
+  ALERGIA
+  PREFERENCIA
+  NOTA
+}
+
+model ClientePreferencia {
+  id        String                 @id @default(dbgenerated("gen_random_uuid()"))
+  clienteId String
+  tipo      TipoPreferenciaCliente
+  titulo    String
+  detalle   String
+  createdBy String
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  cliente Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  creador Empleado @relation("PreferenciaClienteCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([clienteId, createdAt])
+  @@index([tipo])
+}
+
+enum EstadoListaEspera {
+  ESPERANDO
+  CONTACTADO
+  AGENDADO
+  CANCELADO
+}
+
+model ListaEspera {
+  id               String            @id @default(dbgenerated("gen_random_uuid()"))
+  clienteId        String
+  servicioId       String?
+  empleadoId       String?
+  fechaDesde       DateTime?         @db.Date
+  fechaHasta       DateTime?         @db.Date
+  jornadaPreferida String?
+  notas            String?
+  prioridad        Int               @default(0)
+  estado           EstadoListaEspera @default(ESPERANDO)
+  createdBy        String
+  contactedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  cliente     Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  servicio    Servicio? @relation(fields: [servicioId], references: [id], onDelete: SetNull)
+  profesional Empleado? @relation("ListaEsperaProfesional", fields: [empleadoId], references: [id], onDelete: SetNull)
+  creador     Empleado  @relation("ListaEsperaCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([estado, prioridad, createdAt])
+  @@index([clienteId])
+  @@index([servicioId])
+  @@index([empleadoId])
+}
+
 model Categoria {
-  id        String     @id @default(dbgenerated("gen_random_uuid()"))
-  nombre    String     @unique
-  color     String?    @default("#6366f1")
-  activo    Boolean    @default(true)
-  orden     Int        @default(0)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  nombre    String   @unique
+  color     String?  @default("#6366f1")
+  activo    Boolean  @default(true)
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   servicios Servicio[]
 }
 
 model CitaServicio {
-  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  id          String @id @default(dbgenerated("gen_random_uuid()"))
   cita_id     String
   servicio_id String
   duracion    Int
-  orden       Int      @default(0)
+  orden       Int    @default(0)
 
-  cita        Cita     @relation(fields: [cita_id], references: [id], onDelete: Cascade)
-  servicio    Servicio @relation(fields: [servicio_id], references: [id], onDelete: Restrict)
+  cita     Cita     @relation(fields: [cita_id], references: [id], onDelete: Cascade)
+  servicio Servicio @relation(fields: [servicio_id], references: [id], onDelete: Restrict)
 
   @@index([cita_id])
 }
 
 model PasswordResetToken {
-  id         String   @id @default(dbgenerated("gen_random_uuid()"))
+  id         String    @id @default(dbgenerated("gen_random_uuid()"))
   user_id    String
-  token_hash String   @unique
+  token_hash String    @unique
   expires_at DateTime
   used_at    DateTime?
-  created_at DateTime @default(now())
+  created_at DateTime  @default(now())
   request_ip String?
 
-  empleado   Empleado @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  empleado Empleado @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([token_hash])
 }
 
 model DispositivoRecordado {
-  id          String    @id @default(dbgenerated("gen_random_uuid()"))
-  userId      String
-  tokenHash   String    @unique
-  userAgent   String?
-  ipAddress   String?
-  deviceName  String?
-  createdAt   DateTime  @default(now())
-  lastUsedAt  DateTime?
-  expiresAt   DateTime
-  revokedAt   DateTime?
+  id         String    @id @default(dbgenerated("gen_random_uuid()"))
+  userId     String
+  tokenHash  String    @unique
+  userAgent  String?
+  ipAddress  String?
+  deviceName String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  expiresAt  DateTime
+  revokedAt  DateTime?
 
-  empleado    Empleado  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empleado Empleado @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
   @@index([expiresAt])
 }
-
-
-
-
-

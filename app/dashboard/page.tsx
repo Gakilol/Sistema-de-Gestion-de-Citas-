@@ -1,136 +1,63 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  Calendar, TrendingUp, Users, CheckCircle2,
-  Clock, ArrowUpRight, ArrowDownRight, RefreshCcw,
-  Scissors, ChevronRight, Activity
-} from 'lucide-react';
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from 'recharts';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, BarChart3, Bot, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock3, RefreshCcw, UserPlus } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
-import { cn } from '@/lib/utils';
-import { formatTime12Hour } from '@/lib/time-utils';
-import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
-import Link from 'next/link';
 import { authFetch } from '@/lib/api-client';
+import { useAppointmentStatusSync } from '@/lib/appointments/use-appointment-status-sync';
+import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
+import { formatTime12Hour } from '@/lib/time-utils';
+import { cn } from '@/lib/utils';
 
-// ─── Tipos ─────────────────────────────────────────────────────────────────
+interface DashboardAppointment {
+  id: string;
+  cliente_nombre: string;
+  fecha: string;
+  hora: string;
+  estado: string;
+  servicio?: { nombre?: string };
+  empleado?: { nombre?: string };
+}
+
 interface DashboardData {
   stats: {
     totalCitas: number;
-    citasCompletadas: number;
     citasHoy: number;
     citasPendientes: number;
-    empleadosActivos: number;
     citasCompletadasMes: number;
     citasCompletadasHoy: number;
+    empleadosActivos: number;
     tasaCompletadas: number;
-    citasCanceladasTotales?: number;
   };
-  upcomingAppointments: any[];
-  citasHoy: any[];
-  serviciosPopulares: { nombre: string; cantidad: number }[];
-  productividadEmpleados: { nombre: string; citas: number }[];
-  actividadReciente: any[];
-  citasChart: { fecha: string; dia: string; citas: number }[];
+  upcomingAppointments: DashboardAppointment[];
+  citasHoy: DashboardAppointment[];
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-const PIE_COLORS = ['#d4a017', '#10b981', '#3b82f6', '#a855f7', '#f97316'];
+const taskCards = [
+  { title: 'Nueva cita', description: 'Abrir la agenda y elegir un horario.', href: '/citas?nueva=1', icon: CalendarPlus, primary: true },
+  { title: 'Pedirlo a la IA', description: 'Dilo con tus palabras y sigue los pasos.', href: '/ia?prompt=Quiero%20crear%20una%20cita', icon: Bot },
+  { title: 'Nuevo cliente', description: 'Registrar sus datos en el directorio.', href: '/clientes?nuevo=1', icon: UserPlus },
+];
 
-function fmtDate(d: string | Date) {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  return date.toLocaleDateString('es-CR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).replace(/\./g, '');
-}
-
-// ─── Skeleton ───────────────────────────────────────────────────────────────
-function SkeletonCard() {
+function DashboardSkeleton() {
   return (
-    <div className="surface-panel p-4 sm:p-5 space-y-3">
-      <div className="flex justify-between items-start">
-        <div className="space-y-2">
-          <div className="skeleton h-3 w-24" />
-          <div className="skeleton h-7 w-16" />
+    <div className="flex min-h-screen bg-background">
+      <AdminSidebar />
+      <main className="min-w-0 flex-1 pb-20 pt-16 lg:pb-0 lg:pt-0">
+        <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="skeleton h-9 w-64" />
+          <div className="skeleton h-5 w-80 max-w-full" />
+          <div className="grid gap-3 sm:grid-cols-3"><div className="skeleton h-44 rounded-2xl sm:col-span-2" /><div className="skeleton h-44 rounded-2xl" /></div>
+          <div className="skeleton h-72 rounded-2xl" />
         </div>
-        <div className="skeleton h-10 w-10 rounded-lg" />
-      </div>
-      <div className="skeleton h-3 w-32" />
+      </main>
     </div>
   );
 }
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-interface KpiCardProps {
-  title: string;
-  value: string;
-  sub?: string;
-  icon: React.ElementType;
-  accent: 'gold' | 'emerald' | 'blue' | 'wine';
-  trend?: number; // positivo=subida, negativo=bajada
-}
-
-function KpiCard({ title, value, sub, icon: Icon, accent, trend }: KpiCardProps) {
-  const accentClass = {
-    gold:    { card: 'card-accent-gold',    icon: 'metric-icon-gold',    text: 'text-amber-500' },
-    emerald: { card: 'card-accent-emerald', icon: 'metric-icon-emerald', text: 'text-emerald-500' },
-    blue:    { card: 'card-accent-blue',    icon: 'metric-icon-blue',    text: 'text-blue-500' },
-    wine:    { card: 'card-accent-wine',    icon: 'metric-icon-wine',    text: 'text-rose-600' },
-  }[accent];
-
-  return (
-    <div className={cn(
-      'surface-panel p-3 sm:p-5 hover-lift transition-all min-w-0',
-      accentClass.card
-    )}>
-      <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
-        <div className="min-w-0">
-          <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 leading-tight">{title}</p>
-          <p className="text-xl sm:text-2xl font-bold text-foreground">{value}</p>
-        </div>
-        <div className={cn('p-2 sm:p-2.5 rounded-xl shrink-0', accentClass.icon)}>
-          <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5', accentClass.text)} />
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5">
-        {trend !== undefined && (
-          trend >= 0
-            ? <ArrowUpRight className="w-3.5 h-3.5 trend-up" />
-            : <ArrowDownRight className="w-3.5 h-3.5 trend-down" />
-        )}
-        {sub && (
-          <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight line-clamp-2">{sub}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Custom Tooltip para gráficas ────────────────────────────────────────────
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="glass rounded-xl px-3 py-2.5 text-xs shadow-xl border border-border/50">
-      <p className="font-semibold text-foreground mb-1.5">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-          <span className="text-muted-foreground">{p.name}:</span>
-          <span className="font-medium text-foreground">
-            {p.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Componente principal ────────────────────────────────────────────────────
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -138,382 +65,135 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) setIsLoading(true);
-    else setRefreshing(true);
+    if (silent) setRefreshing(true); else setIsLoading(true);
     try {
-      const res = await authFetch('/api/dashboard?t=' + Date.now());
-      const d = await res.json();
-      setData(d);
-    } catch (err) {
-      console.error(err);
+      const response = await authFetch(`/api/dashboard?t=${Date.now()}`);
+      if (!response.ok) throw new Error('No se pudo cargar el inicio.');
+      setData(await response.json());
+    } catch (error) {
+      console.error(error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { if (user) load(); }, [user, load]);
+  useEffect(() => { if (user) void load(); }, [user, load]);
+  useAppointmentStatusSync(Boolean(user), () => void load(true));
 
-  const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT';
-
-  // ─── Loading skeleton ───────────────────────────────────────────────
-  if (isAuthLoading || isLoading) {
-    return (
-      <div className="flex min-h-screen bg-background">
-        <AdminSidebar />
-        <main className="flex-1 pt-14 lg:pt-0 overflow-y-auto">
-          <div className="app-page space-y-6">
-            <div className="skeleton h-8 w-48 mb-2" />
-            <div className="skeleton h-4 w-64" />
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-              {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 skeleton h-64 rounded-xl" />
-              <div className="skeleton h-64 rounded-xl" />
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  if (isAuthLoading || isLoading) return <DashboardSkeleton />;
 
   const stats = data?.stats;
+  const today = data?.citasHoy ?? [];
   const upcoming = data?.upcomingAppointments ?? [];
-  const citasHoy = data?.citasHoy ?? [];
-  const populares = data?.serviciosPopulares ?? [];
-  const productividad = data?.productividadEmpleados ?? [];
-  const actividad = data?.actividadReciente ?? [];
-  const chartData = data?.citasChart ?? [];
+  const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT';
+  const completed = stats?.citasCompletadasHoy ?? 0;
+  const totalToday = stats?.citasHoy ?? 0;
+  const progress = totalToday > 0 ? Math.min(100, Math.round((completed / totalToday) * 100)) : 0;
+  const firstName = user?.nombre?.split(' ')[0] ?? '';
+  const longDate = new Date().toLocaleDateString('es-NI', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        <div className="app-page space-y-5 sm:space-y-6 page-enter">
-
-          {/* ── Header ─────────────────────────────────────────── */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="page-heading text-foreground">
-                Bienvenido, <span className="text-gold-gradient">{user?.nombre?.split(' ')[0]}</span> 👋
-              </h1>
-              <p className="page-description capitalize">
-                {new Date().toLocaleDateString('es-CR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </p>
+      <main className="min-w-0 flex-1 overflow-y-auto pb-20 pt-16 lg:pb-0 lg:pt-0">
+        <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <header className="flex items-start justify-between gap-4">
+            <div>
+              <p className="capitalize text-sm font-semibold text-primary">{longDate}</p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-4xl">Hola, {firstName}</h1>
+              <p className="mt-2 text-base text-muted-foreground">Empieza por una tarea. El sistema te guía en lo demás.</p>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => load(true)}
-              disabled={refreshing}
-              aria-label="Actualizar dashboard"
-              title="Actualizar dashboard"
-              className="flex shrink-0"
-            >
-              <RefreshCcw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
+            <Button variant="outline" size="icon" className="size-11" onClick={() => void load(true)} disabled={refreshing} aria-label="Actualizar inicio">
+              <RefreshCcw className={cn('size-4', refreshing && 'animate-spin')} />
             </Button>
-          </div>
+          </header>
 
-          {/* ── KPI Cards ──────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {isAdmin ? (
-              <>
-                <KpiCard
-                  title="Citas Hoy"
-                  value={String(stats?.citasHoy ?? 0)}
-                  sub={`${stats?.citasPendientes ?? 0} pendientes`}
-                  icon={Calendar}
-                  accent="gold"
-                />
-                <KpiCard
-                  title="Completadas Hoy"
-                  value={String(stats?.citasCompletadasHoy ?? 0)}
-                  sub="Citas finalizadas hoy"
-                  icon={CheckCircle2}
-                  accent="emerald"
-                />
-                <KpiCard
-                  title="Completadas Mes"
-                  value={String(stats?.citasCompletadasMes ?? 0)}
-                  sub="Citas finalizadas este mes"
-                  icon={Calendar}
-                  accent="blue"
-                />
-                <KpiCard
-                  title="Personal Activo"
-                  value={String(stats?.empleadosActivos ?? 0)}
-                  sub="Profesionales disponibles"
-                  icon={Users}
-                  accent="wine"
-                />
-              </>
-            ) : (
-              <>
-                <KpiCard
-                  title="Mis Citas de Hoy"
-                  value={String(stats?.citasHoy ?? 0)}
-                  sub={`${stats?.citasPendientes ?? 0} pendientes`}
-                  icon={Calendar}
-                  accent="gold"
-                />
-                <KpiCard
-                  title="Completadas Hoy"
-                  value={String(stats?.citasCompletadasHoy ?? 0)}
-                  sub={`${stats?.tasaCompletadas ?? 0}% tasa de éxito`}
-                  icon={CheckCircle2}
-                  accent="emerald"
-                />
-                <KpiCard
-                  title="Completadas del Mes"
-                  value={String(stats?.citasCompletadasMes ?? 0)}
-                  sub="Mis citas finalizadas este mes"
-                  icon={TrendingUp}
-                  accent="blue"
-                />
-                <KpiCard
-                  title="Citas Canceladas"
-                  value={String(stats?.citasCanceladasTotales ?? 0)}
-                  sub="Total canceladas hasta hoy"
-                  icon={Clock}
-                  accent="wine"
-                />
-              </>
-            )}
-          </div>
-
-          {/* ── Gráficas ────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Área: citas 7 días */}
-            <Card className="surface-panel lg:col-span-2 p-4 sm:p-5 min-w-0">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">
-                    {isAdmin ? 'Citas Completadas — Últimos 7 días' : 'Mis Citas Completadas — Últimos 7 días'}
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isAdmin ? 'Volumen diario de citas finalizadas' : 'Mi volumen diario de citas finalizadas'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary rounded-lg px-2.5 py-1">
-                  <Activity className="w-3 h-3" />
-                  En vivo
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#d4a017" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#d4a017" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="citas"    name="Citas"    stroke="#d4a017" strokeWidth={2} fill="url(#gradGold)" dot={{ r: 3, fill: '#d4a017', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* Pie: servicios populares */}
-            <Card className="surface-panel p-4 sm:p-5 min-w-0">
-              <div className="mb-4">
-                <h2 className="text-sm font-semibold text-foreground">
-                  {isAdmin ? 'Servicios Populares' : 'Mis Servicios Populares'}
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isAdmin ? 'Por número de citas' : 'Mis servicios más realizados'}
-                </p>
-              </div>
-              {populares.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={140}>
-                    <PieChart>
-                      <Pie
-                        data={populares}
-                        dataKey="cantidad"
-                        nameKey="nombre"
-                        cx="50%" cy="50%"
-                        innerRadius={38}
-                        outerRadius={60}
-                        paddingAngle={3}
-                      >
-                        {populares.map((_, i) => (
-                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v, n) => [`${v} citas`, n]}
-                        contentStyle={{ borderRadius: 10, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))', fontSize: 12 }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1.5 mt-1">
-                    {populares.map((s, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                          <span className="text-muted-foreground truncate max-w-[110px]">{s.nombre}</span>
-                        </div>
-                        <span className="font-semibold text-foreground">{s.cantidad}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="h-[180px] flex items-center justify-center text-muted-foreground text-xs">Sin datos suficientes</div>
-              )}
-            </Card>
-          </div>
-
-          {/* ── Segunda fila de gráficas ─────────────────────────── */}
-          {isAdmin && productividad.length > 0 && (
-            <Card className="surface-panel p-4 sm:p-5 min-w-0">
-              <div className="mb-4">
-                <h2 className="text-sm font-semibold text-foreground">Productividad por Empleado — Este mes</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Citas atendidas en el mes actual</p>
-              </div>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={productividad} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="citas"    name="Citas"    fill="#d4a017" radius={[4,4,0,0]} maxBarSize={40} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          )}
-
-          {/* ── Citas de hoy + Próximas ──────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Citas hoy */}
-            <Card className="surface-panel p-4 sm:p-5 min-w-0">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">Agenda de Hoy</h2>
-                  <p className="text-xs text-muted-foreground">{citasHoy.length} citas programadas</p>
-                </div>
-                <Link href="/citas">
-                  <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
-                    Ver todas <ChevronRight className="w-3 h-3" />
-                  </Button>
+          <section aria-labelledby="tasks-heading">
+            <h2 id="tasks-heading" className="mb-3 text-lg font-bold text-foreground">¿Qué necesitas hacer?</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {taskCards.map(({ title, description, href, icon: Icon, primary }) => (
+                <Link key={title} href={href} className={cn('group flex min-h-40 flex-col rounded-2xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25', primary ? 'border-primary bg-primary text-primary-foreground sm:col-span-2' : 'border-border bg-card text-foreground hover:border-primary/45')}>
+                  <span className={cn('flex size-12 items-center justify-center rounded-xl', primary ? 'bg-black/15 text-primary-foreground' : 'bg-primary/12 text-primary')}><Icon className="size-6" /></span>
+                  <span className="mt-auto flex items-center justify-between gap-3 pt-5 text-xl font-black">{title}<ArrowRight className="size-5 transition-transform group-hover:translate-x-1" /></span>
+                  <span className={cn('mt-1 text-sm leading-5', primary ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{description}</span>
                 </Link>
-              </div>
-              {citasHoy.length > 0 ? (
-                <div className="space-y-2">
-                  {citasHoy.slice(0, 5).map((cita: any) => (
-                    <div key={cita.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Clock className="w-3.5 h-3.5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{cita.cliente_nombre}</p>
-                        <p className="text-xs text-muted-foreground">{cita.servicio?.nombre} · {cita.empleado?.nombre}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-foreground">{formatTime12Hour(cita.hora)}</p>
-                        <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', APPOINTMENT_STATUS_BADGE_CLASSES[cita.estado])}>
-                          {APPOINTMENT_STATUS_LABELS[cita.estado]}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {citasHoy.length > 5 && (
-                    <p className="text-xs text-center text-muted-foreground pt-1">+{citasHoy.length - 5} citas más hoy</p>
-                  )}
-                </div>
-              ) : (
-                <div className="py-10 text-center">
-                  <Calendar className="w-9 h-9 mx-auto mb-3 empty-state-icon" />
-                  <p className="text-sm font-medium text-foreground">La agenda de hoy está libre</p>
-                  <p className="text-xs text-muted-foreground mt-1">No hay citas programadas para hoy</p>
-                </div>
-              )}
-            </Card>
+              ))}
+            </div>
+          </section>
 
-            {/* Próximas citas */}
-            <Card className="surface-panel p-4 sm:p-5 min-w-0">
-              <div className="flex items-center justify-between mb-4">
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm" aria-labelledby="today-heading">
+            <div className="border-b border-border p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-foreground">Próximas Citas</h2>
-                  <p className="text-xs text-muted-foreground">Pendientes y confirmadas</p>
+                  <p className="text-sm font-bold text-primary">Tu día de un vistazo</p>
+                  <h2 id="today-heading" className="mt-0.5 text-xl font-black text-foreground">{totalToday === 0 ? 'Hoy no hay citas programadas' : `${totalToday} ${totalToday === 1 ? 'cita' : 'citas'} para hoy`}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{completed} completadas · {stats?.citasPendientes ?? 0} pendientes</p>
                 </div>
-                <Link href="/citas">
-                  <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
-                    Gestionar <ChevronRight className="w-3 h-3" />
-                  </Button>
-                </Link>
+                <Link href="/citas"><Button variant="outline" size="lg" className="min-h-11">Abrir agenda <ChevronRight /></Button></Link>
               </div>
-              {upcoming.length > 0 ? (
-                <div className="space-y-2">
-                  {upcoming.map((cita: any) => (
-                    <div key={cita.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                        <Scissors className="w-3.5 h-3.5 text-blue-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{cita.cliente_nombre}</p>
-                        <p className="text-xs text-muted-foreground">{cita.servicio?.nombre}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-foreground">{fmtDate(cita.fecha)}</p>
-                        <p className="text-[10px] text-muted-foreground">{formatTime12Hour(cita.hora)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-10 text-center">
-                  <CheckCircle2 className="w-9 h-9 mx-auto mb-3 empty-state-icon" />
-                  <p className="text-sm font-medium text-foreground">Todo está al día</p>
-                  <p className="text-xs text-muted-foreground mt-1">No hay citas futuras por el momento</p>
-                </div>
-              )}
-            </Card>
-          </div>
-
-          {/* ── Actividad Reciente ───────────────────────────────── */}
-          <Card className="surface-panel p-4 sm:p-5 min-w-0">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Actividad Reciente</h2>
-                <p className="text-xs text-muted-foreground">Últimas citas registradas en el sistema</p>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary" aria-label={`${progress}% de las citas de hoy completadas`}>
+                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
               </div>
             </div>
-            {actividad.length > 0 ? (
-              <div className="divide-y divide-border/50">
-                {actividad.slice(0, 6).map((item: any) => (
-                  <div key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-primary">
-                      {item.cliente_nombre.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">
-                        {item.cliente_nombre}
-                        <span className="text-muted-foreground font-normal"> — {item.servicio}</span>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">con {item.empleado} · {fmtDate(item.fecha)} {formatTime12Hour(item.hora)}</p>
-                    </div>
-                    <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full hidden sm:inline-flex', APPOINTMENT_STATUS_BADGE_CLASSES[item.estado])}>
-                      {APPOINTMENT_STATUS_LABELS[item.estado]}
+
+            {today.length > 0 ? (
+              <div className="divide-y divide-border/70">
+                {today.slice(0, 4).map((appointment) => (
+                  <Link key={appointment.id} href="/citas" className="group flex min-h-[4.75rem] items-center gap-3 px-4 py-3 transition hover:bg-secondary/55 sm:px-5">
+                    <span className="flex min-h-11 min-w-[4.75rem] shrink-0 items-center justify-center rounded-xl bg-primary/12 px-2 text-sm font-black tabular-nums text-primary">{formatTime12Hour(appointment.hora)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-base font-bold text-foreground">{appointment.cliente_nombre}</span>
+                      <span className="mt-0.5 block truncate text-sm text-muted-foreground">{appointment.servicio?.nombre ?? 'Servicio'}{appointment.empleado?.nombre ? ` · ${appointment.empleado.nombre}` : ''}</span>
                     </span>
-                  </div>
+                    <span className={cn('hidden rounded-full px-2.5 py-1 text-xs font-bold sm:inline-flex', APPOINTMENT_STATUS_BADGE_CLASSES[appointment.estado])}>{APPOINTMENT_STATUS_LABELS[appointment.estado] ?? appointment.estado}</span>
+                    <ChevronRight className="size-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </Link>
                 ))}
               </div>
             ) : (
-              <div className="py-10 text-center">
-                <Activity className="w-9 h-9 mx-auto mb-3 empty-state-icon" />
-                <p className="text-sm font-medium text-foreground">Sin actividad aún</p>
-                <p className="text-xs text-muted-foreground mt-1">Aquí aparecerán las últimas citas registradas</p>
+              <div className="flex flex-col items-center px-5 py-10 text-center">
+                <CalendarDays className="size-10 text-primary" />
+                <p className="mt-3 text-base font-bold text-foreground">La agenda está libre</p>
+                <p className="mt-1 text-sm text-muted-foreground">Puedes aprovechar para crear la próxima cita.</p>
               </div>
             )}
-          </Card>
+          </section>
 
+          {upcoming.length > 0 && (
+            <section aria-labelledby="next-heading">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 id="next-heading" className="text-lg font-bold text-foreground">Después de hoy</h2>
+                <Link href="/citas" className="text-sm font-bold text-primary hover:underline">Ver todas</Link>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {upcoming.slice(0, 3).map((appointment) => (
+                  <Link key={appointment.id} href="/citas" className="flex min-h-28 items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/45">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary"><Clock3 className="size-5" /></span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-bold text-foreground">{appointment.cliente_nombre}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">{new Date(appointment.fecha).toLocaleDateString('es-NI', { day: 'numeric', month: 'short', timeZone: 'UTC' })} · {formatTime12Hour(appointment.hora)}</span>
+                      <span className="mt-1 block truncate text-sm text-muted-foreground">{appointment.servicio?.nombre}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isAdmin && (
+            <details className="rounded-2xl border border-border bg-card">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 font-bold text-foreground sm:px-5">
+                <BarChart3 className="size-5 text-primary" /> Ver resumen del negocio <ChevronRight className="ml-auto size-4 transition-transform [[open]>&]:rotate-90" />
+              </summary>
+              <div className="grid gap-px border-t border-border bg-border sm:grid-cols-3">
+                <div className="bg-card p-5"><CheckCircle2 className="size-5 text-emerald-600" /><p className="mt-3 text-2xl font-black text-foreground">{stats?.citasCompletadasMes ?? 0}</p><p className="text-sm text-muted-foreground">Citas completadas este mes</p></div>
+                <div className="bg-card p-5"><CalendarDays className="size-5 text-primary" /><p className="mt-3 text-2xl font-black text-foreground">{stats?.totalCitas ?? 0}</p><p className="text-sm text-muted-foreground">Citas registradas</p></div>
+                <div className="bg-card p-5"><UserPlus className="size-5 text-primary" /><p className="mt-3 text-2xl font-black text-foreground">{stats?.empleadosActivos ?? 0}</p><p className="text-sm text-muted-foreground">Profesionales activos</p></div>
+              </div>
+              <div className="border-t border-border p-4 sm:p-5"><Link href="/reportes"><Button variant="outline">Abrir reportes completos <ArrowRight /></Button></Link></div>
+            </details>
+          )}
         </div>
       </main>
     </div>

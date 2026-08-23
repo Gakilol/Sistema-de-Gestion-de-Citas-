@@ -10,10 +10,13 @@ import { formatDBDateLong } from '@/lib/timezone';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { buildGoogleCalendarUrl, calcularFinCita, isValidTimeZone } from '@/lib/calendar-event';
 import CalendarioClienteUI from './CalendarioClienteUI';
+import { ShieldAlert } from 'lucide-react';
+import { BrandMark } from '@/components/shared/brand-mark';
+import { BRAND } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'Agregar cita al calendario — HAIR STYLE Salon & Barber',
-  description: 'Agregue su cita en HAIR STYLE Salon & Barber a su calendario favorito.',
+  title: `Agregar cita al calendario — ${BRAND.businessName}`,
+  description: `Agregue su cita en ${BRAND.businessName} a su calendario favorito.`,
 };
 
 interface PageProps {
@@ -73,7 +76,7 @@ export default async function CalendarioPublicoPage({ params }: PageProps) {
   let servicios: string[] = [];
   if (cita.citaServicios && cita.citaServicios.length > 0) {
     servicios = cita.citaServicios
-      .map((cs: any) => cs.servicio?.nombre)
+      .map((cs: { servicio: { nombre: string } | null }) => cs.servicio?.nombre)
       .filter(Boolean);
   } else if (cita.servicio?.nombre) {
     servicios = [cita.servicio.nombre];
@@ -85,11 +88,11 @@ export default async function CalendarioPublicoPage({ params }: PageProps) {
   try {
     const config = await prisma.configuracion.findUnique({ where: { id: 'default' } });
     if (config?.negocio && typeof config.negocio === 'object') {
-      const negocio = config.negocio as any;
-        if (negocio.direccion) {
+      const negocio = config.negocio as { direccion?: unknown; zona_horaria?: unknown };
+        if (typeof negocio.direccion === 'string') {
           ubicacion = negocio.direccion;
         }
-        if (isValidTimeZone(negocio.zona_horaria)) {
+        if (typeof negocio.zona_horaria === 'string' && isValidTimeZone(negocio.zona_horaria)) {
           zonaHoraria = negocio.zona_horaria;
         }
     }
@@ -130,31 +133,21 @@ export default async function CalendarioPublicoPage({ params }: PageProps) {
 
 function ErrorPage({ mensaje }: { mensaje: string }) {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-sm text-center space-y-6">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <img
-            src="/logo.png"
-            alt="HAIR STYLE Salon & Barber"
-            className="h-16 w-auto object-contain"
-          />
-        </div>
-
-        {/* Error */}
-        <div className="bg-card rounded-2xl border border-border/50 p-6 shadow-lg space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
-            <svg className="w-6 h-6 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
+    <main className="flex min-h-dvh items-center justify-center bg-background p-5">
+      <div className="w-full max-w-md">
+        <BrandMark className="mb-8 justify-center" />
+        <div className="surface-panel p-7 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full border border-destructive/20 bg-destructive/10 text-destructive">
+            <ShieldAlert className="size-5" aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{mensaje}</p>
+          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-destructive">Vínculo no disponible</p>
+          <h1 className="mt-2 font-display text-3xl tracking-tight text-foreground">No pudimos abrir esta cita.</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">{mensaje}</p>
         </div>
-
-        <p className="text-xs text-muted-foreground/60">
-          HAIR STYLE Salon & Barber
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Si necesitas ayuda, comunícate directamente con {BRAND.businessName}.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

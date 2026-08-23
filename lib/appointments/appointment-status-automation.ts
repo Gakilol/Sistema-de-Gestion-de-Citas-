@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db';
 import { BUSINESS_TIMEZONE } from '@/lib/timezone';
 import { EstadoCita, Prisma } from '@prisma/client';
 
-function getNowInBusinessTZ(): Date {
+export function getNowInBusinessTZ(reference = new Date()): Date {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: BUSINESS_TIMEZONE,
     year: 'numeric',
@@ -13,11 +13,41 @@ function getNowInBusinessTZ(): Date {
     second: '2-digit',
     hour12: false,
   });
-  const parts = formatter.formatToParts(new Date());
+  const parts = formatter.formatToParts(reference);
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '00';
+  const hour = get('hour') === '24' ? '00' : get('hour');
   return new Date(
-    `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}Z`
+    `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}:${get('second')}Z`
   );
+}
+
+interface AppointmentStatusInput {
+  fecha: Date;
+  hora: string;
+  duracion: number;
+  estado: EstadoCita;
+}
+
+export function getAutomaticAppointmentStatus(
+  appointment: AppointmentStatusInput,
+  nowLocal: Date
+): { status: EstadoCita; completedAt?: Date } {
+  const date = appointment.fecha.toISOString().split('T')[0];
+  const [hours, minutes] = appointment.hora.split(':').map(Number);
+  const start = new Date(
+    `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00Z`
+  );
+  const end = new Date(start.getTime() + appointment.duracion * 60_000);
+
+  if (nowLocal < start) {
+    return {
+      status: appointment.estado === EstadoCita.CONFIRMADA
+        ? EstadoCita.CONFIRMADA
+        : EstadoCita.PENDIENTE,
+    };
+  }
+  if (nowLocal < end) return { status: EstadoCita.EN_PROGRESO };
+  return { status: EstadoCita.COMPLETADA, completedAt: end };
 }
 
 export interface AppointmentStatusSyncResult {
@@ -53,23 +83,8 @@ export async function syncAppointmentStatuses(
   }> = [];
 
   for (const appointment of appointments) {
-    const date = appointment.fecha.toISOString().split('T')[0];
-    const [hours, minutes] = appointment.hora.split(':').map(Number);
-    const start = new Date(
-      `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00Z`
-    );
-    const end = new Date(start.getTime() + appointment.duracion * 60_000);
-
-    let target = appointment.estado;
-    if (nowLocal < start) {
-      if (![EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA].includes(appointment.estado)) {
-        target = EstadoCita.PENDIENTE;
-      }
-    } else if (nowLocal < end) {
-      target = EstadoCita.EN_PROGRESO;
-    } else {
-      target = EstadoCita.COMPLETADA;
-    }
+    const planned = getAutomaticAppointmentStatus(appointment, nowLocal);
+    const target = planned.status;
 
     if (target !== appointment.estado) {
       changes.push({
@@ -77,7 +92,9 @@ export async function syncAppointmentStatuses(
         before: appointment.estado,
         after: target,
         completedAt:
-          target === EstadoCita.COMPLETADA && !appointment.completed_at ? end : undefined,
+          target === EstadoCita.COMPLETADA && !appointment.completed_at
+            ? planned.completedAt
+            : undefined,
       });
     }
   }

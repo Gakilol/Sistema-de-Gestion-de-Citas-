@@ -128,6 +128,22 @@ export function urlWhatsAppCancelacion(cita: CitaWA): string | null {
   return generarEnlaceWA(cita.cliente_telefono, mensajeCancelacion(cita));
 }
 
+export function mensajeEspacioDisponible(params: { cliente_nombre: string; servicio?: string | null; fecha?: string | Date | null; hora?: string | null }): string {
+  return [
+    `Hola ${params.cliente_nombre}, somos de ${SALON_NAME}.`,
+    '',
+    `Se liberó un espacio${params.servicio ? ` para ${params.servicio}` : ''}${params.fecha ? ` el ${fmtFecha(params.fecha)}` : ''}${params.hora ? ` a las ${formatTime12Hour(params.hora)}` : ''}.`,
+    'Como estás en nuestra lista de espera, queríamos consultarte primero.',
+    '',
+    '¿Te gustaría reservarlo? El espacio se confirma cuando respondas este mensaje.',
+  ].join('\n');
+}
+
+export function urlWhatsAppEspacioDisponible(params: { cliente_nombre: string; cliente_telefono?: string | null; servicio?: string | null; fecha?: string | Date | null; hora?: string | null }): string | null {
+  if (!params.cliente_telefono) return null;
+  return generarEnlaceWA(params.cliente_telefono, mensajeEspacioDisponible(params));
+}
+
 // ─── Reactivación de clientes inactivos ──────────────────────────────────────
 export interface InactiveClientWA {
   cliente_nombre: string;
