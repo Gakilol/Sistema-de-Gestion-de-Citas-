@@ -47,7 +47,7 @@ export default function Empleados() {
   const [saving, setSaving]       = useState(false);
 
   const handleEliminarEmpleado = async (emp: EmployeeRecord) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente al empleado/administrador "${emp.nombre}"? Esto eliminará también todas sus citas y horarios asociados.`)) {
+    if (!confirm(`¿Eliminar permanentemente a "${emp.nombre}"? Se borrarán sus citas, horarios y acceso al sistema. Los clientes se conservarán. Esta acción no se puede deshacer.`)) {
       return;
     }
     try {
@@ -58,7 +58,8 @@ export default function Empleados() {
         const d = await res.json();
         throw new Error(d.error || 'Error al eliminar empleado');
       }
-      toast.success('Empleado eliminado exitosamente');
+      const data = await res.json();
+      toast.success(data.mensaje || 'Empleado eliminado permanentemente');
       fetchEmpleados();
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, 'Error al eliminar empleado'));
