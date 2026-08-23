@@ -23,6 +23,7 @@ import {
   Users,
   UserX,
   Sparkles,
+  Accessibility,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -46,6 +47,7 @@ const menuGroups: MenuGroup[] = [
     label: 'Lo más usado',
     items: [
       { title: 'Inicio', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
+      { title: 'Modo recepción', href: '/recepcion', icon: Accessibility, roles: ['ADMIN', 'EMPLEADO'] },
       { title: 'Agenda', href: '/citas', icon: Calendar, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Asistente', href: '/ia', icon: Sparkles, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
       { title: 'Clientes', href: '/clientes', icon: Users, roles: ['ADMIN', 'EMPLEADO', 'TECH_SUPPORT'] },
@@ -67,6 +69,7 @@ const menuGroups: MenuGroup[] = [
 
 const pageNames: Record<string, string> = {
   '/dashboard': 'Inicio',
+  '/recepcion': 'Modo recepción',
   '/citas': 'Agenda',
   '/ia': 'Asistente IA',
   '/clientes': 'Clientes',

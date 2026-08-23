@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Bot, CalendarPlus, Check, CheckCircle2, Loader2, Mic, MicOff, Search, Send, Sparkles, UserPlus, UserRound, X } from 'lucide-react';
+import { ArrowRight, Bot, CalendarPlus, Check, CheckCircle2, ListPlus, Loader2, MessageCircle, Mic, MicOff, Search, Send, Sparkles, UserPlus, UserRound, X } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { BRAND } from '@/lib/brand';
@@ -56,6 +56,8 @@ const quickTasks = [
   { title: 'Crear una cita', example: 'Quiero crear una cita', description: 'Busco servicio, profesional y horario.', icon: CalendarPlus },
   { title: 'Registrar cliente', example: 'Quiero registrar un cliente', description: 'Te pediré nombre y datos opcionales.', icon: UserPlus },
   { title: 'Consultar agenda', example: '¿Quién viene hoy?', description: 'Reviso los datos reales del sistema.', icon: Search },
+  { title: 'Lista de espera', example: 'Quiero agregar un cliente a la lista de espera', description: 'Preparo una solicitud para una cancelación.', icon: ListPlus },
+  { title: 'Recordar por WhatsApp', example: 'Quiero enviar un recordatorio por WhatsApp', description: 'Busco la cita y preparo el mensaje.', icon: MessageCircle },
 ];
 
 function MessageText({ content }: { content: string }) {
@@ -84,7 +86,7 @@ function PendingActionCard({ message, onConfirm, onCancel }: { message: Message;
           {done ? <CheckCircle2 className="size-5" /> : <Check className="size-5" />}
         </span>
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">{done ? 'Operación realizada' : 'Revisa antes de guardar'}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">{done ? 'Operación realizada' : 'Revisa antes de continuar'}</p>
           <h2 className="mt-0.5 text-lg font-bold text-foreground">{action.title}</h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{action.description}</p>
         </div>
@@ -103,7 +105,7 @@ function PendingActionCard({ message, onConfirm, onCancel }: { message: Message;
 
       <div className="flex flex-col gap-2 p-4 sm:flex-row">
         {done ? (
-          <div className="flex min-h-12 w-full items-center gap-2 rounded-xl bg-emerald-600/10 px-4 font-semibold text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-5" /> Listo, quedó guardado en el sistema.</div>
+          <div className="flex min-h-12 w-full items-center gap-2 rounded-xl bg-emerald-600/10 px-4 font-semibold text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-5" /> {action.type === 'OPEN_WHATSAPP_REMINDER' ? 'WhatsApp quedó abierto con el mensaje preparado.' : 'Listo, quedó guardado en el sistema.'}</div>
         ) : cancelled ? (
           <div className="flex min-h-12 w-full items-center gap-2 rounded-xl bg-secondary px-4 font-semibold text-muted-foreground"><X className="size-5" /> Operación cancelada. No se guardó nada.</div>
         ) : (
@@ -218,11 +220,16 @@ export default function IAPage() {
     if (!action || messages[index].actionStatus === 'confirming') return;
     updateActionMessage(index, { actionStatus: 'confirming', actionError: undefined });
     try {
-      const response = await authFetch(action.endpoint, {
+      const response = await authFetch(action.endpoint, action.method === 'GET' ? undefined : {
         method: action.method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.body),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'No se pudo guardar. Revisa los datos e intenta de nuevo.');
+      if (action.type === 'OPEN_WHATSAPP_REMINDER') {
+        const targetUrl = data.waUrlRecordatorio || data.waUrl;
+        if (!targetUrl) throw new Error('No se pudo preparar WhatsApp para esta cita.');
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
       updateActionMessage(index, { actionStatus: 'completed', actionError: undefined });
       setMessages((current) => [...current, {
         role: 'assistant',
@@ -230,7 +237,13 @@ export default function IAPage() {
           ? 'La cita quedó creada y ya aparece en la Agenda.'
           : action.type === 'CREATE_CLIENT'
             ? 'El cliente quedó registrado y ya aparece en Clientes.'
-            : 'El estado de la cita quedó actualizado.',
+            : action.type === 'ADD_WAITLIST'
+              ? 'El cliente quedó agregado a la lista de espera.'
+              : action.type === 'ADD_CLIENT_PREFERENCE'
+                ? 'La preferencia quedó guardada en la ficha del cliente.'
+                : action.type === 'OPEN_WHATSAPP_REMINDER'
+                  ? 'Abrí WhatsApp con el recordatorio preparado. Revísalo y pulsa enviar cuando estés listo.'
+                  : 'El estado de la cita quedó actualizado.',
       }]);
     } catch (error) {
       updateActionMessage(index, { actionStatus: 'error', actionError: error instanceof Error ? error.message : 'No se pudo guardar.' });
@@ -261,7 +274,7 @@ export default function IAPage() {
           </header>
 
           {messages.length === 1 && (
-            <section className="mb-5 grid gap-3 sm:grid-cols-3" aria-label="Acciones rápidas">
+            <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Acciones rápidas">
               {quickTasks.map(({ title, example, description, icon: Icon }) => (
                 <button key={title} type="button" onClick={() => void send(example, title === 'Crear una cita')} disabled={loading} className="group flex min-h-32 flex-col items-start rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:opacity-50">
                   <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary"><Icon className="size-5" /></span>

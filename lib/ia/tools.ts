@@ -4,7 +4,11 @@ import { prisma } from '@/lib/db';
 import { getScopedAppointmentWhere } from '@/lib/auth-helpers';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
-import { IAToolInputError, prepareCreateAppointment, prepareCreateClient, prepareUpdateAppointmentStatus } from './action-builders';
+import {
+  IAToolInputError, prepareAddClientPreference, prepareAddWaitlist, prepareCreateAppointment,
+  prepareCreateClient, prepareUpdateAppointmentStatus, prepareUpdateAppointmentStatusByQuery,
+  prepareWhatsAppReminder,
+} from './action-builders';
 import type { IAExecutionContext, IAToolName, IAToolResult } from './types';
 
 const emptySchema = z.object({}).optional().default({});
@@ -185,7 +189,11 @@ export async function executeIATool(
     else if (name === 'getStaffWorkload') data = await getStaffWorkload(args, context);
     else if (name === 'prepareCreateClient') pendingAction = await prepareCreateClient(args);
     else if (name === 'prepareCreateAppointment') pendingAction = await prepareCreateAppointment(args, context);
-    else pendingAction = await prepareUpdateAppointmentStatus(args, context);
+    else if (name === 'prepareUpdateAppointmentStatus') pendingAction = await prepareUpdateAppointmentStatus(args, context);
+    else if (name === 'prepareUpdateAppointmentStatusByQuery') pendingAction = await prepareUpdateAppointmentStatusByQuery(args, context);
+    else if (name === 'prepareAddWaitlist') pendingAction = await prepareAddWaitlist(args, context);
+    else if (name === 'prepareAddClientPreference') pendingAction = await prepareAddClientPreference(args);
+    else pendingAction = await prepareWhatsAppReminder(args, context);
     if (pendingAction) data = { readyForConfirmation: true, summary: pendingAction.details };
     return { ok: true, data, meta: { fuenteDatos: 'HAIR STYLE' }, ...(pendingAction ? { pendingAction } : {}) };
   } catch (error) {

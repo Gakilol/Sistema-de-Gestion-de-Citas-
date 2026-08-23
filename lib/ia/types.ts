@@ -10,15 +10,19 @@ export type IAToolName =
   | 'getStaffWorkload'
   | 'prepareCreateClient'
   | 'prepareCreateAppointment'
-  | 'prepareUpdateAppointmentStatus';
+  | 'prepareUpdateAppointmentStatus'
+  | 'prepareUpdateAppointmentStatusByQuery'
+  | 'prepareAddWaitlist'
+  | 'prepareAddClientPreference'
+  | 'prepareWhatsAppReminder';
 
 export interface IAPendingAction {
-  type: 'CREATE_CLIENT' | 'CREATE_APPOINTMENT' | 'UPDATE_APPOINTMENT_STATUS';
+  type: 'CREATE_CLIENT' | 'CREATE_APPOINTMENT' | 'UPDATE_APPOINTMENT_STATUS' | 'ADD_WAITLIST' | 'ADD_CLIENT_PREFERENCE' | 'OPEN_WHATSAPP_REMINDER';
   title: string;
   description: string;
   confirmLabel: string;
   endpoint: string;
-  method: 'POST' | 'PATCH';
+  method: 'GET' | 'POST' | 'PATCH';
   body: Record<string, unknown>;
   details: Array<{ label: string; value: string }>;
 }

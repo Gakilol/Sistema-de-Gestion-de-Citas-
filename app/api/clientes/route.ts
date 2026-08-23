@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
     const busqueda = normalizarNombre(req.nextUrl.searchParams.get('q') ?? '');
+    const creadoPor = req.nextUrl.searchParams.get('creadoPor')?.trim() ?? '';
+    const orden = req.nextUrl.searchParams.get('orden') === 'nombre' ? 'nombre' : 'recientes';
     const page = Math.max(1, Number(req.nextUrl.searchParams.get('page') ?? '1') || 1);
     const limit = Math.min(50, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '24') || 24));
 
@@ -31,18 +33,30 @@ export async function GET(req: NextRequest) {
             { telefono: { contains: busqueda, mode: 'insensitive' as const } },
             { cedula: { contains: busqueda, mode: 'insensitive' as const } },
             { correo: { contains: busqueda, mode: 'insensitive' as const } },
+            { creador: { nombre: { contains: busqueda, mode: 'insensitive' as const } } },
           ],
         }
       : {};
 
-    const [total, clientesData] = await Promise.all([
-      prisma.cliente.count({ where: searchWhere }),
+    const where = {
+      ...searchWhere,
+      ...(creadoPor ? { createdByUserId: creadoPor } : {}),
+    };
+
+    const [total, clientesData, creadores] = await Promise.all([
+      prisma.cliente.count({ where }),
       prisma.cliente.findMany({
-        where: searchWhere,
-        orderBy: { createdAt: 'desc' },
+        where,
+        orderBy: orden === 'nombre' ? { nombre: 'asc' } : { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         include: {
+          creador: { select: { id: true, nombre: true } },
+          preferencias: {
+            select: { id: true, tipo: true, titulo: true, detalle: true, createdAt: true, createdBy: true, creador: { select: { nombre: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+          },
           citas: {
             ...(userRole === 'EMPLEADO' ? { where: { empleado_id: userId } } : {}),
             select: {
@@ -57,6 +71,11 @@ export async function GET(req: NextRequest) {
             orderBy: { fecha: 'desc' },
           },
         },
+      }),
+      prisma.empleado.findMany({
+        where: { clientesCreados: { some: {} } },
+        select: { id: true, nombre: true, _count: { select: { clientesCreados: true } } },
+        orderBy: { nombre: 'asc' },
       }),
     ]);
 
@@ -91,6 +110,9 @@ export async function GET(req: NextRequest) {
         correo: c.correo,
         notas: c.notas,
         createdByUserId: c.createdByUserId,
+        creador: c.creador,
+        preferencias: c.preferencias,
+        createdAt: c.createdAt,
         citas: c.citas,
         totalCitas: c.citas.length,
         citasCompletadas,
@@ -104,14 +126,13 @@ export async function GET(req: NextRequest) {
       return buildClientResponse(rawCliente, userRole);
     });
 
-    clientes.sort((a: any, b: any) => b.totalCitas - a.totalCitas);
-
     return NextResponse.json({
       clientes,
       total,
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+      filtros: { creadores },
     }, { status: 200 });
   } catch (err: any) {
     console.error('[CLIENTS_GET_ERROR] Error al obtener clientes:', err);

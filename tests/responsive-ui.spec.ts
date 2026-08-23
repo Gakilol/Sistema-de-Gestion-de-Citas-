@@ -95,6 +95,7 @@ test.describe('UI responsive autenticada', () => {
 
     const modules = [
       { path: '/dashboard', heading: /Hola/i },
+      { path: '/recepcion', heading: 'Recepción' },
       { path: '/ia', heading: /Qué necesitas hacer/i },
       { path: '/citas', heading: 'Agenda y citas' },
       { path: '/clientes', heading: 'Clientes' },

@@ -4,7 +4,8 @@ import { authFetch } from '@/lib/api-client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Star, Phone, Calendar,
-  Scissors, X, RefreshCcw, UserPlus, ChevronRight, Trash2, Edit
+  Scissors, X, RefreshCcw, UserPlus, ChevronRight, Trash2, Edit,
+  SlidersHorizontal, Palette, ShieldAlert, Heart, StickyNote, Plus, UserRound
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,24 @@ interface ClienteAppointment {
   empleado: { nombre: string };
 }
 
+type PreferenceType = 'CORTE' | 'TINTE' | 'ALERGIA' | 'PREFERENCIA' | 'NOTA';
+
+interface ClientePreference {
+  id: string;
+  tipo: PreferenceType;
+  titulo: string;
+  detalle: string;
+  createdAt: string;
+  createdBy: string;
+  creador: { nombre: string };
+}
+
+interface CreatorFilter {
+  id: string;
+  nombre: string;
+  _count: { clientesCreados: number };
+}
+
 interface Cliente {
   id: string;
   nombre: string;
@@ -42,7 +61,17 @@ interface Cliente {
   servicioFavorito: string | null;
   historial: ClienteAppointment[];
   createdByUserId?: string | null;
+  creador?: { id: string; nombre: string } | null;
+  preferencias?: ClientePreference[];
 }
+
+const preferenceMeta: Record<PreferenceType, { label: string; icon: typeof Scissors; className: string }> = {
+  CORTE: { label: 'Corte', icon: Scissors, className: 'text-primary bg-primary/10 border-primary/20' },
+  TINTE: { label: 'Tinte', icon: Palette, className: 'text-[#A40022] bg-[#A40022]/10 border-[#A40022]/20' },
+  ALERGIA: { label: 'Alergia', icon: ShieldAlert, className: 'text-destructive bg-destructive/10 border-destructive/20' },
+  PREFERENCIA: { label: 'Preferencia', icon: Heart, className: 'text-foreground bg-secondary border-border' },
+  NOTA: { label: 'Nota', icon: StickyNote, className: 'text-muted-foreground bg-secondary border-border' },
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtDate(d: string) {
@@ -84,10 +113,49 @@ function Skeleton() {
 }
 
 // ─── Modal de historial ───────────────────────────────────────────────────────
-function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: Cliente) => void }) {
+function HistorialModal({ cliente, onClose, onDelete, onEdit, onPreferencesChanged }: { cliente: Cliente; onClose: () => void; onDelete: (id: string) => void; onEdit: (cliente: Cliente) => void; onPreferencesChanged: (preferencias: ClientePreference[]) => void }) {
   const { user } = useAuth();
   const canEdit = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
   const canDelete = user?.rol === 'ADMIN' || user?.rol === 'TECH_SUPPORT' || (user?.rol === 'EMPLEADO' && cliente.createdByUserId === user?.id);
+  const canManagePreferences = user?.rol !== 'TECH_SUPPORT';
+  const [preferences, setPreferences] = useState<ClientePreference[]>(cliente.preferencias ?? []);
+  const [showPreferenceForm, setShowPreferenceForm] = useState(false);
+  const [savingPreference, setSavingPreference] = useState(false);
+  const [preferenceForm, setPreferenceForm] = useState<{ tipo: PreferenceType; titulo: string; detalle: string }>({ tipo: 'PREFERENCIA', titulo: '', detalle: '' });
+
+  const savePreference = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (savingPreference) return;
+    setSavingPreference(true);
+    try {
+      const res = await authFetch(`/api/clientes/${cliente.id}/preferencias`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(preferenceForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo guardar la preferencia');
+      const next = [data.preferencia as ClientePreference, ...preferences];
+      setPreferences(next);
+      onPreferencesChanged(next);
+      setPreferenceForm({ tipo: 'PREFERENCIA', titulo: '', detalle: '' });
+      setShowPreferenceForm(false);
+      toast.success('Preferencia agregada al historial');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la preferencia');
+    } finally {
+      setSavingPreference(false);
+    }
+  };
+
+  const removePreference = async (preference: ClientePreference) => {
+    if (!window.confirm(`¿Eliminar “${preference.titulo}” del historial?`)) return;
+    const res = await authFetch(`/api/clientes/${cliente.id}/preferencias/${preference.id}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast.error(data.error || 'No se pudo eliminar la preferencia');
+    const next = preferences.filter((item) => item.id !== preference.id);
+    setPreferences(next);
+    onPreferencesChanged(next);
+    toast.success('Preferencia eliminada');
+  };
 
   return (
     <div
@@ -138,9 +206,77 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: Clien
           </div>
         </div>
 
-        {/* Historial */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Historial de citas</p>
+        {/* Perfil e historial */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+          <section aria-labelledby="preferencias-cliente-title" className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p id="preferencias-cliente-title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preferencias importantes</p>
+                <p className="mt-1 text-xs text-muted-foreground">Cortes, fórmulas, alergias y detalles para la próxima visita.</p>
+              </div>
+              {canManagePreferences && (
+                <Button type="button" variant="outline" size="sm" className="min-h-10 shrink-0 gap-1.5" onClick={() => setShowPreferenceForm((value) => !value)}>
+                  {showPreferenceForm ? <X className="size-4" /> : <Plus className="size-4" />}
+                  {showPreferenceForm ? 'Cerrar' : 'Agregar'}
+                </Button>
+              )}
+            </div>
+
+            {showPreferenceForm && (
+              <form onSubmit={savePreference} className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+                  <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
+                    Tipo
+                    <select value={preferenceForm.tipo} onChange={(event) => setPreferenceForm((current) => ({ ...current, tipo: event.target.value as PreferenceType }))} className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+                      {Object.entries(preferenceMeta).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
+                    Título corto
+                    <Input required minLength={2} maxLength={80} value={preferenceForm.titulo} onChange={(event) => setPreferenceForm((current) => ({ ...current, titulo: event.target.value }))} placeholder="Ej. Fórmula rubio ceniza" />
+                  </label>
+                </div>
+                <label className="block space-y-1.5 text-xs font-semibold text-muted-foreground">
+                  Detalle
+                  <textarea required minLength={2} maxLength={1000} rows={3} value={preferenceForm.detalle} onChange={(event) => setPreferenceForm((current) => ({ ...current, detalle: event.target.value }))} placeholder="Anota medidas, productos, alergias o cómo le gusta el acabado…" className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </label>
+                <Button type="submit" disabled={savingPreference} className="min-h-11 w-full sm:w-auto">
+                  {savingPreference ? 'Guardando…' : 'Guardar en el historial'}
+                </Button>
+              </form>
+            )}
+
+            {preferences.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">Todavía no hay preferencias registradas.</div>
+            ) : (
+              <div className="space-y-2">
+                {preferences.map((preference) => {
+                  const meta = preferenceMeta[preference.tipo];
+                  const Icon = meta.icon;
+                  const canRemove = user?.rol === 'ADMIN' || preference.createdBy === user?.id;
+                  return (
+                    <article key={preference.id} className="rounded-xl border border-border/60 bg-secondary/20 p-3.5">
+                      <div className="flex items-start gap-3">
+                        <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-lg border', meta.className)}><Icon className="size-4" /></span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-bold text-foreground">{preference.titulo}</h3>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{meta.label}</span>
+                          </div>
+                          <p className="mt-1 text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap">{preference.detalle}</p>
+                          <p className="mt-2 text-[11px] text-muted-foreground">{fmtDate(preference.createdAt)} · {preference.creador.nombre}</p>
+                        </div>
+                        {canRemove && <button type="button" onClick={() => void removePreference(preference)} aria-label={`Eliminar ${preference.titulo}`} className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="size-4" /></button>}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2" aria-labelledby="historial-citas-title">
+          <p id="historial-citas-title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Historial de citas</p>
           {cliente.historial && cliente.historial.length > 0 ? (
             cliente.historial.map((cita) => (
               <div key={cita.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
@@ -162,6 +298,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit }: { cliente: Clien
           ) : (
             <p className="text-xs text-muted-foreground italic text-center py-4">Sin citas en el historial visible</p>
           )}
+          </section>
         </div>
 
         {/* Notas Privadas */}
@@ -276,6 +413,14 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
 
       {/* Info adicional */}
       <div className="space-y-1.5">
+        {cliente.preferencias && cliente.preferencias.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {cliente.preferencias.slice(0, 2).map((preference) => {
+              const meta = preferenceMeta[preference.tipo];
+              return <span key={preference.id} className={cn('max-w-full truncate rounded-md border px-2 py-1 text-[10px] font-bold', meta.className)}>{meta.label}: {preference.titulo}</span>;
+            })}
+          </div>
+        )}
         {cliente.servicioFavorito && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Scissors className="w-3 h-3 flex-shrink-0" />
@@ -286,6 +431,12 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
           <Calendar className="w-3 h-3 flex-shrink-0" />
           <span>Última visita: {fmtDate(cliente.ultimaCita)}</span>
         </div>
+        {cliente.creador && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <UserRound className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">Registrado por {cliente.creador.nombre}</span>
+          </div>
+        )}
       </div>
     </button>
   );
@@ -504,6 +655,9 @@ export default function Clientes() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [creadores, setCreadores] = useState<CreatorFilter[]>([]);
+  const [creadoPor, setCreadoPor] = useState('');
+  const [orden, setOrden] = useState<'recientes' | 'nombre'>('recientes');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -514,10 +668,11 @@ export default function Clientes() {
     }
   }, []);
 
-  const fetchClientes = useCallback(async (q = '', targetPage = 1) => {
+  const fetchClientes = useCallback(async (q = '', targetPage = 1, creator = '', sort: 'recientes' | 'nombre' = 'recientes') => {
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({ q, page: String(targetPage), limit: '24' });
+      const params = new URLSearchParams({ q, page: String(targetPage), limit: '24', orden: sort });
+      if (creator) params.set('creadoPor', creator);
       const res = await authFetch(`/api/clientes?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al consultar la lista de clientes');
@@ -526,6 +681,7 @@ export default function Clientes() {
       setTotal(data.total ?? 0);
       setPage(data.page ?? targetPage);
       setTotalPages(data.totalPages ?? 1);
+      setCreadores(data.filtros?.creadores ?? []);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al consultar la lista de clientes');
     } finally {
@@ -539,7 +695,7 @@ export default function Clientes() {
   const handleSearch = (val: string) => {
     setBusqueda(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchClientes(val, 1), 350);
+    debounceRef.current = setTimeout(() => fetchClientes(val, 1, creadoPor, orden), 350);
   };
 
   const handleEliminarCliente = async (id: string) => {
@@ -554,7 +710,7 @@ export default function Clientes() {
       if (!res.ok) throw new Error(data.error || 'Error al eliminar cliente');
       toast.success('Cliente eliminado exitosamente');
       setClienteSeleccionado(null);
-      fetchClientes(busqueda);
+      fetchClientes(busqueda, 1, creadoPor, orden);
     } catch (err: any) {
       toast.error(err.message || 'Error al eliminar cliente');
     }
@@ -576,7 +732,7 @@ export default function Clientes() {
             description="Historial, preferencias y relación con cada cliente"
             actions={(
               <>
-              <Button variant="outline" size="icon" onClick={() => fetchClientes(busqueda)} aria-label="Actualizar clientes" title="Actualizar clientes">
+              <Button variant="outline" size="icon" onClick={() => fetchClientes(busqueda, page, creadoPor, orden)} aria-label="Actualizar clientes" title="Actualizar clientes">
                 <RefreshCcw className="w-4 h-4" />
               </Button>
               <Button onClick={() => setShowAgregar(true)} className="gap-2 px-3.5 sm:px-4">
@@ -595,20 +751,36 @@ export default function Clientes() {
           />
 
           {/* ── Búsqueda ─────────────────────────────────────────── */}
-          <div className="sticky top-14 lg:top-0 z-20 -mx-1 px-1 py-2 bg-background/90 backdrop-blur-xl">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, teléfono o cédula..."
-              value={busqueda}
-              onChange={(e) => handleSearch(e.target.value)}
-              aria-label="Buscar clientes"
-              className="pl-10 pr-11 bg-card border-border/60 shadow-sm"
-            />
-            {busqueda && (
-              <button type="button" onClick={() => handleSearch('')} aria-label="Limpiar búsqueda" className="absolute right-1.5 top-1/2 -translate-y-1/2 size-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          <div className="sticky top-14 lg:top-0 z-20 -mx-1 space-y-2 bg-background/92 px-1 py-2 backdrop-blur-xl">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Nombre, teléfono, cédula, correo o quién lo registró…"
+                value={busqueda}
+                onChange={(e) => handleSearch(e.target.value)}
+                aria-label="Buscar clientes"
+                type="search"
+                className="min-h-12 pl-10 pr-11 bg-card border-border/60 shadow-sm"
+              />
+              {busqueda && (
+                <button type="button" onClick={() => handleSearch('')} aria-label="Limpiar búsqueda" className="absolute right-1.5 top-1/2 -translate-y-1/2 size-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[auto_minmax(12rem,18rem)_minmax(10rem,14rem)] sm:items-center">
+              <span className="hidden items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground sm:flex"><SlidersHorizontal className="size-4" /> Filtrar</span>
+              <label className="sr-only" htmlFor="cliente-creador-filter">Usuario que registró al cliente</label>
+              <select id="cliente-creador-filter" value={creadoPor} onChange={(event) => { const value = event.target.value; setCreadoPor(value); void fetchClientes(busqueda, 1, value, orden); }} className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="">Registrados por cualquier usuario</option>
+                {creadores.map((creator) => <option key={creator.id} value={creator.id}>{creator.nombre} ({creator._count.clientesCreados})</option>)}
+              </select>
+              <label className="sr-only" htmlFor="cliente-order-filter">Ordenar clientes</label>
+              <select id="cliente-order-filter" value={orden} onChange={(event) => { const value = event.target.value as 'recientes' | 'nombre'; setOrden(value); void fetchClientes(busqueda, 1, creadoPor, value); }} className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="recientes">Más recientes primero</option>
+                <option value="nombre">Orden alfabético</option>
+              </select>
+            </div>
           </div>
 
           {/* ── Grid de clientes ─────────────────────────────────── */}
@@ -639,10 +811,10 @@ export default function Clientes() {
                     Página {page} de {totalPages} · {total} clientes
                   </p>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => fetchClientes(busqueda, page - 1)} disabled={page <= 1} className="min-h-11 flex-1 sm:flex-none">
+                    <Button variant="outline" onClick={() => fetchClientes(busqueda, page - 1, creadoPor, orden)} disabled={page <= 1} className="min-h-11 flex-1 sm:flex-none">
                       Anterior
                     </Button>
-                    <Button variant="outline" onClick={() => fetchClientes(busqueda, page + 1)} disabled={page >= totalPages} className="min-h-11 flex-1 sm:flex-none">
+                    <Button variant="outline" onClick={() => fetchClientes(busqueda, page + 1, creadoPor, orden)} disabled={page >= totalPages} className="min-h-11 flex-1 sm:flex-none">
                       Siguiente
                     </Button>
                   </div>
@@ -660,6 +832,10 @@ export default function Clientes() {
           onClose={() => setClienteSeleccionado(null)}
           onDelete={handleEliminarCliente}
           onEdit={(c) => setClienteAEditar(c)}
+          onPreferencesChanged={(preferencias) => {
+            setClienteSeleccionado((current) => current ? { ...current, preferencias } : null);
+            setClientes((current) => current.map((item) => item.id === clienteSeleccionado.id ? { ...item, preferencias } : item));
+          }}
         />
       )}
 
@@ -667,7 +843,7 @@ export default function Clientes() {
       {showAgregar && (
         <AgregarClienteModal
           onClose={() => setShowAgregar(false)}
-          onCreated={() => fetchClientes(busqueda)}
+          onCreated={() => fetchClientes(busqueda, 1, creadoPor, orden)}
         />
       )}
 
@@ -677,7 +853,7 @@ export default function Clientes() {
           cliente={clienteAEditar}
           onClose={() => setClienteAEditar(null)}
           onUpdated={(formFields) => {
-            fetchClientes(busqueda);
+            fetchClientes(busqueda, page, creadoPor, orden);
             if (clienteSeleccionado && clienteSeleccionado.id === clienteAEditar.id) {
               setClienteSeleccionado((prev) => prev ? {
                 ...prev,

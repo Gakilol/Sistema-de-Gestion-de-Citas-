@@ -238,6 +238,36 @@ function isClientCreation(message: string) {
   return /\b(registra|registrar|registre|crear|crea|nuevo)\b.*\bcliente\b/.test(normalize(message));
 }
 
+function extractAppointmentClient(message: string) {
+  const match = message.match(/\bcita\s+(?:de|del|para)\s+(?:el\s+cliente\s+|la\s+cliente\s+)?([\p{L}][\p{L}' -]*?)(?=\s+a\s+las?\b|\s+(?:hoy|mañana|manana|el\s+lunes|el\s+martes|el\s+miércoles|el\s+miercoles|el\s+jueves|el\s+viernes|el\s+sábado|el\s+sabado|el\s+domingo)\b|\s+por\s+whatsapp\b|$)/iu)
+    ?? message.match(/(?:recordatorio|whatsapp)\s+(?:a|para|de)\s+([\p{L}][\p{L}' -]{1,80})(?=\s+a\s+las?\b|\s+(?:hoy|mañana|manana)\b|$)/iu);
+  return match?.[1] ? titleCase(match[1]) : undefined;
+}
+
+function detectLocalMutation(message: string) {
+  const text = normalize(message);
+  const cliente = extractAppointmentClient(message);
+  const fecha = parseHumanDate(message, getBusinessTodayString());
+  const hora = parseHumanTime(message);
+
+  let estado: 'CONFIRMADA' | 'EN_PROGRESO' | 'COMPLETADA' | 'CANCELADA' | 'NO_SHOW' | undefined;
+  if (/\b(cancela|cancelar|anula|anular)\b.*\bcita\b|\bcita\b.*\b(cancela|cancelar|anula|anular)\b/.test(text)) estado = 'CANCELADA';
+  else if (/\b(completa|completar|termina|terminar|finaliza|finalizar)\b.*\bcita\b|\bcita\b.*\b(completada|terminada|finalizada)\b/.test(text)) estado = 'COMPLETADA';
+  else if (/\b(inicia|iniciar|comienza|comenzar|empieza|empezar)\b.*\bcita\b|\bcita\b.*\b(en progreso|iniciada)\b/.test(text)) estado = 'EN_PROGRESO';
+  else if (/\bconfirma(?:r)?\b.*\bcita\b|\bcita\b.*\bconfirmada\b/.test(text)) estado = 'CONFIRMADA';
+  else if (/\b(no llego|no asistio|ausente)\b.*\bcita\b|\bcita\b.*\b(no llego|no asistio|ausente)\b/.test(text)) estado = 'NO_SHOW';
+
+  if (estado) return cliente
+    ? { tool: 'prepareUpdateAppointmentStatusByQuery' as const, args: { query: cliente, estado, ...(fecha ? { fecha } : {}), ...(hora ? { hora } : {}) } }
+    : { missing: '¿De qué cliente es la cita? Puedes decir, por ejemplo, “inicia la cita de Ana”.' };
+
+  if (/recordatorio|recordar/.test(text) && /whatsapp/.test(text)) return cliente
+    ? { tool: 'prepareWhatsAppReminder' as const, args: { query: cliente, ...(fecha ? { fecha } : {}), ...(hora ? { hora } : {}) } }
+    : { missing: '¿A qué cliente deseas enviarle el recordatorio por WhatsApp?' };
+
+  return undefined;
+}
+
 const QUESTIONS: Record<IAAppointmentDraftField, string> = {
   cliente: '¿A nombre de quién será la cita?',
   servicio: '¿Qué servicio desea reservar?',
@@ -268,6 +298,19 @@ export async function runLocalAssistant(messages: IAConversationMessage[], conte
   const latestMessage = messages.at(-1)?.content ?? '';
   const previousDraft = [...messages].reverse().find((message) => message.appointmentDraft)?.appointmentDraft;
   const previousClientDraft = [...messages].reverse().find((message) => message.clientDraft)?.clientDraft;
+
+  const mutation = detectLocalMutation(latestMessage);
+  if (mutation) {
+    if ('missing' in mutation) return { text: mutation.missing, toolsUsed: [], mode: 'local_guided' };
+    const result = await executeIATool(mutation.tool, mutation.args, context);
+    if (!result.ok) return { text: result.error, toolsUsed: [mutation.tool], mode: 'local_operational' };
+    return {
+      text: mutation.tool === 'prepareWhatsAppReminder'
+        ? 'Encontré la cita y preparé el recordatorio. Revisa los datos antes de abrir WhatsApp.'
+        : 'Encontré la cita. Revisa el cambio de estado antes de confirmarlo.',
+      toolsUsed: [mutation.tool], mode: 'local_operational', pendingAction: result.pendingAction,
+    };
+  }
 
   if (previousClientDraft || isClientCreation(latestMessage)) {
     const draft = parseClientMessage(latestMessage, previousClientDraft ?? {});
@@ -331,7 +374,7 @@ export async function runLocalAssistant(messages: IAConversationMessage[], conte
   const intent = detectLocalIntent(latestMessage);
   if (!intent.tool) {
     return {
-      text: 'Puedo crear una cita paso a paso, registrar clientes y consultar la agenda. Pulsa “Crear cita” o dime qué necesitas con tus propias palabras.',
+      text: 'Puedo crear citas, registrar clientes, iniciar o completar atenciones, preparar recordatorios por WhatsApp, guardar preferencias y administrar la lista de espera. Dime qué necesitas con tus propias palabras.',
       toolsUsed: [],
       mode: 'local_operational',
     };

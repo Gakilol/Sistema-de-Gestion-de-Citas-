@@ -11,6 +11,8 @@ describe('asistente Hair Style', () => {
       expect(checkToolPermission('getTodayAppointments', role)).toBe(true);
       expect(checkToolPermission('prepareCreateAppointment', role)).toBe(true);
       expect(checkToolPermission('prepareCreateClient', role)).toBe(true);
+      expect(checkToolPermission('prepareUpdateAppointmentStatusByQuery', role)).toBe(true);
+      expect(checkToolPermission('prepareWhatsAppReminder', role)).toBe(true);
       expect(checkToolPermission('deleteAppointment', role)).toBe(false);
     }
   });

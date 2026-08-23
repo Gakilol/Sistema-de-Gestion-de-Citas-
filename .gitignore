@@ -42,6 +42,7 @@ pnpm-debug.log*
 
 # Database and local backups
 *.sql
+!prisma/migrations/**/*.sql
 *.backup
 *.sql.bak
 *.bak

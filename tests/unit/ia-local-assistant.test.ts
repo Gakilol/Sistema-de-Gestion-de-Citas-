@@ -143,4 +143,44 @@ describe('asistente local en lenguaje natural', () => {
     }), expect.any(Object));
     expect(response.pendingAction).toMatchObject({ type: 'CREATE_CLIENT' });
   });
+
+  it('entiende un comando humano para iniciar una cita sin pedir identificadores', async () => {
+    executeIAToolMock.mockResolvedValue({
+      ok: true,
+      data: { readyForConfirmation: true },
+      meta: { fuenteDatos: 'HAIR STYLE' },
+      pendingAction: { type: 'UPDATE_APPOINTMENT_STATUS', title: 'Cambiar estado' },
+    });
+
+    const response = await runLocalAssistant(
+      [{ role: 'user', content: 'Inicia la cita de Kevin Duarte a las 10am' }],
+      { userId: 'user-1', userRole: 'ADMIN' }
+    );
+
+    expect(executeIAToolMock).toHaveBeenCalledWith('prepareUpdateAppointmentStatusByQuery', expect.objectContaining({
+      query: 'Kevin Duarte',
+      estado: 'EN_PROGRESO',
+      hora: '10:00',
+    }), expect.any(Object));
+    expect(response.pendingAction).toMatchObject({ type: 'UPDATE_APPOINTMENT_STATUS' });
+  });
+
+  it('prepara un recordatorio por WhatsApp usando el nombre del cliente', async () => {
+    executeIAToolMock.mockResolvedValue({
+      ok: true,
+      data: { readyForConfirmation: true },
+      meta: { fuenteDatos: 'HAIR STYLE' },
+      pendingAction: { type: 'OPEN_WHATSAPP_REMINDER', title: 'Recordatorio' },
+    });
+
+    const response = await runLocalAssistant(
+      [{ role: 'user', content: 'Prepara un recordatorio por WhatsApp para la cita de Ana López' }],
+      { userId: 'user-1', userRole: 'ADMIN' }
+    );
+
+    expect(executeIAToolMock).toHaveBeenCalledWith('prepareWhatsAppReminder', expect.objectContaining({
+      query: 'Ana López',
+    }), expect.any(Object));
+    expect(response.pendingAction).toMatchObject({ type: 'OPEN_WHATSAPP_REMINDER' });
+  });
 });

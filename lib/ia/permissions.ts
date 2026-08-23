@@ -11,6 +11,10 @@ const ALL_TOOLS = new Set<IAToolName>([
   'prepareCreateClient',
   'prepareCreateAppointment',
   'prepareUpdateAppointmentStatus',
+  'prepareUpdateAppointmentStatusByQuery',
+  'prepareAddWaitlist',
+  'prepareAddClientPreference',
+  'prepareWhatsAppReminder',
 ]);
 
 const PERMISSIONS: Record<IAUserRole, Set<IAToolName>> = {

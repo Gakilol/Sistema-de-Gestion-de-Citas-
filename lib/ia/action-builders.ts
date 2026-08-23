@@ -1,8 +1,8 @@
-import { EstadoCita } from '@prisma/client';
+import { EstadoCita, TipoPreferenciaCliente } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
-import { getBusinessTodayString } from '@/lib/timezone';
+import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import type { IAExecutionContext, IAPendingAction } from './types';
 
 export class IAToolInputError extends Error {}
@@ -30,6 +30,35 @@ const updateStatusSchema = z.object({
   citaId: z.string().uuid(),
   estado: z.nativeEnum(EstadoCita),
   motivo: optionalText(300),
+});
+
+const appointmentQuerySchema = z.object({
+  query: z.string().trim().min(2).max(150),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  hora: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+});
+
+const updateStatusByQuerySchema = appointmentQuerySchema.extend({
+  estado: z.nativeEnum(EstadoCita),
+  motivo: optionalText(300),
+});
+
+const addWaitlistSchema = z.object({
+  cliente: z.string().trim().min(2).max(150),
+  servicio: optionalText(100),
+  profesional: optionalText(100),
+  fechaDesde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  fechaHasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  jornadaPreferida: z.enum(['MANANA', 'TARDE', 'CUALQUIERA']).optional().default('CUALQUIERA'),
+  notas: optionalText(500),
+  prioridad: z.number().int().min(0).max(2).optional().default(0),
+});
+
+const addClientPreferenceSchema = z.object({
+  cliente: z.string().trim().min(2).max(150),
+  tipo: z.nativeEnum(TipoPreferenciaCliente),
+  titulo: z.string().trim().min(2).max(80),
+  detalle: z.string().trim().min(2).max(1000),
 });
 
 function clean(value: string | null | undefined) {
@@ -73,6 +102,45 @@ async function resolveEmployee(query: string | undefined, context: IAExecutionCo
   if (employees.length === 1) return employees[0];
   if (employees.length === 0) throw new IAToolInputError('No encontré un profesional disponible con ese nombre.');
   throw new IAToolInputError(`Indica el profesional: ${employees.map((employee: { nombre: string }) => employee.nombre).join(', ')}.`);
+}
+
+async function resolveClient(query: string) {
+  const clients = await prisma.cliente.findMany({
+    where: { OR: [
+      { nombre: { contains: query, mode: 'insensitive' } },
+      { telefono: { contains: query, mode: 'insensitive' } },
+    ] },
+    select: { id: true, nombre: true, telefono: true },
+    orderBy: { nombre: 'asc' },
+    take: 6,
+  });
+  const exact = clients.find((client: { nombre: string }) => client.nombre.localeCompare(query, 'es', { sensitivity: 'base' }) === 0);
+  if (exact) return exact;
+  if (clients.length === 1) return clients[0];
+  if (clients.length === 0) throw new IAToolInputError(`No encontré un cliente llamado “${query}”.`);
+  throw new IAToolInputError(`Encontré varios clientes: ${clients.map((client: { nombre: string }) => client.nombre).join(', ')}. Indica el nombre completo.`);
+}
+
+async function resolveAppointmentByQuery(args: unknown, context: IAExecutionContext) {
+  const data = appointmentQuerySchema.parse(args);
+  const fecha = data.fecha ?? getBusinessTodayString();
+  const appointments = await prisma.cita.findMany({
+    where: {
+      fecha: parseLocalDateToUTC(fecha),
+      ...(data.hora ? { hora: data.hora } : {}),
+      ...(context.userRole === 'EMPLEADO' ? { empleado_id: context.userId } : {}),
+      OR: [
+        { cliente_nombre: { contains: data.query, mode: 'insensitive' } },
+        { cliente_telefono: { contains: data.query, mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true, cliente_nombre: true, cliente_telefono: true, fecha: true, hora: true, estado: true, servicio: { select: { nombre: true } }, empleado: { select: { nombre: true } } },
+    orderBy: { hora: 'asc' },
+    take: 8,
+  });
+  if (appointments.length === 0) throw new IAToolInputError(`No encontré una cita de ${data.query} para ${fecha}.`);
+  if (appointments.length > 1) throw new IAToolInputError(`Encontré varias citas: ${appointments.map((item: { cliente_nombre: string; hora: string }) => `${item.cliente_nombre} a las ${item.hora}`).join(', ')}. Indica también la hora.`);
+  return appointments[0];
 }
 
 export async function prepareCreateClient(args: unknown): Promise<IAPendingAction> {
@@ -180,6 +248,70 @@ export async function prepareUpdateAppointmentStatus(args: unknown, context: IAE
       { label: 'Cita', value: `${appointment.fecha.toISOString().slice(0, 10)} · ${appointment.hora}` },
       { label: 'Estado actual', value: appointment.estado },
       { label: 'Nuevo estado', value: data.estado },
+    ],
+  };
+}
+
+export async function prepareUpdateAppointmentStatusByQuery(args: unknown, context: IAExecutionContext): Promise<IAPendingAction> {
+  const data = updateStatusByQuerySchema.parse(args);
+  const appointment = await resolveAppointmentByQuery(data, context);
+  return prepareUpdateAppointmentStatus({ citaId: appointment.id, estado: data.estado, motivo: data.motivo }, context);
+}
+
+export async function prepareAddWaitlist(args: unknown, context: IAExecutionContext): Promise<IAPendingAction> {
+  const data = addWaitlistSchema.parse(args);
+  const client = await resolveClient(data.cliente);
+  const [service, employee] = await Promise.all([
+    data.servicio ? resolveService(data.servicio) : null,
+    data.profesional ? resolveEmployee(data.profesional, context) : null,
+  ]);
+  return {
+    type: 'ADD_WAITLIST', title: 'Agregar a lista de espera',
+    description: 'Se avisará manualmente por WhatsApp cuando se libere un espacio.',
+    confirmLabel: 'Sí, agregar a la lista', endpoint: '/api/lista-espera', method: 'POST',
+    body: {
+      clienteId: client.id, servicioId: service?.id, empleadoId: employee?.id,
+      fechaDesde: data.fechaDesde, fechaHasta: data.fechaHasta,
+      jornadaPreferida: data.jornadaPreferida, notas: clean(data.notas), prioridad: data.prioridad,
+    },
+    details: [
+      { label: 'Cliente', value: client.nombre },
+      { label: 'Servicio', value: service?.nombre ?? 'Cualquier servicio' },
+      { label: 'Profesional', value: employee?.nombre ?? 'Cualquiera disponible' },
+      { label: 'Horario', value: data.jornadaPreferida === 'MANANA' ? 'Por la mañana' : data.jornadaPreferida === 'TARDE' ? 'Por la tarde' : 'Cualquier hora' },
+    ],
+  };
+}
+
+export async function prepareAddClientPreference(args: unknown): Promise<IAPendingAction> {
+  const data = addClientPreferenceSchema.parse(args);
+  const client = await resolveClient(data.cliente);
+  return {
+    type: 'ADD_CLIENT_PREFERENCE', title: 'Guardar preferencia del cliente',
+    description: 'La nota quedará en la ficha para futuras visitas.',
+    confirmLabel: 'Sí, guardar preferencia', endpoint: `/api/clientes/${client.id}/preferencias`, method: 'POST',
+    body: { tipo: data.tipo, titulo: data.titulo, detalle: data.detalle },
+    details: [
+      { label: 'Cliente', value: client.nombre },
+      { label: 'Tipo', value: data.tipo.charAt(0) + data.tipo.slice(1).toLowerCase() },
+      { label: 'Título', value: data.titulo },
+      { label: 'Detalle', value: data.detalle },
+    ],
+  };
+}
+
+export async function prepareWhatsAppReminder(args: unknown, context: IAExecutionContext): Promise<IAPendingAction> {
+  const appointment = await resolveAppointmentByQuery(args, context);
+  if (!appointment.cliente_telefono) throw new IAToolInputError(`${appointment.cliente_nombre} no tiene teléfono registrado.`);
+  return {
+    type: 'OPEN_WHATSAPP_REMINDER', title: 'Preparar recordatorio por WhatsApp',
+    description: 'Se abrirá WhatsApp con el mensaje listo. Tú decides si lo envías.',
+    confirmLabel: 'Abrir WhatsApp', endpoint: `/api/citas/${appointment.id}/calendario`, method: 'GET', body: {},
+    details: [
+      { label: 'Cliente', value: appointment.cliente_nombre },
+      { label: 'Cita', value: `${appointment.fecha.toISOString().slice(0, 10)} · ${appointment.hora}` },
+      { label: 'Servicio', value: appointment.servicio.nombre },
+      { label: 'Profesional', value: appointment.empleado.nombre },
     ],
   };
 }
