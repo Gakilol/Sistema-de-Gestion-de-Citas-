@@ -1,11 +1,13 @@
 import { EstadoCita, TipoPreferenciaCliente } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
+import { calculateAppointmentAvailability, timeToMinutes } from '@/lib/appointments/appointment-availability';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import type { IAExecutionContext, IAPendingAction } from './types';
 
 export class IAToolInputError extends Error {}
+
+const MAX_FLEXIBLE_TIME_MINUTES = 30;
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().nullable();
 
@@ -207,18 +209,31 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
   ]);
   const availability = await calculateAppointmentAvailability(employee.id, data.fecha, service.id, service.duracion, data.hora);
   const requested = availability.bloques?.find((slot: { hora: string }) => slot.hora === data.hora);
-  if (!availability.disponible || !requested?.disponible) {
-    const alternatives = (availability.bloques ?? [])
-      .filter((slot: { disponible: boolean }) => slot.disponible)
-      .slice(0, 6)
-      .map((slot: { hora: string }) => slot.hora);
+  const availableSlots = (availability.bloques ?? [])
+    .filter((slot: { disponible: boolean }) => slot.disponible)
+    .sort((a: { hora: string }, b: { hora: string }) => {
+      const requestedMinutes = timeToMinutes(data.hora);
+      const distance = Math.abs(timeToMinutes(a.hora) - requestedMinutes) - Math.abs(timeToMinutes(b.hora) - requestedMinutes);
+      return distance || a.hora.localeCompare(b.hora);
+    });
+  const closest = availableSlots[0];
+  const closestDistance = closest ? Math.abs(timeToMinutes(closest.hora) - timeToMinutes(data.hora)) : Number.POSITIVE_INFINITY;
+  const adjustedTime = availability.disponible && !requested?.disponible && closestDistance <= MAX_FLEXIBLE_TIME_MINUTES
+    ? closest.hora
+    : undefined;
+
+  if (!availability.disponible || (!requested?.disponible && !adjustedTime)) {
+    const alternatives = availableSlots.slice(0, 6).map((slot: { hora: string }) => slot.hora);
     throw new IAToolInputError(`Ese horario no está disponible.${alternatives.length ? ` Horas disponibles: ${alternatives.join(', ')}.` : ''}`);
   }
+  const appointmentTime = adjustedTime ?? data.hora;
 
   return {
     type: 'CREATE_APPOINTMENT',
     title: 'Crear cita',
-    description: 'El horario está disponible. Confirma para guardarlo en la agenda.',
+    description: adjustedTime
+      ? `La hora ${data.hora} no estaba disponible. Encontré ${adjustedTime}, la opción más cercana. Confirma solo si te sirve.`
+      : 'El horario está disponible. Confirma para guardarlo en la agenda.',
     confirmLabel: 'Sí, crear cita',
     endpoint: '/api/citas',
     method: 'POST',
@@ -229,7 +244,7 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
       servicio_id: service.id,
       empleado_id: employee.id,
       fecha: data.fecha,
-      hora: data.hora,
+      hora: appointmentTime,
       notas: clean(data.notas),
     },
     details: [
@@ -237,7 +252,12 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
       { label: 'Servicio', value: `${service.nombre} · ${service.duracion} min` },
       { label: 'Profesional', value: employee.nombre },
       { label: 'Fecha', value: data.fecha },
-      { label: 'Hora', value: data.hora },
+      ...(adjustedTime
+        ? [
+            { label: 'Hora solicitada', value: data.hora },
+            { label: 'Hora disponible', value: adjustedTime },
+          ]
+        : [{ label: 'Hora', value: data.hora }]),
     ],
   };
 }

@@ -20,6 +20,10 @@ const availabilityMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
 vi.mock('@/lib/appointments/appointment-availability', () => ({
   calculateAppointmentAvailability: availabilityMock,
+  timeToMinutes: (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  },
 }));
 vi.mock('@/lib/timezone', () => ({
   getBusinessTodayString: () => '2026-08-22',
@@ -104,5 +108,49 @@ describe('preparación segura de citas con IA', () => {
       fecha: '2026-08-24',
       hora: '10:00',
     }, context)).rejects.toThrow('José López (88881111), José López (88882222)');
+  });
+
+  it('ajusta una hora irregular al espacio disponible más cercano dentro de 30 minutos', async () => {
+    prismaMock.cliente.findMany.mockResolvedValue([{ id: 'client-1', nombre: 'Kevin Duarte', telefono: null }]);
+    availabilityMock.mockResolvedValue({
+      disponible: true,
+      bloques: [
+        { hora: '10:00', disponible: true },
+        { hora: '10:11', disponible: false },
+      ],
+    });
+
+    const action = await prepareCreateAppointment({
+      cliente: 'Kevin Duarte',
+      servicio: 'Corte clásico',
+      profesional: 'Álvaro',
+      fecha: '2026-08-24',
+      hora: '10:11',
+    }, context);
+
+    expect(action.body.hora).toBe('10:00');
+    expect(action.details).toEqual(expect.arrayContaining([
+      { label: 'Hora solicitada', value: '10:11' },
+      { label: 'Hora disponible', value: '10:00' },
+    ]));
+  });
+
+  it('no cambia la hora si la alternativa disponible queda demasiado lejos', async () => {
+    prismaMock.cliente.findMany.mockResolvedValue([{ id: 'client-1', nombre: 'Kevin Duarte', telefono: null }]);
+    availabilityMock.mockResolvedValue({
+      disponible: true,
+      bloques: [
+        { hora: '10:00', disponible: true },
+        { hora: '15:00', disponible: false },
+      ],
+    });
+
+    await expect(prepareCreateAppointment({
+      cliente: 'Kevin Duarte',
+      servicio: 'Corte clásico',
+      profesional: 'Álvaro',
+      fecha: '2026-08-24',
+      hora: '15:00',
+    }, context)).rejects.toThrow('Ese horario no está disponible');
   });
 });
