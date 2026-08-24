@@ -16,6 +16,10 @@ const prismaMock = vi.hoisted(() => ({
 }));
 
 const availabilityMock = vi.hoisted(() => vi.fn());
+const resolveClientDirectoryMock = vi.hoisted(() => vi.fn());
+const resolveServiceDirectoryMock = vi.hoisted(() => vi.fn());
+const resolveEmployeeDirectoryMock = vi.hoisted(() => vi.fn());
+const searchEmployeeDirectoryMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
 vi.mock('@/lib/appointments/appointment-availability', () => ({
@@ -24,6 +28,12 @@ vi.mock('@/lib/appointments/appointment-availability', () => ({
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
   },
+}));
+vi.mock('@/lib/clients/client-search', () => ({ resolveClientDirectory: resolveClientDirectoryMock }));
+vi.mock('@/lib/catalog/catalog-search', () => ({
+  resolveServiceDirectory: resolveServiceDirectoryMock,
+  resolveEmployeeDirectory: resolveEmployeeDirectoryMock,
+  searchEmployeeDirectory: searchEmployeeDirectoryMock,
 }));
 vi.mock('@/lib/timezone', () => ({
   getBusinessTodayString: () => '2026-08-22',
@@ -41,12 +51,17 @@ describe('preparación segura de citas con IA', () => {
       disponible: true,
       bloques: [{ hora: '10:00', disponible: true }],
     });
-    prismaMock.empleado.findMany.mockResolvedValue([{ id: 'staff-1', nombre: 'Álvaro' }]);
-    prismaMock.servicio.findMany.mockResolvedValue([{ id: 'service-1', nombre: 'Corte clásico', duracion: 30 }]);
+    resolveEmployeeDirectoryMock.mockResolvedValue({ kind: 'found', item: { id: 'staff-1', nombre: 'Álvaro' } });
+    resolveServiceDirectoryMock.mockResolvedValue({ kind: 'found', item: { id: 'service-1', nombre: 'Corte clásico', duracion: 30, categoria: null } });
+    searchEmployeeDirectoryMock.mockResolvedValue([{ id: 'staff-1', nombre: 'Álvaro' }]);
+    resolveClientDirectoryMock.mockResolvedValue({
+      kind: 'found',
+      client: { id: 'client-1', nombre: 'Kevin Duarte', telefono: null, correo: null, cedula: null },
+    });
   });
 
   it('rechaza una cita si el cliente no está guardado', async () => {
-    prismaMock.cliente.findMany.mockResolvedValue([]);
+    resolveClientDirectoryMock.mockResolvedValue({ kind: 'not_found', clients: [] });
 
     await expect(prepareCreateAppointment({
       cliente: 'Persona nueva',
@@ -58,7 +73,7 @@ describe('preparación segura de citas con IA', () => {
   });
 
   it('usa exactamente el cliente y servicio seleccionados en la plantilla', async () => {
-    prismaMock.cliente.findUnique.mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111', nombre: 'Kevin Duarte', telefono: '88887777' });
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111', nombre: 'Kevin Duarte', telefono: '88887777', correo: null, cedula: null });
     prismaMock.servicio.findFirst.mockResolvedValue({ id: '22222222-2222-4222-8222-222222222222', nombre: 'Corte clásico', duracion: 30 });
 
     const action = await prepareCreateAppointment({
@@ -80,11 +95,13 @@ describe('preparación segura de citas con IA', () => {
   });
 
   it('obliga a escoger el servicio exacto cuando “Corte” coincide con varios', async () => {
-    prismaMock.cliente.findMany.mockResolvedValue([{ id: 'client-1', nombre: 'Kevin Duarte', telefono: null }]);
-    prismaMock.servicio.findMany.mockResolvedValue([
-      { id: 'service-1', nombre: 'Corte clásico', duracion: 30 },
-      { id: 'service-2', nombre: 'Corte y barba', duracion: 60 },
-    ]);
+    resolveServiceDirectoryMock.mockResolvedValue({
+      kind: 'ambiguous',
+      items: [
+        { id: 'service-1', nombre: 'Corte clásico', duracion: 30, categoria: null },
+        { id: 'service-2', nombre: 'Corte y barba', duracion: 60, categoria: null },
+      ],
+    });
 
     await expect(prepareCreateAppointment({
       cliente: 'Kevin Duarte',
@@ -96,22 +113,38 @@ describe('preparación segura de citas con IA', () => {
   });
 
   it('no elige al primero cuando dos clientes guardados comparten nombre', async () => {
-    prismaMock.cliente.findMany.mockResolvedValue([
-      { id: 'client-1', nombre: 'José López', telefono: '88881111' },
-      { id: 'client-2', nombre: 'José López', telefono: '88882222' },
-    ]);
+    resolveClientDirectoryMock.mockResolvedValue({
+      kind: 'ambiguous',
+      clients: [
+        { id: 'client-1', nombre: 'José López', telefono: '88881111', correo: null, cedula: null },
+        { id: 'client-2', nombre: 'José López', telefono: '88882222', correo: null, cedula: null },
+      ],
+    });
 
-    await expect(prepareCreateAppointment({
-      cliente: 'José López',
-      servicio: 'Corte clásico',
-      profesional: 'Álvaro',
-      fecha: '2026-08-24',
-      hora: '10:00',
-    }, context)).rejects.toThrow('José López (88881111), José López (88882222)');
+    try {
+      await prepareCreateAppointment({
+        cliente: 'José López',
+        servicio: 'Corte clásico',
+        profesional: 'Álvaro',
+        fecha: '2026-08-24',
+        hora: '10:00',
+      }, context);
+      throw new Error('La cita ambigua no fue rechazada');
+    } catch (error) {
+      expect(error).toBeInstanceOf(IAToolInputError);
+      expect(error).toMatchObject({
+        choiceRequest: {
+          kind: 'client',
+          options: [
+            { id: 'client-1', label: 'José López', description: 'Tel. 88881111' },
+            { id: 'client-2', label: 'José López', description: 'Tel. 88882222' },
+          ],
+        },
+      });
+    }
   });
 
   it('ajusta una hora irregular al espacio disponible más cercano dentro de 30 minutos', async () => {
-    prismaMock.cliente.findMany.mockResolvedValue([{ id: 'client-1', nombre: 'Kevin Duarte', telefono: null }]);
     availabilityMock.mockResolvedValue({
       disponible: true,
       bloques: [
@@ -136,7 +169,6 @@ describe('preparación segura de citas con IA', () => {
   });
 
   it('no cambia la hora si la alternativa disponible queda demasiado lejos', async () => {
-    prismaMock.cliente.findMany.mockResolvedValue([{ id: 'client-1', nombre: 'Kevin Duarte', telefono: null }]);
     availabilityMock.mockResolvedValue({
       disponible: true,
       bloques: [

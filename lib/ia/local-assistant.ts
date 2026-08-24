@@ -8,6 +8,7 @@ import type {
   IAClientDraft,
   IAConversationMessage,
   IAExecutionContext,
+  IAAssistantResponse,
   IAToolName,
 } from './types';
 
@@ -103,6 +104,7 @@ export function parseHumanTime(message: string): string | undefined {
   if (hour > 23 || minute > 59) return undefined;
   if ((period === 'pm' || period.includes('tarde') || period.includes('noche')) && hour < 12) hour += 12;
   if ((period === 'am' || period.includes('manana')) && hour === 12) hour = 0;
+  if (!period && hour >= 1 && hour <= 7) hour += 12;
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
@@ -130,6 +132,7 @@ export function parseAppointmentMessage(message: string, current: IAAppointmentD
   }
 
   const cliente = extractNamedValue(message, [
+    /(?:agenda(?:r)?|ag[eé]ndame|pon|programa|reserva)\s+(?:una\s+cita\s+)?a\s+([\p{L}][\p{L}' -]*?)(?=\s*,|\s+(?:el\s+)?(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b|\s+(?:hoy|mañana|manana)\b|\s+a\s+las?\b|\s+para\b|\s+con\b|[.;]?\s*$)/iu,
     /(?:cita\s+(?:para|a\s+nombre\s+de)\s+(?:el\s+cliente\s+)?|cliente\s+|para\s+el\s+cliente\s+)([\p{L}][\p{L}' -]*?)(?=\s*,|\s+(?:lo|la)\s+atender|\s+con\s+|\s+(?:el\s+)?d[ií]a\b|\s+para\s+(?:el\s+)?(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)|\s+(?:hoy|mañana|manana)\b|\s+a\s+las?\b|$)/iu,
     /(?:a\s+nombre\s+de)\s+([\p{L}][\p{L}' -]{1,80})/iu,
   ]);
@@ -137,7 +140,7 @@ export function parseAppointmentMessage(message: string, current: IAAppointmentD
 
   const profesional = extractNamedValue(message, [
     /(?:lo|la)?\s*atender[aá]\s+([\p{L}][\p{L}' -]*?)(?=\s*,|\s+(?:el\s+)?d[ií]a\b|\s+(?:hoy|mañana|manana|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b|\s+a\s+las?\b|$)/iu,
-    /(?:con\s+(?:el|la)?\s*(?:estilista|barbero|profesional)?\s*)([\p{L}][\p{L}' -]*?)(?=\s*,|\s+(?:el\s+)?d[ií]a\b|\s+(?:hoy|mañana|manana|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b|\s+a\s+las?\b|$)/iu,
+    /(?:con\s+(?:el|la)?\s*(?:estilista|barbero|profesional)?\s*)([\p{L}][\p{L}' -]*?)(?=\s*,|\s+para\b|\s+(?:el\s+)?d[ií]a\b|\s+(?:hoy|mañana|manana|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b|\s+a\s+las?\b|[.;]?\s*$)/iu,
   ]);
   if (profesional) draft.profesional = profesional.replace(/\s+(El|La)$/i, '');
 
@@ -209,8 +212,11 @@ export function formatLocalToolResult(tool: IAToolName, data: unknown) {
   }
   if (tool === 'searchClients') {
     const clients = Array.isArray(data) ? data as Array<Record<string, any>> : [];
-    if (clients.length === 0) return 'No encontré clientes con ese nombre o teléfono.';
-    return clients.map((item) => `- ${item.nombre}${item.telefono ? ` · ${item.telefono}` : ''} · ${item._count?.citas ?? 0} citas`).join('\n');
+    if (clients.length === 0) return 'No encontré clientes con ese nombre, teléfono, correo o identificador.';
+    return clients.map((item) => {
+      const appointmentCount = item._count?.citas;
+      return `- ${item.nombre}${item.telefono ? ` · ${item.telefono}` : ''}${typeof appointmentCount === 'number' ? ` · ${appointmentCount} citas` : ''}`;
+    }).join('\n');
   }
   if (tool === 'getPopularServices') {
     const services = Array.isArray(data) ? data as Array<Record<string, any>> : [];
@@ -231,7 +237,7 @@ export function formatLocalToolResult(tool: IAToolName, data: unknown) {
 
 function isAppointmentCreation(message: string) {
   const text = normalize(message);
-  return /\b(crea|crear|registre|registrar|agenda|agendar|reserva|reservar|sacar|nueva)\b.*\b(cita|turno|espacio)\b|\b(cita|turno)\b.*\b(para|con|el|la)\b/.test(text);
+  return /\b(crea|crear|registre|registrar|agenda|agendar|reserva|reservar|sacar|nueva)\b.*\b(cita|turno|espacio)\b|\b(cita|turno)\b.*\b(para|con|el|la)\b|\b(agenda|agendar|agendame|pon|programa|reserva)\s+(?:una\s+cita\s+)?a\b/.test(text);
 }
 
 function isClientCreation(message: string) {
@@ -294,14 +300,14 @@ function fieldFromToolError(error: string): IAAppointmentDraftField | undefined 
   return undefined;
 }
 
-export async function runLocalAssistant(messages: IAConversationMessage[], context: IAExecutionContext) {
+export async function runLocalAssistant(messages: IAConversationMessage[], context: IAExecutionContext): Promise<IAAssistantResponse> {
   const latestMessage = messages.at(-1)?.content ?? '';
   const previousDraft = [...messages].reverse().find((message) => message.appointmentDraft)?.appointmentDraft;
   const previousClientDraft = [...messages].reverse().find((message) => message.clientDraft)?.clientDraft;
 
   const mutation = detectLocalMutation(latestMessage);
   if (mutation) {
-    if ('missing' in mutation) return { text: mutation.missing, toolsUsed: [], mode: 'local_guided' };
+    if ('missing' in mutation) return { text: mutation.missing ?? 'Indica el cliente para continuar.', toolsUsed: [], mode: 'local_guided' };
     const result = await executeIATool(mutation.tool, mutation.args, context);
     if (!result.ok) return { text: result.error, toolsUsed: [mutation.tool], mode: 'local_operational' };
     return {
@@ -361,6 +367,7 @@ export async function runLocalAssistant(messages: IAConversationMessage[], conte
         toolsUsed: ['prepareCreateAppointment'],
         mode: 'local_guided',
         appointmentDraft: draft,
+        ...(result.choiceRequest ? { choiceRequest: { ...result.choiceRequest, appointmentDraft: draft } } : {}),
       };
     }
     return {

@@ -97,7 +97,7 @@ test.describe('UI responsive autenticada', () => {
       { path: '/dashboard', heading: /Hola/i },
       { path: '/recepcion', heading: 'Recepción' },
       { path: '/ia', heading: /Qué necesitas hacer/i },
-      { path: '/citas', heading: 'Agenda y citas' },
+      { path: '/citas', heading: 'Agenda' },
       { path: '/clientes', heading: 'Clientes' },
       { path: '/servicios', heading: /Catálogo de Servicios/i },
       { path: '/categorias', heading: /Categorías de Servicios/i },
@@ -194,8 +194,7 @@ test.describe('UI responsive autenticada', () => {
       }
 
       await clienteSearch.fill('Cliente de prueba UI');
-      await expect(citaDialog.getByRole('button', { name: /\+ Nuevo Cliente/i })).toBeVisible();
-      await expect(citaDialog.getByRole('button', { name: /Crear solo con nombre/i })).toBeEnabled();
+      await expect(citaDialog.getByRole('button', { name: /Registrar cliente que no aparece/i })).toBeVisible();
 
       await citaDialog.getByRole('button', { name: 'Cerrar modal' }).click();
       await expect(citaDialog).toBeHidden();
@@ -267,25 +266,13 @@ test.describe('UI responsive autenticada', () => {
     await expectNoDocumentOverflow(page);
   });
 
-  test('la plantilla rápida de IA exige cliente guardado y servicio exacto', async ({ page }) => {
-    const clientsReady = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === '/api/clientes' && response.request().method() === 'GET'
-    );
-
+  test('la IA permite empezar una cita natural sin abrir una plantilla', async ({ page }) => {
     await page.goto('/ia');
-    await page.getByRole('button', { name: 'Crear cita con IA' }).click();
-    await expect(page.getByRole('heading', { name: 'Crear una cita sin adivinar datos' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Registrar un cliente que no aparece/i })).toBeVisible();
-
-    const clientInput = page.getByRole('textbox', { name: 'Busca por nombre o teléfono' });
-    await clientInput.fill('Cliente que no existe E2E');
-    const clientsResponse = await clientsReady;
-    expect(clientsResponse.ok()).toBeTruthy();
-    await expect(page.getByText(/No está guardado. Regístralo antes/i)).toBeVisible();
-
-    const serviceInput = page.getByRole('textbox', { name: 'Escribe el servicio' });
-    await serviceInput.fill('Corte');
-    await expect(page.getByRole('option', { name: /Corte E2E/i })).toBeVisible();
+    await page.getByRole('button', { name: 'Escribir cita rápida' }).click();
+    const messageInput = page.getByRole('textbox', { name: 'Mensaje para el asistente' });
+    await expect(messageInput).toBeFocused();
+    await expect(messageInput).toHaveValue('Agenda a ');
+    await expect(page.getByRole('heading', { name: 'Crear una cita sin adivinar datos' })).toHaveCount(0);
     await expectNoDocumentOverflow(page);
   });
 

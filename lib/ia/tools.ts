@@ -4,6 +4,9 @@ import { prisma } from '@/lib/db';
 import { getScopedAppointmentWhere } from '@/lib/auth-helpers';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
+import { searchClientDirectory } from '@/lib/clients/client-search';
+import { resolveServiceDirectory, searchEmployeeDirectory, searchServiceDirectory } from '@/lib/catalog/catalog-search';
+import { buildClientDirectoryResponse } from '@/lib/client-privacy';
 import {
   IAToolInputError, prepareAddClientPreference, prepareAddWaitlist, prepareCreateAppointment,
   prepareCreateClient, prepareUpdateAppointmentStatus, prepareUpdateAppointmentStatusByQuery,
@@ -53,45 +56,32 @@ async function getTodayAppointments(context: IAExecutionContext) {
 
 async function searchServices(args: unknown) {
   const { query } = catalogSearchSchema.parse(args);
-  return prisma.servicio.findMany({
-    where: { activo: true, ...(query ? { nombre: { contains: query, mode: 'insensitive' } } : {}) },
-    select: { id: true, nombre: true, duracion: true, categoria: true },
-    orderBy: { nombre: 'asc' },
-    take: 12,
-  });
+  return searchServiceDirectory(query, { limit: 12 });
 }
 
 async function getAvailableSlots(args: unknown, context: IAExecutionContext) {
   const data = slotsSchema.parse(args);
-  const services = await prisma.servicio.findMany({
-    where: { activo: true, nombre: { contains: data.servicio, mode: 'insensitive' } },
-    select: { id: true, nombre: true, duracion: true },
-    take: 3,
-  });
-  if (services.length !== 1) {
-    throw new IAToolInputError(services.length === 0
+  const serviceResult = await resolveServiceDirectory(data.servicio, { limit: 8 });
+  if (serviceResult.kind !== 'found') {
+    throw new IAToolInputError(serviceResult.kind === 'not_found'
       ? `No encontré el servicio “${data.servicio}”.`
-      : `Indica uno de estos servicios: ${services.map((item: { nombre: string }) => item.nombre).join(', ')}.`);
+      : `Indica uno de estos servicios: ${serviceResult.items.map((item) => item.nombre).join(', ')}.`);
   }
-  const employees = await prisma.empleado.findMany({
-    where: {
-      activo: true,
-      esAgendable: true,
-      ...(context.userRole === 'EMPLEADO'
-        ? { id: context.userId }
-        : data.profesional ? { nombre: { contains: data.profesional, mode: 'insensitive' } } : {}),
-    },
-    select: { id: true, nombre: true },
-    orderBy: { nombre: 'asc' },
-    take: 8,
-  });
+  const service = serviceResult.item;
+  const employees = context.userRole === 'EMPLEADO'
+    ? await prisma.empleado.findMany({
+        where: { id: context.userId, activo: true, esAgendable: true },
+        select: { id: true, nombre: true },
+        take: 1,
+      })
+    : await searchEmployeeDirectory(data.profesional ?? '', { limit: 8 });
   if (employees.length === 0) throw new IAToolInputError('No encontré profesionales disponibles con ese criterio.');
 
   return Promise.all(employees.map(async (employee: { id: string; nombre: string }) => {
-    const availability = await calculateAppointmentAvailability(employee.id, data.fecha, services[0].id, services[0].duracion);
+    const availability = await calculateAppointmentAvailability(employee.id, data.fecha, service.id, service.duracion);
     return {
       profesional: employee.nombre,
-      servicio: services[0].nombre,
+      servicio: service.nombre,
       fecha: data.fecha,
       horas: (availability.bloques ?? []).filter((slot: { disponible: boolean }) => slot.disponible).slice(0, 12).map((slot: { hora: string }) => slot.hora),
     };
@@ -117,19 +107,10 @@ async function getAppointmentSummary(context: IAExecutionContext) {
   };
 }
 
-async function searchClients(args: unknown) {
+async function searchClients(args: unknown, context: IAExecutionContext) {
   const { query, limit } = searchSchema.parse(args);
-  return prisma.cliente.findMany({
-    where: {
-      OR: [
-        { nombre: { contains: query, mode: 'insensitive' } },
-        { telefono: { contains: query, mode: 'insensitive' } },
-      ],
-    },
-    select: { id: true, nombre: true, telefono: true, correo: true, _count: { select: { citas: true } } },
-    orderBy: { nombre: 'asc' },
-    take: limit,
-  });
+  const clients = await searchClientDirectory(query, { limit });
+  return clients.map((client) => buildClientDirectoryResponse(client, context.userRole));
 }
 
 async function getPopularServices(args: unknown, context: IAExecutionContext) {
@@ -182,23 +163,23 @@ export async function executeIATool(
     let pendingAction;
     if (name === 'getTodayAppointments') data = await getTodayAppointments(context);
     else if (name === 'getAppointmentSummary') data = await getAppointmentSummary(context);
-    else if (name === 'searchClients') data = await searchClients(args);
+    else if (name === 'searchClients') data = await searchClients(args, context);
     else if (name === 'searchServices') data = await searchServices(args);
     else if (name === 'getAvailableSlots') data = await getAvailableSlots(args, context);
     else if (name === 'getPopularServices') data = await getPopularServices(args, context);
     else if (name === 'getStaffWorkload') data = await getStaffWorkload(args, context);
-    else if (name === 'prepareCreateClient') pendingAction = await prepareCreateClient(args);
+    else if (name === 'prepareCreateClient') pendingAction = await prepareCreateClient(args, context);
     else if (name === 'prepareCreateAppointment') pendingAction = await prepareCreateAppointment(args, context);
     else if (name === 'prepareUpdateAppointmentStatus') pendingAction = await prepareUpdateAppointmentStatus(args, context);
     else if (name === 'prepareUpdateAppointmentStatusByQuery') pendingAction = await prepareUpdateAppointmentStatusByQuery(args, context);
     else if (name === 'prepareAddWaitlist') pendingAction = await prepareAddWaitlist(args, context);
-    else if (name === 'prepareAddClientPreference') pendingAction = await prepareAddClientPreference(args);
+    else if (name === 'prepareAddClientPreference') pendingAction = await prepareAddClientPreference(args, context);
     else pendingAction = await prepareWhatsAppReminder(args, context);
     if (pendingAction) data = { readyForConfirmation: true, summary: pendingAction.details };
     return { ok: true, data, meta: { fuenteDatos: 'HAIR STYLE' }, ...(pendingAction ? { pendingAction } : {}) };
   } catch (error) {
     if (error instanceof IAToolInputError) {
-      return { ok: false, error: error.message, code: 'INVALID_PARAMS' };
+      return { ok: false, error: error.message, code: 'INVALID_PARAMS', ...(error.choiceRequest ? { choiceRequest: error.choiceRequest } : {}) };
     }
     if (error instanceof z.ZodError) {
       return { ok: false, error: 'Los parámetros de la consulta no son válidos.', code: 'INVALID_PARAMS' };

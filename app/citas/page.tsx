@@ -46,6 +46,7 @@ import type { CalendarAppointment, CalendarEmployee } from '@/components/appoint
 import type { AppointmentConflict } from '@/lib/appointments/appointment-availability';
 import { getErrorMessage } from '@/lib/errors';
 import { useAppointmentStatusSync } from '@/lib/appointments/use-appointment-status-sync';
+import { clientMatchesQuery } from '@/lib/clients/client-normalization';
 
 function CitasContent() {
   const [citas, setCitas]         = useState<CalendarAppointment[]>([]);
@@ -66,7 +67,7 @@ function CitasContent() {
   const [page, setPage]           = useState(1);
 
   // Modos de Vista y Scopes
-  const [vistaModo, setVistaModo] = useState<AppointmentWorkspaceView>('lista');
+  const [vistaModo, setVistaModo] = useState<AppointmentWorkspaceView>('agenda');
   const [scope, setScope] = useState<AppointmentWorkspaceScope>('mine');
   // La agenda siempre parte de hoy. El formulario de creación conserva por
   // separado la regla operativa que puede proponer mañana después del cierre.
@@ -430,64 +431,14 @@ function CitasContent() {
     }
   };
 
-  const handleCrearClienteMinimo = async () => {
-    const nombre = clienteBusqueda.trim();
-    if (nombre.length < 2) {
-      toast.error('El nombre debe tener al menos 2 caracteres');
-      return;
-    }
-
-    setSavingCliente(true);
-    try {
-      let res = await authFetch('/api/clientes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre }),
-      });
-      let data = await res.json();
-      if (!res.ok && data.requiresConfirmation) {
-        const continuar = window.confirm(`${data.error}\n\n¿Deseas crear otro cliente con este nombre?`);
-        if (!continuar) return;
-        res = await authFetch('/api/clientes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre, confirmarDuplicadoNombre: true }),
-        });
-        data = await res.json();
-      }
-      if (!res.ok) throw new Error(data.error);
-
-      const nuevoCliente = data.cliente;
-      setClientesList((prev) => [nuevoCliente, ...prev]);
-      setForm((prev) => ({
-        ...prev,
-        cliente_id: nuevoCliente.id,
-        cliente_nombre: nuevoCliente.nombre,
-        cliente_telefono: nuevoCliente.telefono || '',
-      }));
-      setClienteBusqueda(nuevoCliente.nombre);
-      setClienteDropdownOpen(false);
-      toast.success(`Cliente "${nuevoCliente.nombre}" creado y seleccionado`);
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Error al crear cliente'));
-    } finally {
-      setSavingCliente(false);
-    }
-  };
-
-
   // Clientes filtrados para el buscador inteligente
   const clientesFiltrados = useMemo(() => {
-    const q = clienteBusqueda.toLowerCase().trim();
+    const q = clienteBusqueda.trim();
     if (!q) {
       // Mostrar primeros 8 clientes si la búsqueda está vacía
       return clientesList.slice(0, 8);
     }
-    return clientesList.filter(c =>
-      c.nombre?.toLowerCase().includes(q) ||
-      (c.telefono && c.telefono.includes(q)) ||
-      (c.correo && c.correo.toLowerCase().includes(q))
-    ).slice(0, 8);
+    return clientesList.filter((client) => clientMatchesQuery(client, q)).slice(0, 8);
   }, [clienteBusqueda, clientesList]);
 
   // Guardar filtro smart en sesión
@@ -853,11 +804,11 @@ function CitasContent() {
       <main className="flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-0">
         <div className="app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
 
-          <header className={cn('items-end justify-between gap-4', vistaModo === 'agenda' ? 'hidden sm:flex' : 'flex')}>
+          <header className="flex items-end justify-between gap-4">
             <div className="min-w-0 border-l border-primary/70 pl-4">
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Libro de citas</p>
-              <h1 className="page-heading">Agenda y citas</h1>
-              <p className="page-description truncate sm:whitespace-normal">
+              <h1 className="page-heading">Agenda</h1>
+              <p className="page-description hidden truncate sm:block sm:whitespace-normal">
                 {vistaModo === 'lista' ? `${filteredAndSortedCitas.length} visibles · ` : ''}
                 {citas.length} cita{citas.length !== 1 ? 's' : ''} cargada{citas.length !== 1 ? 's' : ''}
               </p>
@@ -866,7 +817,7 @@ function CitasContent() {
               onClick={openCreate}
               disabled={catalogosLoading}
               aria-busy={catalogosLoading}
-              className="h-11 shrink-0 gap-2 px-3.5 text-sm sm:px-4"
+              className="hidden h-11 shrink-0 gap-2 px-3.5 text-sm sm:inline-flex sm:px-4"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva cita</span><span className="sm:hidden">Nueva</span>
             </Button>
@@ -1418,11 +1369,10 @@ function CitasContent() {
                     />
                     {clienteDropdownOpen && (
                       <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border shadow-xl rounded-xl overflow-hidden">
-                        {/* ─── Acciones de Creación / Agendamiento Rápido ───── */}
-                        <div className="p-2 bg-muted/20 border-b border-border/50 flex flex-row flex-wrap items-center gap-2">
+                        <div className="p-2 bg-muted/20 border-b border-border/50">
                           <button
                             type="button"
-                            className="flex-1 min-w-[120px] text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25 rounded-lg px-2.5 py-2 flex items-center justify-center gap-1.5 transition-colors group shrink-0"
+                            className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                             onClick={() => {
                               setClienteDropdownOpen(false);
                               setFormNuevoCliente({ nombre: clienteBusqueda, telefono: '', correo: '', notas: '' });
@@ -1431,18 +1381,7 @@ function CitasContent() {
                             }}
                           >
                             <UserPlus className="w-3.5 h-3.5 text-primary shrink-0" />
-                            <span className="truncate">+ Nuevo Cliente</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={!clienteBusqueda.trim()}
-                            className="flex-1 min-w-[140px] text-xs font-semibold text-foreground bg-secondary hover:bg-secondary/80 border border-border/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2.5 py-2 flex items-center justify-center gap-1.5 transition-colors group shrink-0"
-                            onClick={handleCrearClienteMinimo}
-                            title={!clienteBusqueda.trim() ? "Escriba un nombre en el buscador primero" : "Agendar cita utilizando solo el nombre"}
-                          >
-                            <UserCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span className="truncate">Crear solo con nombre</span>
+                            <span className="truncate">Registrar cliente que no aparece</span>
                           </button>
                         </div>
 

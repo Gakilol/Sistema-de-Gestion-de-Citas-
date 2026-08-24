@@ -36,6 +36,27 @@ function maskEmail(value: string | null | undefined): string | null {
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
+export interface ClientDirectoryPrivacySource {
+  id: string;
+  nombre: string;
+  telefono: string | null;
+  correo: string | null;
+  cedula: string | null;
+}
+
+export function buildClientDirectoryResponse<T extends ClientDirectoryPrivacySource>(
+  client: T,
+  role: string | null,
+): T {
+  if (role !== 'TECH_SUPPORT') return { ...client };
+  return {
+    ...client,
+    telefono: maskValue(client.telefono),
+    correo: maskEmail(client.correo),
+    cedula: maskValue(client.cedula),
+  };
+}
+
 /**
  * The caller must scope appointments in the database before passing data here.
  * EMPLEADO receives a deliberate allowlist with no ownership metadata.

@@ -3,9 +3,17 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { calculateAppointmentAvailability, timeToMinutes } from '@/lib/appointments/appointment-availability';
 import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
-import type { IAExecutionContext, IAPendingAction } from './types';
+import { isExactClientDirectoryMatch, resolveClientDirectory, searchClientDirectory } from '@/lib/clients/client-search';
+import { resolveEmployeeDirectory, resolveServiceDirectory, searchEmployeeDirectory } from '@/lib/catalog/catalog-search';
+import { buildClientDirectoryResponse } from '@/lib/client-privacy';
+import type { IAChoiceRequest, IAExecutionContext, IAPendingAction } from './types';
 
-export class IAToolInputError extends Error {}
+export class IAToolInputError extends Error {
+  constructor(message: string, public readonly choiceRequest?: IAChoiceRequest) {
+    super(message);
+    this.name = 'IAToolInputError';
+  }
+}
 
 const MAX_FLEXIBLE_TIME_MINUTES = 30;
 
@@ -70,17 +78,10 @@ function clean(value: string | null | undefined) {
 }
 
 async function resolveService(query: string) {
-  const services = await prisma.servicio.findMany({
-    where: { activo: true, nombre: { contains: query, mode: 'insensitive' } },
-    select: { id: true, nombre: true, duracion: true },
-    orderBy: { nombre: 'asc' },
-    take: 6,
-  });
-  const exact = services.find((service: { nombre: string }) => service.nombre.localeCompare(query, 'es', { sensitivity: 'base' }) === 0);
-  if (exact) return exact;
-  if (services.length === 1) return services[0];
-  if (services.length === 0) throw new IAToolInputError(`No encontré un servicio activo llamado “${query}”.`);
-  throw new IAToolInputError(`Encontré varios servicios: ${services.map((service: { nombre: string }) => service.nombre).join(', ')}. Indica uno exactamente.`);
+  const result = await resolveServiceDirectory(query, { limit: 8 });
+  if (result.kind === 'found') return result.item;
+  if (result.kind === 'not_found') throw new IAToolInputError(`No encontré un servicio activo llamado “${query}”.`);
+  throw new IAToolInputError(`Encontré varios servicios: ${result.items.map((service) => service.nombre).join(', ')}. Indica uno exactamente.`);
 }
 
 async function resolveSelectedService(id: string | undefined, query: string) {
@@ -99,50 +100,51 @@ async function resolveEmployee(query: string | undefined, context: IAExecutionCo
     if (!own?.activo || !own.esAgendable) throw new IAToolInputError('Tu usuario no está habilitado para recibir citas.');
     return own;
   }
-  const employees = await prisma.empleado.findMany({
-    where: {
-      activo: true,
-      esAgendable: true,
-      ...(query ? { nombre: { contains: query, mode: 'insensitive' } } : {}),
-    },
-    select: { id: true, nombre: true },
-    orderBy: { nombre: 'asc' },
-    take: 8,
-  });
-  const exact = query
-    ? employees.find((employee: { nombre: string }) => employee.nombre.localeCompare(query, 'es', { sensitivity: 'base' }) === 0)
-    : undefined;
-  if (exact) return exact;
-  if (employees.length === 1) return employees[0];
-  if (employees.length === 0) throw new IAToolInputError('No encontré un profesional disponible con ese nombre.');
-  throw new IAToolInputError(`Indica el profesional: ${employees.map((employee: { nombre: string }) => employee.nombre).join(', ')}.`);
+  const normalizedQuery = query ?? '';
+  const result = normalizedQuery
+    ? await resolveEmployeeDirectory(normalizedQuery, { limit: 8 })
+    : { kind: 'ambiguous' as const, items: await searchEmployeeDirectory('', { limit: 8 }) };
+  if (result.kind === 'found') return result.item;
+  if (result.kind === 'not_found' || result.items.length === 0) throw new IAToolInputError('No encontré un profesional disponible con ese nombre.');
+  throw new IAToolInputError(`Indica el profesional: ${result.items.map((employee) => employee.nombre).join(', ')}.`);
 }
 
-async function resolveClient(query: string) {
-  const clients = await prisma.cliente.findMany({
-    where: { OR: [
-      { nombre: { contains: query, mode: 'insensitive' } },
-      { telefono: { contains: query, mode: 'insensitive' } },
-    ] },
-    select: { id: true, nombre: true, telefono: true },
-    orderBy: { nombre: 'asc' },
-    take: 6,
-  });
-  const exact = clients.filter((client: { nombre: string }) => client.nombre.localeCompare(query, 'es', { sensitivity: 'base' }) === 0);
-  if (exact.length === 1) return exact[0];
-  if (clients.length === 1) return clients[0];
-  if (clients.length === 0) throw new IAToolInputError(`No encontré a “${query}” en Clientes. Regístralo primero y vuelve a crear la cita. No se creó ningún cliente.`);
-  throw new IAToolInputError(`Encontré varios clientes: ${clients.map((client: { nombre: string; telefono: string | null }) => `${client.nombre}${client.telefono ? ` (${client.telefono})` : ''}`).join(', ')}. Elige el cliente exacto para no crear la cita a nombre de otra persona.`);
+function clientChoiceDescription(client: { telefono: string | null; correo: string | null; cedula: string | null }): string {
+  if (client.telefono) return `Tel. ${client.telefono}`;
+  if (client.correo) return client.correo;
+  if (client.cedula) return `Cédula terminada en ${client.cedula.replace(/\D/g, '').slice(-4) || client.cedula.slice(-4)}`;
+  return 'Sin teléfono ni correo registrado';
 }
 
-async function resolveSelectedClient(id: string | undefined, query: string) {
-  if (!id) return resolveClient(query);
+async function resolveClient(query: string, context: IAExecutionContext) {
+  const result = await resolveClientDirectory(query, { limit: 8 });
+  if (result.kind === 'found') return buildClientDirectoryResponse(result.client, context.userRole);
+  if (result.kind === 'not_found') {
+    throw new IAToolInputError(`No encontré a “${query}” en Clientes. Regístralo primero y vuelve a crear la cita. No se creó ningún cliente.`);
+  }
+  const choiceRequest: IAChoiceRequest = {
+    kind: 'client',
+    prompt: 'Encontré más de un cliente. ¿Cuál deseas usar?',
+    options: result.clients.map((client) => {
+      const visibleClient = buildClientDirectoryResponse(client, context.userRole);
+      return {
+        id: visibleClient.id,
+        label: visibleClient.nombre,
+        description: clientChoiceDescription(visibleClient),
+      };
+    }),
+  };
+  throw new IAToolInputError('Encontré varios clientes con ese nombre. Elige el registro correcto para continuar.', choiceRequest);
+}
+
+async function resolveSelectedClient(id: string | undefined, query: string, context: IAExecutionContext) {
+  if (!id) return resolveClient(query, context);
   const client = await prisma.cliente.findUnique({
     where: { id },
-    select: { id: true, nombre: true, telefono: true },
+    select: { id: true, nombre: true, telefono: true, correo: true, cedula: true },
   });
   if (!client) throw new IAToolInputError('El cliente seleccionado ya no existe. Búscalo de nuevo en Clientes.');
-  return client;
+  return buildClientDirectoryResponse(client, context.userRole);
 }
 
 async function resolveAppointmentByQuery(args: unknown, context: IAExecutionContext) {
@@ -167,20 +169,23 @@ async function resolveAppointmentByQuery(args: unknown, context: IAExecutionCont
   return appointments[0];
 }
 
-export async function prepareCreateClient(args: unknown): Promise<IAPendingAction> {
+export async function prepareCreateClient(args: unknown, context: IAExecutionContext): Promise<IAPendingAction> {
   const data = createClientSchema.parse(args);
   const phone = clean(data.telefono);
   const email = clean(data.email);
-  const duplicate = await prisma.cliente.findFirst({
-    where: {
-      OR: [
-        ...(phone ? [{ telefono: phone }] : [{ nombre: { equals: data.nombre, mode: 'insensitive' } }]),
-        ...(email ? [{ correo: { equals: email, mode: 'insensitive' } }] : []),
-      ],
-    },
-    select: { nombre: true, telefono: true },
-  });
-  if (duplicate) throw new IAToolInputError(`Ya existe un cliente llamado ${duplicate.nombre}${duplicate.telefono ? ` (${duplicate.telefono})` : ''}. Búscalo antes de crear otro.`);
+  const duplicateResults = await Promise.all(
+    [phone, email, data.nombre].filter((query): query is string => Boolean(query))
+      .map(async (query) => ({
+        query,
+        clients: await searchClientDirectory(query, { limit: 50 }),
+      })),
+  );
+  const duplicate = duplicateResults
+    .flatMap(({ query, clients }) => clients.filter((client) => isExactClientDirectoryMatch(client, query)))[0];
+  if (duplicate) {
+    const client = buildClientDirectoryResponse(duplicate, context.userRole);
+    throw new IAToolInputError(`Ya existe un cliente llamado ${client.nombre}${client.telefono ? ` (${client.telefono})` : ''}. Búscalo antes de crear otro.`);
+  }
 
   return {
     type: 'CREATE_CLIENT',
@@ -203,7 +208,7 @@ export async function prepareCreateAppointment(args: unknown, context: IAExecuti
   if (data.fecha < getBusinessTodayString()) throw new IAToolInputError('La fecha de la cita no puede estar en el pasado.');
 
   const [client, service, employee] = await Promise.all([
-    resolveSelectedClient(data.clienteId, data.cliente),
+    resolveSelectedClient(data.clienteId, data.cliente, context),
     resolveSelectedService(data.servicioId, data.servicio),
     resolveEmployee(clean(data.profesional), context),
   ]);
@@ -296,7 +301,7 @@ export async function prepareUpdateAppointmentStatusByQuery(args: unknown, conte
 
 export async function prepareAddWaitlist(args: unknown, context: IAExecutionContext): Promise<IAPendingAction> {
   const data = addWaitlistSchema.parse(args);
-  const client = await resolveClient(data.cliente);
+  const client = await resolveClient(data.cliente, context);
   const [service, employee] = await Promise.all([
     data.servicio ? resolveService(data.servicio) : null,
     data.profesional ? resolveEmployee(data.profesional, context) : null,
@@ -319,9 +324,9 @@ export async function prepareAddWaitlist(args: unknown, context: IAExecutionCont
   };
 }
 
-export async function prepareAddClientPreference(args: unknown): Promise<IAPendingAction> {
+export async function prepareAddClientPreference(args: unknown, context: IAExecutionContext): Promise<IAPendingAction> {
   const data = addClientPreferenceSchema.parse(args);
-  const client = await resolveClient(data.cliente);
+  const client = await resolveClient(data.cliente, context);
   return {
     type: 'ADD_CLIENT_PREFERENCE', title: 'Guardar preferencia del cliente',
     description: 'La nota quedará en la ficha para futuras visitas.',

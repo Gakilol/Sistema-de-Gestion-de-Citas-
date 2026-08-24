@@ -16,13 +16,13 @@ interface AppointmentWorkspaceToolbarProps {
 }
 
 const viewOptions = [
-  { id: 'agenda' as const, label: 'Agenda', compactLabel: 'Agenda', icon: CalendarDays },
   { id: 'lista' as const, label: 'Lista', compactLabel: 'Lista', icon: List },
+  { id: 'agenda' as const, label: 'Agenda', compactLabel: 'Agenda', icon: CalendarDays },
 ];
 
 const scopeOptions = [
   { id: 'mine' as const, label: 'Mi agenda', compactLabel: 'Mía', icon: UserRound },
-  { id: 'all' as const, label: 'Equipo', compactLabel: 'Equipo', icon: Users },
+  { id: 'all' as const, label: 'Agenda de todos', compactLabel: 'Todos', icon: Users },
 ];
 
 export function AppointmentWorkspaceToolbar({

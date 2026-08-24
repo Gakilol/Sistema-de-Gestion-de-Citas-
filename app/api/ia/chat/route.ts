@@ -17,8 +17,10 @@ const MODEL = 'gemini-2.5-flash';
 const MAX_TOOL_CALLS = 5;
 
 const appointmentDraftSchema = z.object({
+  clienteId: z.string().uuid().optional(),
   cliente: z.string().trim().max(150).optional(),
   telefono: z.string().trim().max(30).optional(),
+  servicioId: z.string().uuid().optional(),
   servicio: z.string().trim().max(100).optional(),
   profesional: z.string().trim().max(100).optional(),
   fecha: z.string().trim().max(20).optional(),
@@ -35,17 +37,6 @@ const clientDraftSchema = z.object({
   awaitingField: z.literal('nombre').optional(),
 });
 
-const quickAppointmentSchema = z.object({
-  clienteId: z.string().uuid(),
-  cliente: z.string().trim().min(2).max(150),
-  servicioId: z.string().uuid(),
-  servicio: z.string().trim().min(2).max(100),
-  profesional: z.string().trim().max(100).optional(),
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  hora: z.string().regex(/^\d{2}:\d{2}$/),
-  notas: z.string().trim().max(500).optional(),
-});
-
 const requestSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
@@ -53,13 +44,12 @@ const requestSchema = z.object({
     appointmentDraft: appointmentDraftSchema.optional(),
     clientDraft: clientDraftSchema.optional(),
   })).min(1).max(20),
-  quickAppointment: quickAppointmentSchema.optional(),
 });
 
 const functionDeclarations = [
   { name: 'getTodayAppointments', description: 'Lista las citas de hoy visibles para el usuario, ordenadas por hora.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'getAppointmentSummary', description: 'Resume cuántas citas hay hoy por estado.', parameters: { type: 'OBJECT', properties: {} } },
-  { name: 'searchClients', description: 'Busca clientes por nombre o teléfono.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nombre o teléfono, mínimo 2 caracteres.' }, limit: { type: 'NUMBER', description: 'Máximo 15 resultados.' } }, required: ['query'] } },
+  { name: 'searchClients', description: 'Busca clientes reales por identificador, cédula, nombre, teléfono o correo, tolerando tildes, mayúsculas y espacios.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'ID, cédula, nombre, teléfono o correo; mínimo 2 caracteres.' }, limit: { type: 'NUMBER', description: 'Máximo 15 resultados.' } }, required: ['query'] } },
   { name: 'searchServices', description: 'Busca servicios activos por nombre y devuelve precio, duración e identificador interno.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nombre parcial del servicio.' }, limit: { type: 'NUMBER', description: 'Máximo 15 resultados.' } } } },
   { name: 'getAvailableSlots', description: 'Consulta horas disponibles para un servicio, fecha y opcionalmente un profesional.', parameters: { type: 'OBJECT', properties: { servicio: { type: 'STRING', description: 'Nombre del servicio.' }, fecha: { type: 'STRING', description: 'Fecha exacta YYYY-MM-DD.' }, profesional: { type: 'STRING', description: 'Nombre del profesional, si se conoce.' } }, required: ['servicio', 'fecha'] } },
   { name: 'getPopularServices', description: 'Muestra los servicios completados más solicitados en un período.', parameters: { type: 'OBJECT', properties: { dias: { type: 'NUMBER', description: 'Días a analizar, entre 1 y 180.' } } } },
@@ -119,27 +109,12 @@ export async function POST(req: NextRequest) {
   }
 
   const context: IAExecutionContext = { userId: user.userId, userRole: user.userRole };
-  const latestMessage = parsed.data.messages.at(-1)?.content ?? '';
+  const latestConversationMessage = parsed.data.messages.at(-1);
+  const latestMessage = latestConversationMessage?.content ?? '';
   await audit(req, context, 'IA_CHAT_QUERY', { messageLength: latestMessage.length });
 
-  if (parsed.data.quickAppointment) {
-    const tool = 'prepareCreateAppointment';
-    if (!checkToolPermission(tool, context.userRole)) {
-      await audit(req, context, 'IA_TOOL_ACCESS_DENIED', { tool });
-      return NextResponse.json({ error: 'No tienes permiso para preparar citas.' }, { status: 403 });
-    }
-    const result = await executeIATool(tool, parsed.data.quickAppointment, context);
-    await audit(req, context, result.ok ? 'IA_TOOL_PREPARE' : 'IA_TOOL_READ', { tool, result: result.ok ? 'OK' : 'ERROR', source: 'quick_template' });
-    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-    const timeAdjusted = result.pendingAction?.details.some((detail) => detail.label === 'Hora solicitada');
-    return NextResponse.json({
-      text: timeAdjusted
-        ? 'La hora exacta no estaba libre, así que encontré el espacio disponible más cercano. Revisa la hora ajustada antes de confirmar.'
-        : 'Encontré el cliente guardado y el servicio exacto. Revisa el resumen antes de crear la cita.',
-      toolsUsed: [tool],
-      mode: 'quick_template',
-      pendingAction: result.pendingAction,
-    });
+  if (latestConversationMessage?.appointmentDraft?.clienteId) {
+    return NextResponse.json(await runLocalAssistant(parsed.data.messages, context));
   }
 
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -206,6 +181,18 @@ export async function POST(req: NextRequest) {
         toolsUsed.push(name);
         if (result.ok && result.pendingAction) pendingAction = result.pendingAction;
         await audit(req, context, result.ok && result.pendingAction ? 'IA_TOOL_PREPARE' : 'IA_TOOL_READ', { tool: name, result: result.ok ? 'OK' : 'ERROR' });
+        if (!result.ok && result.choiceRequest) {
+          const draftResult = name === 'prepareCreateAppointment' ? appointmentDraftSchema.safeParse(args ?? {}) : undefined;
+          const appointmentDraft = draftResult?.success ? draftResult.data : undefined;
+          const choiceRequest = { ...result.choiceRequest, ...(appointmentDraft ? { appointmentDraft } : {}) };
+          return NextResponse.json({
+            text: choiceRequest.prompt,
+            toolsUsed,
+            mode: providerMode,
+            choiceRequest,
+            ...(appointmentDraft ? { appointmentDraft } : {}),
+          });
+        }
         functionResponses.push({
           functionResponse: {
             name,

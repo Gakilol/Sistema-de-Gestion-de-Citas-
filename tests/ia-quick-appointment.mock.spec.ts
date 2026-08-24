@@ -31,21 +31,96 @@ test.beforeEach(async ({ page, baseURL }) => {
     contentType: 'application/json',
     body: JSON.stringify({ clientes: [] }),
   }));
+  await page.route('**/api/ia/chat', async (route) => {
+    const body = route.request().postDataJSON();
+    const latest = body.messages.at(-1);
+    if (latest?.content.includes('José López') && !latest?.appointmentDraft?.clienteId) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          text: 'Encontré más de un cliente. ¿Cuál deseas usar?',
+          toolsUsed: ['prepareCreateAppointment'],
+          appointmentDraft: { cliente: 'José López', servicio: 'Corte', profesional: 'Álvaro', fecha: '2026-08-25', hora: '09:00' },
+          choiceRequest: {
+            kind: 'client',
+            prompt: 'Encontré más de un cliente. ¿Cuál deseas usar?',
+            appointmentDraft: { cliente: 'José López', servicio: 'Corte', profesional: 'Álvaro', fecha: '2026-08-25', hora: '09:00' },
+            options: [
+              { id: '11111111-1111-4111-8111-111111111111', label: 'José López', description: 'Tel. 88881111' },
+              { id: '22222222-2222-4222-8222-222222222222', label: 'José López', description: 'Tel. 88882222' },
+            ],
+          },
+        }),
+      });
+      return;
+    }
+    if (latest?.appointmentDraft?.clienteId) {
+      expect(latest.appointmentDraft.clienteId).toBe('22222222-2222-4222-8222-222222222222');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          text: 'Cliente verificado. Revisa el resumen antes de guardar.',
+          toolsUsed: ['prepareCreateAppointment'],
+          pendingAction: {
+            type: 'CREATE_APPOINTMENT',
+            title: 'Crear cita',
+            description: 'El horario está disponible. Confirma para guardarlo en la agenda.',
+            confirmLabel: 'Sí, crear cita',
+            endpoint: '/api/citas',
+            method: 'POST',
+            body: {},
+            details: [
+              { label: 'Cliente', value: 'José López' },
+              { label: 'Teléfono', value: '88882222' },
+              { label: 'Hora', value: '09:00' },
+            ],
+          },
+        }),
+      });
+      return;
+    }
+    expect(latest?.content).toBe('Agenda a Carlos mañana a las 9 para corte con Álvaro.');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ text: 'Encontré los datos reales. Revisa el resumen antes de crear la cita.', toolsUsed: ['prepareCreateAppointment'] }),
+    });
+  });
 });
 
-test('muestra una plantilla clara, exacta y sin desbordamiento', async ({ page }) => {
+test('acepta una instrucción natural sin plantilla ni desbordamiento', async ({ page }) => {
   await page.goto('/ia');
-  await page.getByRole('button', { name: 'Crear cita con IA' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Crear una cita sin adivinar datos' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Busca por nombre o teléfono' }).fill('Cliente nuevo');
-  await expect(page.getByText(/No está guardado. Regístralo antes/i)).toBeVisible();
-
-  await page.getByRole('textbox', { name: 'Escribe el servicio' }).fill('Corte');
-  await expect(page.getByRole('option', { name: /Corte clásico/i })).toBeVisible();
-  await expect(page.getByRole('option', { name: /Corte y barba/i })).toBeVisible();
+  await page.getByRole('button', { name: 'Escribir cita rápida' }).click();
+  const input = page.getByRole('textbox', { name: 'Mensaje para el asistente' });
+  await expect(input).toBeFocused();
+  await input.fill('Agenda a Carlos mañana a las 9 para corte con Álvaro.');
+  await input.press('Enter');
+  await expect(page.getByText(/Encontré los datos reales/i)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Crear una cita sin adivinar datos' })).toHaveCount(0);
 
   const widths = await page.locator('html').evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
   expect(widths.scrollWidth).toBeLessThanOrEqual(widths.clientWidth + 1);
   await expect(page.locator('[data-nextjs-dialog]')).toHaveCount(0);
+});
+
+test('permite escoger visualmente entre clientes con el mismo nombre', async ({ page }, testInfo) => {
+  await page.goto('/ia');
+  await page.getByRole('button', { name: 'Escribir cita rápida' }).click();
+  const input = page.getByRole('textbox', { name: 'Mensaje para el asistente' });
+  await input.fill('Agenda a José López mañana a las 9 para corte con Álvaro.');
+  await input.press('Enter');
+
+  await expect(page.getByText('Revisa el dato secundario antes de continuar. No se guardará nada todavía.')).toBeVisible();
+  await page.getByRole('button', { name: /José López Tel\. 88882222/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Crear cita' })).toBeVisible();
+  await expect(page.getByText('88882222', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sí, crear cita' })).toBeVisible();
+
+  if (process.env.CAPTURE_VISUALS === 'true') {
+    const suffix = testInfo.project.name.includes('Mobile') ? 'mobile' : 'desktop';
+    await page.screenshot({ path: `audit-screenshots/internal/14-ia-client-choice-${suffix}.png`, fullPage: true });
+  }
 });

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors, Plus, AlertTriangle, GripVertical, Undo2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { getBusinessTodayString } from '@/lib/timezone';
+import { getBusinessNowTime, getBusinessTodayString } from '@/lib/timezone';
 import {
   HORA_INICIO,
   HORA_FIN,
@@ -44,6 +44,7 @@ const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
+const CALENDAR_VIEW_STORAGE_KEY = 'novacita_calendar_view';
 
 export function AppointmentCalendar({
   citas,
@@ -64,6 +65,7 @@ export function AppointmentCalendar({
   isModalOpen,
 }: AppointmentCalendarProps) {
   const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('3dias');
+  const [businessNow, setBusinessNow] = useState(() => getBusinessNowTime());
   const [hoveredSlot, setHoveredSlot] = useState<{ dayStr: string; empleadoId: string; top: number; timeLabel: string } | null>(null);
   const [provisionalSlot, setProvisionalSlot] = useState<ProvisionalSlot | null>(null);
 
@@ -258,6 +260,13 @@ export function AppointmentCalendar({
   const fechaBase = useMemo(() => parseCalendarDate(selectedDateStr), [selectedDateStr]);
 
   const [activeMobileEmpId, setActiveMobileEmpId] = useState<string>('all');
+
+  useEffect(() => {
+    const refreshCurrentTime = () => setBusinessNow(getBusinessNowTime());
+    refreshCurrentTime();
+    const timer = window.setInterval(refreshCurrentTime, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // ─── Permisos de edición ─────────────────────────────────────────────────────
   const canMoveToOtherEmployee = useCallback((): boolean => {
@@ -479,13 +488,31 @@ export function AppointmentCalendar({
     return `${Math.max(735, totalSubColumnas * 105)}px`;
   }, [vista, totalSubColumnas]);
 
-  // En móvil y tablet se priorizan tres días; en escritorio se aprovecha
-  // el ancho para mostrar una semana desde la fecha seleccionada.
+  const updateCalendarView = useCallback((nextView: 'dia' | '3dias' | 'semana') => {
+    setVista(nextView);
+    try {
+      localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, nextView);
+    } catch {}
+  }, []);
+
+  // Conserva la preferencia explícita. La primera visita usa tres días en
+  // móvil y semana en escritorio para aprovechar el espacio disponible.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+    const saved = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+    if (saved === 'dia' || saved === '3dias' || saved === 'semana') {
+      setVista(saved);
+    } else if (window.innerWidth >= 1024) {
       setVista('semana');
     }
   }, []);
+
+  const currentTimePosition = useMemo(() => {
+    const minutes = timeStrToMinutes(businessNow);
+    const start = HORA_INICIO * 60;
+    const end = HORA_FIN * 60;
+    if (minutes < start || minutes > end) return null;
+    return (minutes - start) * (hourHeight / 60);
+  }, [businessNow, hourHeight]);
 
   useEffect(() => {
     if (hasInitialScrollRef.current) return;
@@ -1829,7 +1856,7 @@ export function AppointmentCalendar({
           {mobileToolbar && <div className="order-2 sm:hidden">{mobileToolbar}</div>}
 
           {/* Toggles de Vista */}
-          <div className="order-3 flex h-11 w-full items-center rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1 sm:order-none sm:h-9 sm:w-auto">
+          <div className="order-3 flex h-11 w-full items-center rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1 sm:order-none sm:h-9 sm:w-auto" role="group" aria-label="Vista del calendario">
             {[
               { id: 'dia', label: 'Día' },
               { id: '3dias', label: '3 Días' },
@@ -1837,7 +1864,9 @@ export function AppointmentCalendar({
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setVista(tab.id as 'dia' | '3dias' | 'semana')}
+                type="button"
+                onClick={() => updateCalendarView(tab.id as 'dia' | '3dias' | 'semana')}
+                aria-pressed={vista === tab.id}
                 className={cn(
                   "relative flex h-9 min-w-[42px] flex-1 cursor-pointer items-center justify-center rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors sm:h-7 sm:flex-none sm:px-3",
                   vista === tab.id
@@ -2018,6 +2047,20 @@ export function AppointmentCalendar({
                       esHoy && "bg-primary/[0.01]"
                     )}
                   >
+                    {esHoy && currentTimePosition !== null && (
+                      <div
+                        data-current-time-indicator
+                        className="pointer-events-none absolute inset-x-0 z-[25] flex -translate-y-1/2 items-center"
+                        style={{ top: `${currentTimePosition}px` }}
+                        aria-hidden="true"
+                      >
+                        <span className="ml-1 size-2 shrink-0 rounded-full bg-primary ring-2 ring-background" />
+                        <span className="h-px flex-1 bg-primary/85" />
+                        <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-black tabular-nums text-primary-foreground shadow-sm">
+                          {formatTime12h(businessNow).replace(':00', '').replace(' p. m.', ' PM').replace(' a. m.', ' AM')}
+                        </span>
+                      </div>
+                    )}
                     {empleadosColumnas.map((emp) => {
                       const citasDiaRaw = citasDiaTodos.filter((cita) => cita.empleado_id === emp.id);
                       const citasDia = procesarCitasDia(citasDiaRaw);

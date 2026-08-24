@@ -29,6 +29,23 @@ describe('asistente local en lenguaje natural', () => {
     });
   });
 
+  it.each([
+    {
+      message: 'Agenda a Carlos mañana a las 9 para corte con Álvaro.',
+      expected: { cliente: 'Carlos', profesional: 'Álvaro', servicio: 'Corte', fecha: '2026-08-23', hora: '09:00' },
+    },
+    {
+      message: 'Pon a José Pérez el viernes a las 10:30 con Kevin para corte y barba.',
+      expected: { cliente: 'José Pérez', profesional: 'Kevin', servicio: 'Corte y barba', fecha: '2026-08-28', hora: '10:30' },
+    },
+    {
+      message: 'Agenda a María López hoy a las 2.',
+      expected: { cliente: 'María López', fecha: '2026-08-22', hora: '14:00' },
+    },
+  ])('entiende la instrucción rápida: $message', ({ message, expected }) => {
+    expect(parseAppointmentMessage(message, {}, '2026-08-22')).toMatchObject(expected);
+  });
+
   it('acepta respuestas cortas cuando está preguntando un dato concreto', () => {
     const draft = parseAppointmentMessage(
       'Corte y barba',
@@ -107,6 +124,52 @@ describe('asistente local en lenguaje natural', () => {
       hora: '10:00',
     }), expect.any(Object));
     expect(response.pendingAction).toMatchObject({ type: 'CREATE_APPOINTMENT' });
+  });
+
+  it('prepara directamente una cita escrita con “Agenda a…”', async () => {
+    executeIAToolMock.mockResolvedValue({
+      ok: true,
+      data: { readyForConfirmation: true },
+      meta: { fuenteDatos: 'HAIR STYLE' },
+      pendingAction: { type: 'CREATE_APPOINTMENT', title: 'Crear cita' },
+    });
+
+    const response = await runLocalAssistant(
+      [{ role: 'user', content: 'Agenda a Carlos mañana a las 9 para corte con Álvaro.' }],
+      { userId: 'user-1', userRole: 'ADMIN' },
+    );
+
+    expect(executeIAToolMock).toHaveBeenCalledWith('prepareCreateAppointment', expect.objectContaining({
+      cliente: 'Carlos', servicio: 'Corte', profesional: 'Álvaro', hora: '09:00',
+    }), expect.any(Object));
+    expect(response.pendingAction).toMatchObject({ type: 'CREATE_APPOINTMENT' });
+  });
+
+  it('conserva el borrador y devuelve opciones visuales si hay clientes homónimos', async () => {
+    executeIAToolMock.mockResolvedValue({
+      ok: false,
+      error: 'Encontré varios clientes con ese nombre.',
+      code: 'INVALID_PARAMS',
+      choiceRequest: {
+        kind: 'client',
+        prompt: '¿Cuál cliente deseas usar?',
+        options: [
+          { id: 'client-1', label: 'José López', description: 'Tel. 88881111' },
+          { id: 'client-2', label: 'José López', description: 'Tel. 88882222' },
+        ],
+      },
+    });
+
+    const response = await runLocalAssistant(
+      [{ role: 'user', content: 'Agenda a José López mañana a las 9 para corte con Álvaro.' }],
+      { userId: 'user-1', userRole: 'ADMIN' },
+    );
+
+    expect(response.choiceRequest).toMatchObject({
+      kind: 'client',
+      appointmentDraft: expect.objectContaining({ cliente: 'José López', servicio: 'Corte' }),
+    });
+    expect(response.appointmentDraft).toMatchObject({ cliente: 'José López', servicio: 'Corte' });
   });
 
   it('guía el registro de un cliente cuando falta el nombre', async () => {

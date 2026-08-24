@@ -4,6 +4,7 @@ import { logAudit, getClientIp } from '@/lib/audit/audit-logger';
 import { getUserContext } from '@/lib/auth-helpers';
 import { validateAndNormalizePhone } from '@/lib/phone';
 import { updateClientSchema } from '@/lib/validation/client-schemas';
+import { isExactClientDirectoryMatch, searchClientDirectory } from '@/lib/clients/client-search';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -62,12 +63,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Validar teléfono duplicado (solo si se provee uno)
     if (telefonoNormalizado) {
-      const duplicadoTel = await prisma.cliente.findFirst({
-        where: {
-          telefono: telefonoNormalizado,
-          id: { not: id },
-        },
-      });
+      const duplicadoTel = (await searchClientDirectory(telefonoNormalizado, { limit: 8 }))
+        .find((client) => client.id !== id && isExactClientDirectoryMatch(client, telefonoNormalizado));
       if (duplicadoTel) {
         return NextResponse.json(
           { error: `Ya existe un cliente con el teléfono ${telefonoNormalizado} (${duplicadoTel.nombre})` },
@@ -78,12 +75,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Validar correo duplicado (solo si se provee uno)
     if (correoNormalizado) {
-      const duplicadoEmail = await prisma.cliente.findFirst({
-        where: {
-          correo: correoNormalizado,
-          id: { not: id },
-        },
-      });
+      const duplicadoEmail = (await searchClientDirectory(correoNormalizado, { limit: 8 }))
+        .find((client) => client.id !== id && isExactClientDirectoryMatch(client, correoNormalizado));
       if (duplicadoEmail) {
         return NextResponse.json(
           { error: `Ya existe un cliente con ese correo electrónico (${duplicadoEmail.nombre})` },

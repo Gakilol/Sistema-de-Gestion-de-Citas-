@@ -30,8 +30,10 @@ export interface IAPendingAction {
 export type IAAppointmentDraftField = 'cliente' | 'servicio' | 'profesional' | 'fecha' | 'hora';
 
 export interface IAAppointmentDraft {
+  clienteId?: string;
   cliente?: string;
   telefono?: string;
+  servicioId?: string;
   servicio?: string;
   profesional?: string;
   fecha?: string;
@@ -40,15 +42,17 @@ export interface IAAppointmentDraft {
   awaitingField?: IAAppointmentDraftField;
 }
 
-export interface IAQuickAppointmentInput {
-  clienteId: string;
-  cliente: string;
-  servicioId: string;
-  servicio: string;
-  profesional?: string;
-  fecha: string;
-  hora: string;
-  notas?: string;
+export interface IAChoiceOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface IAChoiceRequest {
+  kind: 'client';
+  prompt: string;
+  options: IAChoiceOption[];
+  appointmentDraft?: IAAppointmentDraft;
 }
 
 export interface IAClientDraft {
@@ -66,9 +70,19 @@ export interface IAConversationMessage {
   clientDraft?: IAClientDraft;
 }
 
+export interface IAAssistantResponse {
+  text: string;
+  toolsUsed: string[];
+  mode: string;
+  pendingAction?: IAPendingAction;
+  appointmentDraft?: IAAppointmentDraft;
+  clientDraft?: IAClientDraft;
+  choiceRequest?: IAChoiceRequest;
+}
+
 export type IAToolResult =
   | { ok: true; data: unknown; meta: { fuenteDatos: string }; pendingAction?: IAPendingAction }
-  | { ok: false; error: string; code: 'ACCESS_DENIED' | 'INVALID_PARAMS' | 'INTERNAL_ERROR' };
+  | { ok: false; error: string; code: 'ACCESS_DENIED' | 'INVALID_PARAMS' | 'INTERNAL_ERROR'; choiceRequest?: IAChoiceRequest };
 
 export interface IAExecutionContext {
   userId: string;

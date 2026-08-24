@@ -9,7 +9,7 @@ const jwtSecret = process.env.JWT_SECRET || 'visual-test-secret-with-at-least-32
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: '**/ia-quick-appointment.mock.spec.ts',
+  testMatch: '**/*.mock.spec.ts',
   timeout: 30_000,
   workers: 1,
   reporter: [['list']],
