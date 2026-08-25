@@ -1,11 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Accessibility, CalendarPlus, CheckCircle2, Clock3, ListPlus, Loader2,
-  MessageCircle, Mic, MicOff, Phone, Play, RefreshCcw, Search, UserPlus, Users, X,
+  MessageCircle, Phone, Play, RefreshCcw, Search, UserPlus, Users, X,
 } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
@@ -44,17 +43,6 @@ interface WaitlistEntry {
   profesional?: CatalogItem | null;
 }
 
-interface SpeechResultLike { 0: { transcript: string }; isFinal: boolean }
-interface SpeechEventLike { results: ArrayLike<SpeechResultLike> }
-interface SpeechController {
-  lang: string; interimResults: boolean; continuous: boolean;
-  start: () => void; stop: () => void;
-  onresult: ((event: SpeechEventLike) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-}
-type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechController; webkitSpeechRecognition?: new () => SpeechController };
-
 const waitlistInitial = {
   clienteId: '', servicioId: '', empleadoId: '', fechaDesde: '', fechaHasta: '',
   jornadaPreferida: 'CUALQUIERA', notas: '', prioridad: 0,
@@ -67,8 +55,6 @@ function getNextAction(appointment: ReceptionAppointment) {
 }
 
 export default function ReceptionPage() {
-  const router = useRouter();
-  const recognitionRef = useRef<SpeechController | null>(null);
   const [appointments, setAppointments] = useState<ReceptionAppointment[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [clients, setClients] = useState<CatalogItem[]>([]);
@@ -81,8 +67,6 @@ export default function ReceptionPage() {
   const [showWaitlistForm, setShowWaitlistForm] = useState(false);
   const [waitlistForm, setWaitlistForm] = useState(waitlistInitial);
   const [savingWaitlist, setSavingWaitlist] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
-  const [listening, setListening] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true); else setLoading(true);
@@ -113,9 +97,6 @@ export default function ReceptionPage() {
 
   useEffect(() => {
     void load();
-    const speechWindow = window as SpeechWindow;
-    setSpeechSupported(Boolean(speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition));
-    return () => recognitionRef.current?.stop();
   }, [load]);
   useAppointmentStatusSync(true, () => void load(true));
 
@@ -148,24 +129,6 @@ export default function ReceptionPage() {
     });
     if (!url) return toast.error('Este cliente no tiene teléfono para WhatsApp.');
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const toggleVoice = () => {
-    if (listening) { recognitionRef.current?.stop(); return; }
-    const speechWindow = window as SpeechWindow;
-    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!Recognition) return router.push('/ia');
-    const recognition = new Recognition();
-    recognition.lang = 'es-NI'; recognition.interimResults = false; recognition.continuous = false;
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? '').join(' ').trim();
-      if (transcript) router.push(`/ia?prompt=${encodeURIComponent(transcript)}`);
-    };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => { setListening(false); toast.error('No pude escuchar. Revisa el permiso del micrófono.'); };
-    recognitionRef.current = recognition;
-    setListening(true);
-    recognition.start();
   };
 
   const saveWaitlist = async (event: React.FormEvent) => {
@@ -220,17 +183,13 @@ export default function ReceptionPage() {
 
           <section aria-labelledby="reception-actions-title">
             <h2 id="reception-actions-title" className="mb-3 text-xl font-black text-foreground">¿Qué necesitas hacer?</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {taskCards.map(({ title, detail, href, icon: Icon, primary }) => (
                 <Link key={title} href={href} className={cn('group flex min-h-36 items-center gap-4 rounded-2xl border p-5 transition-[transform,border-color,box-shadow] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25', primary ? 'border-primary bg-primary text-primary-foreground shadow-md sm:col-span-2 lg:col-span-1' : 'border-border bg-card text-foreground shadow-sm hover:border-primary/40')}>
                   <span className={cn('flex size-14 shrink-0 items-center justify-center rounded-xl', primary ? 'bg-black/15' : 'bg-primary/10 text-primary')}><Icon className="size-7" /></span>
                   <span><span className="block text-lg font-black">{title}</span><span className={cn('mt-1 block text-sm', primary ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{detail}</span></span>
                 </Link>
               ))}
-              <button type="button" onClick={toggleVoice} className={cn('flex min-h-36 items-center gap-4 rounded-2xl border p-5 text-left shadow-sm transition-[transform,border-color] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25', listening ? 'border-destructive bg-destructive/10 text-destructive' : 'border-border bg-card text-foreground hover:border-primary/40')}>
-                <span className={cn('flex size-14 shrink-0 items-center justify-center rounded-xl', listening ? 'bg-destructive text-destructive-foreground' : 'bg-primary/10 text-primary')}>{listening ? <MicOff className="size-7" /> : <Mic className="size-7" />}</span>
-                <span><span className="block text-lg font-black">{listening ? 'Escuchando…' : 'Hablar a la IA'}</span><span className="mt-1 block text-sm text-muted-foreground">{speechSupported ? 'Dime la tarea completa' : 'Abrir asistente'}</span></span>
-              </button>
             </div>
           </section>
 

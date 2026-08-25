@@ -57,9 +57,5 @@ Surfaces use subtle tonal shifts. Light mode adds a quiet layered shadow to rais
 - Agenda workspace: Lista precedes Agenda in the selector, but Agenda is the default; “Mi agenda” and “Agenda de todos” share the same time grid and current day uses the gold rail/node treatment.
 - Agenda time context: Día, 3 días and Semana persist per device; today shows a thin gold current-time rail with a compact tabular label and no decorative animation.
 - Task card: icon, verb-led 18–20px title and one short explanation. Never put metrics, menus or tertiary actions inside it.
-- AI mutation confirmation: the assistant may prepare an operation, but the user sees a bordered summary with every material field and a 48px explicit confirmation button before any write.
-- AI task bar: “Crear cita con IA” and the manual form fallback remain visible above the conversation; voice dictation is an optional adjacent input, never the only path.
-- Guided conversation: ask for one missing appointment field at a time, preserve the draft between turns, accept ordinary Spanish date/time phrases, and never expose database identifiers or serialized objects.
-- AI client disambiguation: when normalized search finds homonyms, show 44px+ selectable client rows with name plus phone/email/last ID digits; gold marks the chosen row, the internal ID remains hidden, and confirmation is still required before writing.
 - Authentication: keep the sign-in form and brand together in one centered panel; supporting copy stays secondary and fabricated operational data is not shown.
 - Progressive disclosure: operational summaries can use `<details>` or a dedicated report page; advanced information never competes with the primary task.

@@ -124,7 +124,7 @@ describe('Security boundaries', () => {
     expect(result._privado).toBe(true);
   });
 
-  test('TECH_SUPPORT también recibe PII enmascarada en búsquedas usadas por la IA', () => {
+  test('TECH_SUPPORT recibe PII enmascarada en el directorio de clientes', () => {
     const result = buildClientDirectoryResponse({
       id: rawClient.id,
       nombre: rawClient.nombre,

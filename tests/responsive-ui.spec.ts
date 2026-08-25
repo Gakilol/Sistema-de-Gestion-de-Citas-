@@ -96,7 +96,6 @@ test.describe('UI responsive autenticada', () => {
     const modules = [
       { path: '/dashboard', heading: /Hola/i },
       { path: '/recepcion', heading: 'Recepción' },
-      { path: '/ia', heading: /Qué necesitas hacer/i },
       { path: '/citas', heading: 'Agenda' },
       { path: '/clientes', heading: 'Clientes' },
       { path: '/servicios', heading: /Catálogo de Servicios/i },
@@ -118,6 +117,13 @@ test.describe('UI responsive autenticada', () => {
     }
 
     const width = testInfo.project.use.viewport?.width ?? 1280;
+    if (width < 768) {
+      const quickNav = page.getByRole('navigation', { name: 'Navegación rápida' });
+      await expect(quickNav.getByRole('link', { name: 'Clientes', exact: true })).toBeVisible();
+      await expect(quickNav.getByRole('link', { name: 'Asistente', exact: true })).toHaveCount(0);
+    } else {
+      await expect(page.locator('aside').getByRole('link', { name: 'Asistente', exact: true })).toHaveCount(0);
+    }
     if (width < 768) {
       await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible();
     } else {
@@ -266,14 +272,9 @@ test.describe('UI responsive autenticada', () => {
     await expectNoDocumentOverflow(page);
   });
 
-  test('la IA permite empezar una cita natural sin abrir una plantilla', async ({ page }) => {
-    await page.goto('/ia');
-    await page.getByRole('button', { name: 'Escribir cita rápida' }).click();
-    const messageInput = page.getByRole('textbox', { name: 'Mensaje para el asistente' });
-    await expect(messageInput).toBeFocused();
-    await expect(messageInput).toHaveValue('Agenda a ');
-    await expect(page.getByRole('heading', { name: 'Crear una cita sin adivinar datos' })).toHaveCount(0);
-    await expectNoDocumentOverflow(page);
+  test('la ruta retirada del asistente devuelve 404', async ({ page }) => {
+    const response = await page.goto('/ia');
+    expect(response?.status()).toBe(404);
   });
 
   test('la navegación respeta los tres roles disponibles', async ({ page }, testInfo) => {

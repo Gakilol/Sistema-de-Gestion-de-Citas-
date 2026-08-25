@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BarChart3, Bot, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock3, RefreshCcw, UserPlus } from 'lucide-react';
+import { ArrowRight, BarChart3, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock3, RefreshCcw, UserPlus } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -38,7 +38,6 @@ interface DashboardData {
 
 const taskCards = [
   { title: 'Nueva cita', description: 'Abrir la agenda y elegir un horario.', href: '/citas?nueva=1', icon: CalendarPlus, primary: true },
-  { title: 'Pedirlo a la IA', description: 'Dilo con tus palabras y sigue los pasos.', href: '/ia?prompt=Quiero%20crear%20una%20cita', icon: Bot },
   { title: 'Nuevo cliente', description: 'Registrar sus datos en el directorio.', href: '/clientes?nuevo=1', icon: UserPlus },
 ];
 
@@ -111,7 +110,7 @@ export default function Dashboard() {
 
           <section aria-labelledby="tasks-heading">
             <h2 id="tasks-heading" className="mb-3 text-lg font-bold text-foreground">¿Qué necesitas hacer?</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-3">
               {taskCards.map(({ title, description, href, icon: Icon, primary }) => (
                 <Link key={title} href={href} className={cn('group flex min-h-40 flex-col rounded-2xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25', primary ? 'border-primary bg-primary text-primary-foreground sm:col-span-2' : 'border-border bg-card text-foreground hover:border-primary/45')}>
                   <span className={cn('flex size-12 items-center justify-center rounded-xl', primary ? 'bg-black/15 text-primary-foreground' : 'bg-primary/12 text-primary')}><Icon className="size-6" /></span>
