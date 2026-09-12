@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { buildClientResponse } from '../../lib/client-privacy';
+import { buildClientDirectoryResponse, buildClientResponse } from '../../lib/client-privacy';
 import {
   getDefaultAppointmentScope,
   getScopedAppointmentWhere,
@@ -122,6 +122,21 @@ describe('Security boundaries', () => {
     expect(result.correo).not.toBe(rawClient.correo);
     expect(result.notas).toBeNull();
     expect(result._privado).toBe(true);
+  });
+
+  test('TECH_SUPPORT recibe PII enmascarada en el directorio de clientes', () => {
+    const result = buildClientDirectoryResponse({
+      id: rawClient.id,
+      nombre: rawClient.nombre,
+      telefono: rawClient.telefono,
+      correo: rawClient.correo,
+      cedula: '001-010190-0001A',
+    }, 'TECH_SUPPORT');
+
+    expect(result.telefono).not.toBe(rawClient.telefono);
+    expect(result.telefono).toMatch(/7777$/);
+    expect(result.correo).toBe('c***@example.test');
+    expect(result.cedula).not.toBe('001-010190-0001A');
   });
 
   test('EMPLOYEE recibe el DTO permitido para un cliente accesible', () => {

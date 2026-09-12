@@ -7,6 +7,7 @@ import {
   getUserContext,
   getScopedAppointmentWhere,
 } from '@/lib/auth-helpers';
+import { resolveClientDirectory } from '@/lib/clients/client-search';
 
 const ServicioSeleccionadoSchema = z.object({
   id: z.string().uuid(),
@@ -222,8 +223,25 @@ export async function POST(req: NextRequest) {
         finalClienteNombre = dbCliente.nombre.trim();
         finalClienteTelefono = dbCliente.telefono?.trim() || null;
       } else {
-        idClienteFinal = null;
+        return NextResponse.json({ error: 'El cliente seleccionado ya no existe. Búscalo de nuevo antes de crear la cita.' }, { status: 400 });
       }
+    } else {
+      const clientQuery = finalClienteTelefono || finalClienteNombre;
+      const resolution = await resolveClientDirectory(clientQuery, { limit: 8 });
+      if (resolution.kind === 'not_found') {
+        return NextResponse.json({
+          error: 'No encontré ese cliente en el directorio. Regístralo primero y luego selecciónalo para crear la cita.',
+        }, { status: 400 });
+      }
+      if (resolution.kind === 'ambiguous') {
+        return NextResponse.json({
+          error: `Encontré varios clientes similares: ${resolution.clients.map((client) => client.nombre).join(', ')}. Selecciona el registro correcto.`,
+          matches: resolution.clients,
+        }, { status: 409 });
+      }
+      idClienteFinal = resolution.client.id;
+      finalClienteNombre = resolution.client.nombre.trim();
+      finalClienteTelefono = resolution.client.telefono?.trim() || null;
     }
 
     // ─── TRANSACCIÓN ATÓMICA: Validación + Lock + Guardar cita ─────────────
@@ -303,23 +321,6 @@ export async function POST(req: NextRequest) {
 
       if (!validacion.valida) {
         return { error: 'Hora no disponible: ' + validacion.motivo, status: 400 };
-      }
-
-      // API callers that submit only a name still receive an official, editable client.
-      if (!idClienteFinal) {
-        const clienteExistente = await tx.cliente.findFirst({
-          where: { nombre: { equals: finalClienteNombre, mode: 'insensitive' } },
-        });
-        const cliente = clienteExistente ?? await tx.cliente.create({
-          data: {
-            nombre: finalClienteNombre,
-            telefono: finalClienteTelefono,
-            createdByUserId: userId,
-          },
-        });
-        idClienteFinal = cliente.id;
-        finalClienteNombre = cliente.nombre;
-        finalClienteTelefono = cliente.telefono;
       }
 
       const hasConflict = conflictosBloqueantes.length > 0;

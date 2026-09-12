@@ -5,6 +5,8 @@ import { getUserContext } from '@/lib/auth-helpers';
 import { buildClientResponse } from '@/lib/client-privacy';
 import { validateAndNormalizePhone } from '@/lib/phone';
 import { createClientSchema } from '@/lib/validation/client-schemas';
+import { normalizeClientText } from '@/lib/clients/client-normalization';
+import { isExactClientDirectoryMatch, searchClientDirectory } from '@/lib/clients/client-search';
 
 function normalizarNombre(nombre: string): string {
   return nombre.trim().replace(/\s+/g, ' ');
@@ -26,17 +28,10 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(req.nextUrl.searchParams.get('page') ?? '1') || 1);
     const limit = Math.min(50, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '24') || 24));
 
-    const searchWhere = busqueda
-      ? {
-          OR: [
-            { nombre: { contains: busqueda, mode: 'insensitive' as const } },
-            { telefono: { contains: busqueda, mode: 'insensitive' as const } },
-            { cedula: { contains: busqueda, mode: 'insensitive' as const } },
-            { correo: { contains: busqueda, mode: 'insensitive' as const } },
-            { creador: { nombre: { contains: busqueda, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {};
+    const directoryMatches = busqueda
+      ? await searchClientDirectory(busqueda, { limit: 500 })
+      : [];
+    const searchWhere = busqueda ? { id: { in: directoryMatches.map((client) => client.id) } } : {};
 
     const where = {
       ...searchWhere,
@@ -183,11 +178,8 @@ export async function POST(req: NextRequest) {
     const notasNormalizadas = notas && String(notas).trim() !== '' ? String(notas).trim() : null;
 
     if (!telefonoNormalizado && !confirmarDuplicadoNombre) {
-      const posiblesDuplicados = await prisma.cliente.findMany({
-        where: { nombre: { equals: nombreNormalizado, mode: 'insensitive' } },
-        select: { id: true, nombre: true, telefono: true },
-        take: 5,
-      });
+      const posiblesDuplicados = (await searchClientDirectory(nombreNormalizado, { limit: 5 }))
+        .filter((client) => normalizeClientText(client.nombre) === normalizeClientText(nombreNormalizado));
       if (posiblesDuplicados.length > 0) {
         return NextResponse.json({
           error: 'Ya existe un cliente con el mismo nombre. Confirma si deseas registrarlo de todos modos.',
@@ -199,26 +191,24 @@ export async function POST(req: NextRequest) {
 
     // Validar teléfono duplicado (solo si se provee uno)
     if (telefonoNormalizado) {
-      const duplicadoTel = await prisma.cliente.findFirst({
-        where: { telefono: telefonoNormalizado },
-      });
-      if (duplicadoTel) {
+      const clienteDuplicado = (await searchClientDirectory(telefonoNormalizado, { limit: 50 }))
+        .find((client) => isExactClientDirectoryMatch(client, telefonoNormalizado));
+      if (clienteDuplicado) {
         const errorMsg = userRole === 'EMPLEADO'
           ? 'Ya existe un cliente con estos datos. Contacte a un administrador para verificar la información.'
-          : `Ya existe un cliente con el teléfono ${telefonoNormalizado} (${duplicadoTel.nombre})`;
+          : `Ya existe un cliente con el teléfono ${telefonoNormalizado} (${clienteDuplicado.nombre})`;
         return NextResponse.json({ error: errorMsg }, { status: 409 });
       }
     }
 
     // Validar correo duplicado (solo si se provee uno)
     if (correoNormalizado) {
-      const duplicadoEmail = await prisma.cliente.findFirst({
-        where: { correo: correoNormalizado },
-      });
-      if (duplicadoEmail) {
+      const clienteDuplicado = (await searchClientDirectory(correoNormalizado, { limit: 50 }))
+        .find((client) => isExactClientDirectoryMatch(client, correoNormalizado));
+      if (clienteDuplicado) {
         const errorMsg = userRole === 'EMPLEADO'
           ? 'Ya existe un cliente con estos datos. Contacte a un administrador para verificar la información.'
-          : `Ya existe un cliente con ese correo electrónico (${duplicadoEmail.nombre})`;
+          : `Ya existe un cliente con ese correo electrónico (${clienteDuplicado.nombre})`;
         return NextResponse.json({ error: errorMsg }, { status: 409 });
       }
     }

@@ -5,6 +5,7 @@ import { getUserContext } from '@/lib/auth-helpers';
 import { getClientIp, logAudit } from '@/lib/audit/audit-logger';
 import { parseLocalDateToUTC } from '@/lib/timezone';
 import { createWaitlistSchema } from '@/lib/validation/waitlist-schemas';
+import { searchClientDirectory } from '@/lib/clients/client-search';
 
 export async function GET(req: NextRequest) {
   const { userId, userRole } = getUserContext(req);
@@ -15,14 +16,12 @@ export async function GET(req: NextRequest) {
   const estado = estadoParam && Object.values(EstadoListaEspera).includes(estadoParam as EstadoListaEspera)
     ? estadoParam as EstadoListaEspera
     : undefined;
+  const clientMatches = q ? await searchClientDirectory(q, { limit: 50 }) : [];
 
   const entradas = await prisma.listaEspera.findMany({
     where: {
       ...(estado ? { estado } : {}),
-      ...(q ? { cliente: { OR: [
-        { nombre: { contains: q, mode: 'insensitive' } },
-        { telefono: { contains: q, mode: 'insensitive' } },
-      ] } } : {}),
+      ...(q ? { clienteId: { in: clientMatches.map((client) => client.id) } } : {}),
       ...(userRole === 'EMPLEADO' ? { OR: [{ empleadoId: null }, { empleadoId: userId }] } : {}),
     },
     include: {
