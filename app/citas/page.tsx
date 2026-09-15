@@ -3,7 +3,7 @@
 import { authFetch } from '@/lib/api-client';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck } from 'lucide-react';
+import { UserRound, Plus, Edit, Trash2, X, Search, MessageCircle, CheckCircle2, Minus, AlertTriangle, UserPlus, UserCheck } from 'lucide-react';
 import { AdminSidebar } from '@/components/shared/admin-sidebar';
 import { AppointmentTimeSelector } from '@/components/appointments/AppointmentTimeSelector';
 import { PhoneInput } from '@/components/shared/PhoneInput';
@@ -72,6 +72,9 @@ function CitasContent() {
   // La agenda siempre parte de hoy. El formulario de creación conserva por
   // separado la regla operativa que puede proponer mañana después del cierre.
   const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
+  const [calendarReady, setCalendarReady] = useState(false);
+  // The production page is static; dates must first render in the browser.
+  useEffect(() => { setCalendarReady(true); }, []);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [citaToDelete, setCitaToDelete] = useState<CalendarAppointment | null>(null);
   const [deleteOrigen, setDeleteOrigen] = useState<'agenda' | 'lista'>('agenda');
@@ -229,7 +232,9 @@ function CitasContent() {
     };
   }, [clienteBusqueda, clienteDropdownOpen, showModal]);
 
+  const citasRequestRef = useRef(0);
   const fetchCitas = async (scopeParam?: string, empParam?: string) => {
+    const requestId = ++citasRequestRef.current;
     setIsLoading(true);
     try {
       const activeScope = scopeParam || scope;
@@ -240,28 +245,36 @@ function CitasContent() {
         limit: vistaModo === 'agenda' ? '500' : '100',
       });
       if (vistaModo === 'agenda') {
-        const [year, month, day] = selectedDateStr.split('-').map(Number);
+        const [year, month] = selectedDateStr.split('-').map(Number);
         const formatDate = (date: Date) => [
           date.getFullYear(),
           String(date.getMonth() + 1).padStart(2, '0'),
           String(date.getDate()).padStart(2, '0'),
         ].join('-');
-        const rangeStart = new Date(year, month - 1, day);
-        const rangeEnd = new Date(year, month - 1, day);
+        const rangeStart = new Date(year, month - 1, 1);
+        const rangeEnd = new Date(year, month, 0);
         rangeStart.setDate(rangeStart.getDate() - 7);
         rangeEnd.setDate(rangeEnd.getDate() + 13);
         params.set('from', formatDate(rangeStart));
         params.set('to', formatDate(rangeEnd));
       }
-      const res  = await authFetch(`/api/citas?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al obtener citas');
-      setCitas(data.citas || []);
+      const loaded: CalendarAppointment[] = [];
+      let cursor: string | null = null;
+      do {
+        if (cursor) params.set('cursor', cursor);
+        const res = await authFetch(`/api/citas?${params.toString()}`);
+        const data = await res.json();
+        if (requestId !== citasRequestRef.current) return;
+        if (!res.ok) throw new Error(data.error || 'Error al obtener citas');
+        loaded.push(...(data.citas || []));
+        cursor = vistaModo === 'agenda' ? data.nextCursor : null;
+      } while (cursor);
+      setCitas(loaded);
       setPage(1);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Error al cargar citas'));
+      if (requestId === citasRequestRef.current) toast.error(getErrorMessage(error, 'Error al cargar citas'));
     } finally {
-      setIsLoading(false);
+      if (requestId === citasRequestRef.current) setIsLoading(false);
     }
   };
 
@@ -315,7 +328,7 @@ function CitasContent() {
     setPage(1);
   };
 
-  const openCreate = () => {
+  const openCreate = (dateOverride?: string) => {
     if (catalogosLoading) {
       toast.info('Cargando datos para la nueva cita');
       return;
@@ -327,7 +340,7 @@ function CitasContent() {
       return;
     }
     const emptyForm = createEmptyAppointmentForm();
-    emptyForm.fecha = getDefaultBookingDate();
+    emptyForm.fecha = dateOverride || getDefaultBookingDate();
     
     // Seleccionar por defecto el colaborador logueado si es agendable (o si es Empleado, forzosamente él mismo), de lo contrario el primero disponible
     if (user?.rol === 'EMPLEADO') {
@@ -784,7 +797,7 @@ function CitasContent() {
 
   const handleScopeChange = (nextScope: AppointmentWorkspaceScope) => {
     setScope(nextScope);
-    if (nextScope === 'mine') setFiltroEmpleado('');
+    setFiltroEmpleado('');
   };
 
   const renderAgendaNavigation = (compact = false) => (
@@ -801,12 +814,13 @@ function CitasContent() {
   const mainContent = (
     <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-0">
-        <div className="app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden">
+      <main className={cn("flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-0", vistaModo === 'agenda' && "agenda-main")}>
+        <div className={cn("app-page agenda-page space-y-4 sm:space-y-5 page-enter overflow-x-hidden", vistaModo === 'agenda' && "agenda-page-compact")}>
 
-          <header className="flex items-end justify-between gap-4">
+          {vistaModo === 'agenda' ? <header className="agenda-desktop-header">
+            <h1>Agenda</h1><a href="/configuracion" aria-label="Abrir perfil y configuración"><UserRound size={22} /></a>
+          </header> : <header className="flex items-end justify-between gap-4">
             <div className="min-w-0 border-l border-primary/70 pl-4">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Libro de citas</p>
               <h1 className="page-heading">Agenda</h1>
               <p className="page-description hidden truncate sm:block sm:whitespace-normal">
                 {vistaModo === 'lista' ? `${filteredAndSortedCitas.length} visibles · ` : ''}
@@ -814,17 +828,16 @@ function CitasContent() {
               </p>
             </div>
             <Button
-              onClick={openCreate}
+              onClick={() => openCreate()}
               disabled={catalogosLoading}
               aria-busy={catalogosLoading}
               className="hidden h-11 shrink-0 gap-2 px-3.5 text-sm sm:inline-flex sm:px-4"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nueva cita</span><span className="sm:hidden">Nueva</span>
             </Button>
-          </header>
+          </header>}
 
           {vistaModo === 'lista' && renderAgendaNavigation(false)}
-          {vistaModo === 'agenda' && <div className="hidden sm:block">{renderAgendaNavigation(false)}</div>}
 
           {/* VISTA DE LISTADO TRADICIONAL */}
           {vistaModo === 'lista' && (
@@ -1229,28 +1242,15 @@ function CitasContent() {
           )}
 
           {/* VISTA DE CALENDARIO / AGENDA */}
-          {vistaModo === 'agenda' && (
-            <div className="space-y-4">
-              {/* Filtro por empleado para administradores en modo agenda */}
-              {(canSeeAll && scope === 'all') && (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1 sm:max-w-xs">
-                    <select
-                      value={filtroEmpleado}
-                      onChange={e => setFiltroEmpleado(e.target.value)}
-                      className="min-h-11 rounded-lg border border-border bg-card px-3 py-2 text-sm w-full cursor-pointer"
-                    >
-                      <option value="">Filtrar todos los estilistas</option>
-                      {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
-              
+          {vistaModo === 'agenda' && !calendarReady && <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground" role="status">Cargando agenda…</div>}
+          {vistaModo === 'agenda' && calendarReady && (
+            <div className="agenda-calendar-host">
               <AppointmentCalendar
                 citas={citas}
                 empleados={empleados}
                 filtroEmpleado={filtroEmpleado}
+                onEmployeeChange={setFiltroEmpleado}
+                createDisabled={catalogosLoading}
                 scope={scope}
                 user={user}
                 onEditCita={openEdit}
@@ -1260,7 +1260,7 @@ function CitasContent() {
                 localCitaOverrides={localCitaOverrides}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
-                onCreateCita={openCreate}
+                onCreateCita={() => openCreate(selectedDateStr)}
                 mobileToolbar={renderAgendaNavigation(true)}
                 isLoading={isLoading}
                 isModalOpen={showModal}

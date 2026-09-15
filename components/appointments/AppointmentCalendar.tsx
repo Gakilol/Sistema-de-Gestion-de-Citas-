@@ -1,5 +1,8 @@
+import { WeekStrip } from './WeekStrip';
+import { FloatingViewBar, type CalendarView } from './FloatingViewBar';
+import { MonthCalendar } from './MonthCalendar';
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Users, Scissors, Plus, AlertTriangle, GripVertical, Undo2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, User, Scissors, Plus, AlertTriangle, GripVertical, Undo2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getBusinessNowTime, getBusinessTodayString } from '@/lib/timezone';
@@ -40,16 +43,15 @@ import type {
 } from './appointment-calendar-types';
 
 const DIAS_SEMANA_ABR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-];
+
 const CALENDAR_VIEW_STORAGE_KEY = 'novacita_calendar_view';
 
 export function AppointmentCalendar({
   citas,
   empleados,
   filtroEmpleado,
+  onEmployeeChange,
+  createDisabled,
   scope,
   user,
   onEditCita,
@@ -64,8 +66,8 @@ export function AppointmentCalendar({
   isLoading = false,
   isModalOpen,
 }: AppointmentCalendarProps) {
-  const [vista, setVista] = useState<'dia' | '3dias' | 'semana'>('3dias');
-  const [businessNow, setBusinessNow] = useState(() => getBusinessNowTime());
+  const [vista, setVista] = useState<CalendarView>('3dias');
+  const [businessNow, setBusinessNow] = useState('');
   const [hoveredSlot, setHoveredSlot] = useState<{ dayStr: string; empleadoId: string; top: number; timeLabel: string } | null>(null);
   const [provisionalSlot, setProvisionalSlot] = useState<ProvisionalSlot | null>(null);
 
@@ -170,6 +172,7 @@ export function AppointmentCalendar({
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignorar si se está escribiendo en un input, textarea o contenido editable
       const target = e.target as HTMLElement;
+      if (isModalOpen || target?.closest('[role="dialog"]')) return;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
@@ -185,7 +188,7 @@ export function AppointmentCalendar({
         onSlotClick({
           date: selectedDateStr,
           time: '09:00',
-          empleadoId: filtroEmpleado === 'TODOS' ? (empleados[0]?.id || '') : filtroEmpleado,
+          empleadoId: filtroEmpleado || (scope === 'mine' ? user?.id : empleados[0]?.id) || '',
           durationMinutes: 30,
         });
       }
@@ -193,7 +196,7 @@ export function AppointmentCalendar({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onSlotClick, selectedDateStr, filtroEmpleado, empleados]);
+  }, [onSlotClick, selectedDateStr, filtroEmpleado, empleados, scope, user?.id, isModalOpen]);
 
   // Ref de estado de interacción del bloque PROVISIONAL (creación / movimiento / resize)
   const provisionalDragRef = useRef<ProvisionalDragRef>({
@@ -259,7 +262,8 @@ export function AppointmentCalendar({
 
   const fechaBase = useMemo(() => parseCalendarDate(selectedDateStr), [selectedDateStr]);
 
-  const [activeMobileEmpId, setActiveMobileEmpId] = useState<string>('all');
+  const activeMobileEmpId = filtroEmpleado || 'all';
+  const setActiveMobileEmpId = (id: string) => onEmployeeChange?.(id === 'all' ? '' : id);
 
   useEffect(() => {
     const refreshCurrentTime = () => setBusinessNow(getBusinessNowTime());
@@ -290,9 +294,6 @@ export function AppointmentCalendar({
       (employee.activo ?? true) && (employee.esAgendable ?? true) && employee.rol !== 'TECH_SUPPORT';
     if (user?.rol === 'EMPLEADO' || scope === 'mine') {
       return empleados.filter((e) => e.id === user?.id && isEligible(e));
-    }
-    if (filtroEmpleado) {
-      return empleados.filter((e) => e.id === filtroEmpleado && isEligible(e));
     }
     return empleados.filter(isEligible);
   }, [empleados, filtroEmpleado, user, scope]);
@@ -325,17 +326,12 @@ export function AppointmentCalendar({
     return dias;
   }, [fechaBase, vista]);
 
-  const tituloCabecera = useMemo(() => {
-    if (diasAMostrar.length === 0) return '';
-    const primerDia = diasAMostrar[0];
-    const ultimoDia = diasAMostrar[diasAMostrar.length - 1];
-    if (primerDia.getMonth() === ultimoDia.getMonth()) {
-      return `${MESES[primerDia.getMonth()]} ${primerDia.getFullYear()}`;
-    }
-    return `${MESES[primerDia.getMonth()]} - ${MESES[ultimoDia.getMonth()]} ${primerDia.getFullYear()}`;
-  }, [diasAMostrar]);
-
+  const daysInCurrentView = vista === 'dia' ? 1 : vista === '3dias' ? 3 : 7;
+  const gridAnimationRef = useRef<HTMLDivElement>(null);
   const cambiarFecha = (offset: number) => {
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gridAnimationRef.current?.animate([{ transform: `translateX(${offset > 0 ? 24 : -24}px)`, opacity: 0.6 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 250, easing: 'ease-out' });
+    }
     const nuevaFecha = new Date(fechaBase);
     nuevaFecha.setDate(fechaBase.getDate() + offset);
     setSelectedDateStr(formatCalendarDate(nuevaFecha));
@@ -343,24 +339,21 @@ export function AppointmentCalendar({
 
   const handleDateSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
     const touch = event.touches[0];
-    dateSwipeStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    dateSwipeStartRef.current = event.touches.length === 1 && touch && !moveRef.current.active && !resizeRef.current.active && !provisionalDragRef.current.active ? { x: touch.clientX, y: touch.clientY } : null;
   };
 
   const handleDateSwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
     const start = dateSwipeStartRef.current;
     const touch = event.changedTouches[0];
     dateSwipeStartRef.current = null;
-    if (!start || !touch) return;
+    if (!start || !touch || moveRef.current.active || resizeRef.current.active || provisionalDragRef.current.active) return;
 
     const deltaX = touch.clientX - start.x;
     const deltaY = touch.clientY - start.y;
     if (Math.abs(deltaX) < 52 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.35) return;
-    cambiarFecha(deltaX < 0 ? 1 : -1);
+    cambiarFecha(deltaX < 0 ? daysInCurrentView : -daysInCurrentView);
   };
 
-  const irAHoy = () => {
-    setSelectedDateStr(getBusinessTodayString());
-  };
 
   // Generar lista de horas para la regla lateral
   const horasRegla = useMemo(() => {
@@ -488,28 +481,27 @@ export function AppointmentCalendar({
     return `${Math.max(735, totalSubColumnas * 105)}px`;
   }, [vista, totalSubColumnas]);
 
-  const updateCalendarView = useCallback((nextView: 'dia' | '3dias' | 'semana') => {
+  const updateCalendarView = useCallback((nextView: CalendarView) => {
     setVista(nextView);
     try {
       localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, nextView);
     } catch {}
   }, []);
 
-  // Conserva la preferencia explícita. La primera visita usa tres días en
-  // móvil y semana en escritorio para aprovechar el espacio disponible.
+  // Conserva la preferencia explícita; la primera visita usa tres días.
   useEffect(() => {
     const saved = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
-    if (saved === 'dia' || saved === '3dias' || saved === 'semana') {
+    if (saved === 'dia' || saved === '3dias' || saved === 'semana' || saved === 'mes' || saved === 'calendario') {
       setVista(saved);
-    } else if (window.innerWidth >= 1024) {
-      setVista('semana');
+
     }
   }, []);
 
   const currentTimePosition = useMemo(() => {
+    if (!businessNow) return null;
     const minutes = timeStrToMinutes(businessNow);
     const start = HORA_INICIO * 60;
-    const end = HORA_FIN * 60;
+    const end = (HORA_INICIO + TOTAL_HORAS) * 60;
     if (minutes < start || minutes > end) return null;
     return (minutes - start) * (hourHeight / 60);
   }, [businessNow, hourHeight]);
@@ -810,6 +802,17 @@ export function AppointmentCalendar({
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      if (moveRef.current.active || resizeRef.current.active || provisionalDragRef.current.active) dateSwipeStartRef.current = null;
+      const origin = dateSwipeStartRef.current;
+      if (origin && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - origin.x;
+        const dy = e.touches[0].clientY - origin.y;
+        if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.35) {
+          if (e.cancelable) e.preventDefault();
+          cancelDrag();
+          cancelMove();
+        }
+      }
       if (e.touches.length >= 2 && pinchRef.current.active) {
         // Prevenir el zoom completo del navegador a nivel de viewport
         if (e.cancelable) e.preventDefault();
@@ -1777,165 +1780,37 @@ export function AppointmentCalendar({
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="surface-panel relative flex h-[calc(100dvh-8.75rem)] min-h-[32rem] max-h-none select-none flex-col overflow-hidden sm:h-[calc(100dvh-13.5rem)] sm:max-h-[58rem] lg:h-[calc(100dvh-10rem)]">
-      
-      {/* CABECERA DEL CALENDARIO */}
-      <div className="z-30 flex shrink-0 flex-col gap-2 border-b border-border/60 bg-card/95 p-2.5 backdrop-blur-xl sm:p-4">
-        <div
-          className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between"
-          onTouchStart={handleDateSwipeStart}
-          onTouchEnd={handleDateSwipeEnd}
-        >
-          {/* Controles de Navegación de Fecha y Control Discreto de Zoom */}
-          <div className="order-1 flex w-full items-center gap-1.5 sm:w-auto">
-            <Button variant="outline" size="sm" onClick={irAHoy} className="h-11 shrink-0 cursor-pointer gap-1 px-2.5 text-[11px] font-semibold sm:h-9 sm:px-3 sm:text-xs">
-              <CalendarIcon className="w-3.5 h-3.5" /> Hoy
-            </Button>
-            <div className="flex h-11 min-w-0 flex-1 items-center rounded-xl border border-border/80 bg-[hsl(var(--control))] sm:h-9 sm:flex-none">
-              <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-r-none cursor-pointer" onClick={() => cambiarFecha(-1)} aria-label="Fecha anterior">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="min-w-0 flex-1 truncate border-x border-border/70 px-1 py-1 text-center text-[11px] font-semibold text-foreground sm:min-w-[142px] sm:px-3 sm:text-sm">
-                {tituloCabecera}
-              </span>
-              <Button variant="ghost" size="icon" className="size-11 sm:h-8 sm:w-8 rounded-l-none cursor-pointer" onClick={() => cambiarFecha(1)} aria-label="Fecha siguiente">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {onCreateCita && (
-              <Button
-                type="button"
-                onClick={onCreateCita}
-                className="h-11 shrink-0 gap-1 rounded-xl px-2.5 text-[10px] font-semibold sm:hidden"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden min-[360px]:inline">Nueva cita</span>
-              </Button>
-            )}
-
-            {/* Control Discreto de Zoom Vertical (- 100% +) */}
-            <div className="hidden sm:flex items-center border border-border rounded-lg bg-background shadow-xs h-9 p-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 sm:h-8 sm:w-7 cursor-pointer text-muted-foreground hover:text-foreground"
-                onClick={() => updateHourHeight(hourHeight - 15)}
-                disabled={hourHeight <= MIN_HOUR_HEIGHT}
-                title="Reducir escala vertical (-)"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </Button>
-              <button
-                type="button"
-                onClick={() => updateHourHeight(DEFAULT_HOUR_HEIGHT)}
-                className="text-xs font-black px-1.5 min-w-[44px] text-center text-foreground hover:text-primary transition-colors cursor-pointer select-none"
-                title="Restablecer escala al 100%"
-              >
-                {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
-              </button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 sm:h-8 sm:w-7 cursor-pointer text-muted-foreground hover:text-foreground"
-                onClick={() => updateHourHeight(hourHeight + 15)}
-                disabled={hourHeight >= MAX_HOUR_HEIGHT}
-                title="Aumentar escala vertical (+)"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-
-            {scope === 'all' && (
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
-                <Users className="w-3 h-3 shrink-0" /> Equipo completo
-              </span>
-            )}
-          </div>
-
-          {mobileToolbar && <div className="order-2 sm:hidden">{mobileToolbar}</div>}
-
-          {/* Toggles de Vista */}
-          <div className="order-3 flex h-11 w-full items-center rounded-xl border border-border/70 bg-[hsl(var(--control))] p-1 sm:order-none sm:h-9 sm:w-auto" role="group" aria-label="Vista del calendario">
-            {[
-              { id: 'dia', label: 'Día' },
-              { id: '3dias', label: '3 Días' },
-              { id: 'semana', label: 'Semana' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => updateCalendarView(tab.id as 'dia' | '3dias' | 'semana')}
-                aria-pressed={vista === tab.id}
-                className={cn(
-                  "relative flex h-9 min-w-[42px] flex-1 cursor-pointer items-center justify-center rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors sm:h-7 sm:flex-none sm:px-3",
-                  vista === tab.id
-                    ? "bg-card text-foreground shadow-sm ring-1 ring-border/70 after:absolute after:inset-x-3 after:-bottom-1 after:h-px after:bg-primary"
-                    : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+    <div className="agenda-calendar relative flex min-h-0 flex-1 select-none flex-col overflow-hidden">
+      <div className="agenda-calendar-controls">
+        <WeekStrip selectedDate={selectedDateStr} onDaySelect={setSelectedDateStr} />
+        <div className="agenda-tabs-row">
+          {mobileToolbar}<span className="agenda-tabs-divider" aria-hidden="true">|</span>
+          <div className="agenda-workspace-tabs" role="group" aria-label="Vista del calendario">
+            {([{ id: 'dia', label: 'Día' }, { id: '3dias', label: '3D' }, { id: 'semana', label: 'Sem' }] as const).map(tab => <button type="button" key={tab.id} aria-pressed={vista === tab.id} onClick={() => updateCalendarView(tab.id)}>{tab.label}</button>)}
           </div>
         </div>
-
-        {/* SELECTOR MÓVIL DE PROFESIONAL (Pestañas horizontales amplias) */}
-        {empleadosBase.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar pt-2 border-t border-border/30 touch-pan-x">
-            <span className="mr-1 hidden shrink-0 text-[10px] font-semibold text-muted-foreground sm:inline">Profesional</span>
-            <button
-              onClick={() => setActiveMobileEmpId('all')}
-              className={cn(
-                "flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:h-8",
-                activeMobileEmpId === 'all'
-                  ? "border-primary/35 bg-primary/10 text-primary"
-                  : "border-border/60 bg-background/80 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-              )}
-            >
-              <Users className="w-3.5 h-3.5" /> Todos ({empleadosBase.length})
-            </button>
-            {empleadosBase.map((emp) => {
-              const isActive = activeMobileEmpId === emp.id;
-              return (
-                <button
-                  key={emp.id}
-                  onClick={() => setActiveMobileEmpId(emp.id)}
-                  className={cn(
-                    "flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:h-8",
-                    isActive
-                      ? "border-primary/35 bg-primary/10 text-primary"
-                      : "border-border/60 bg-background/80 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-                  )}
-                >
-                  <User className="w-3.5 h-3.5" /> {emp.nombre.split(' ')[0]}
-                </button>
-              );
-            })}
+        <div className="agenda-chips-row">
+          <div className="agenda-employee-chips" role="group" aria-label="Filtrar profesionales">
+            <button type="button" aria-pressed={activeMobileEmpId === 'all'} onClick={() => setActiveMobileEmpId('all')}>Todos({empleadosBase.length})</button>
+            {empleadosBase.map(emp => <button type="button" key={emp.id} title={emp.nombre} aria-pressed={activeMobileEmpId === emp.id} onClick={() => setActiveMobileEmpId(emp.id)}>{emp.nombre.split(' ')[0]}</button>)}
           </div>
-        )}
-
-        <div className="flex items-center gap-3 overflow-x-auto border-t border-border/25 pt-2 text-[9px] font-bold text-muted-foreground sm:hidden">
-          {[
-            { label: 'Pendientes', color: '#f5b800' },
-            { label: 'Programadas', color: '#3b82f6' },
-            { label: 'Cumplidas', color: '#10b981' },
-          ].map((item) => (
-            <span key={item.label} className="flex shrink-0 items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-              {item.label}
-            </span>
-          ))}
+          <div className="agenda-status-legend" aria-label="Estados de citas">
+            {[{ label: 'Pendientes', color: '#C9A84C' }, { label: 'Programadas', color: '#3b82f6' }, { label: 'Cumplidas', color: '#10b981' }].map(item => <span key={item.label} role="img" aria-label={item.label} title={item.label} style={{ backgroundColor: item.color }} />)}
+          </div>
         </div>
       </div>
-
+      {(vista === 'mes' || vista === 'calendario') && <MonthCalendar selectedDate={selectedDateStr} overview={vista === 'calendario'} appointments={citasConOverrides.filter(c => empleadosColumnas.some(e => e.id === c.empleado_id))} onSelect={setSelectedDateStr} onShowDay={(date) => { setSelectedDateStr(date); updateCalendarView('dia'); }} onOpen={onViewCita || onEditCita} />}
+      <div className={cn('agenda-time-workspace', (vista === 'mes' || vista === 'calendario') && 'hidden')}>
+      <button type="button" className="agenda-edge agenda-edge-left" aria-label="Periodo anterior" onClick={() => cambiarFecha(-daysInCurrentView)}><ChevronLeft size={22} /></button>
+      <button type="button" className="agenda-edge agenda-edge-right" aria-label="Periodo siguiente" onClick={() => cambiarFecha(daysInCurrentView)}><ChevronRight size={22} /></button>
       {/* CONTENEDOR DE GRID Y HORAS (SCROLL) */}
-      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto relative custom-scrollbar bg-background/40 overscroll-contain">
+      <div ref={scrollContainerRef} data-calendar-scroll onTouchStart={handleDateSwipeStart} onTouchEnd={handleDateSwipeEnd} onTouchCancel={() => { dateSwipeStartRef.current = null; }} className="flex-1 min-h-0 overflow-auto relative custom-scrollbar bg-background/40 overscroll-contain">
         
         {/* Envoltorio con Ancho Mínimo */}
         <div
-          className="flex flex-col h-full min-h-[850px]"
-          style={{ minWidth: minGridWidth }}
+          ref={gridAnimationRef}
+          className="flex flex-col"
+          style={{ minWidth: minGridWidth, paddingBottom: 88 }}
         >
           {/* CABECERA DE DÍAS Y EMPLEADOS (Sticky top) */}
           <div className="flex sticky top-0 bg-card border-b border-border/40 z-30 shadow-xs">
@@ -1988,7 +1863,7 @@ export function AppointmentCalendar({
           </div>
 
           {/* GRID DEL CALENDARIO */}
-          <div className="flex relative flex-1" style={{ height: `${TOTAL_HORAS * hourHeight}px` }}>
+          <div className="flex relative shrink-0" style={{ height: `${TOTAL_HORAS * hourHeight}px` }}>
             
             {/* Columna lateral de Horas (sticky left) */}
             <div className="w-14 sm:w-20 shrink-0 sticky left-0 border-r border-border/40 bg-card z-20 select-none shadow-xs">
@@ -2004,6 +1879,10 @@ export function AppointmentCalendar({
                 </div>
               ))}
             </div>
+
+            {diasAMostrar.some(day => formatCalendarDate(day) === getBusinessTodayString()) && currentTimePosition !== null && <div data-current-time-indicator className="agenda-now-line" style={{ top: currentTimePosition }} aria-label={`Hora actual ${businessNow}`}>
+              <span className="agenda-now-label">{businessNow}</span><span className="agenda-now-dot" /><span className="agenda-now-rule" />
+            </div>}
 
             {/* Grid principal */}
             <div className="flex-1 flex relative">
@@ -2027,7 +1906,7 @@ export function AppointmentCalendar({
                     <div
                       key={idx}
                       className="border-b border-border/[0.08] w-full"
-                      style={{ height: `${hourHeight / 4}px` }}
+                      style={{ position: 'absolute', top: `${idx * hourHeight / 4}px` }}
                     />
                   );
                 })}
@@ -2047,20 +1926,6 @@ export function AppointmentCalendar({
                       esHoy && "bg-primary/[0.01]"
                     )}
                   >
-                    {esHoy && currentTimePosition !== null && (
-                      <div
-                        data-current-time-indicator
-                        className="pointer-events-none absolute inset-x-0 z-[25] flex -translate-y-1/2 items-center"
-                        style={{ top: `${currentTimePosition}px` }}
-                        aria-hidden="true"
-                      >
-                        <span className="ml-1 size-2 shrink-0 rounded-full bg-primary ring-2 ring-background" />
-                        <span className="h-px flex-1 bg-primary/85" />
-                        <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-black tabular-nums text-primary-foreground shadow-sm">
-                          {formatTime12h(businessNow).replace(':00', '').replace(' p. m.', ' PM').replace(' a. m.', ' AM')}
-                        </span>
-                      </div>
-                    )}
                     {empleadosColumnas.map((emp) => {
                       const citasDiaRaw = citasDiaTodos.filter((cita) => cita.empleado_id === emp.id);
                       const citasDia = procesarCitasDia(citasDiaRaw);
@@ -2510,6 +2375,8 @@ export function AppointmentCalendar({
 
       </div>
 
+      </div>
+      {!provisionalSlot && !isModalOpen && <FloatingViewBar view={vista} selectedDate={selectedDateStr} onViewChange={updateCalendarView} onDaySelect={setSelectedDateStr} onCreate={onCreateCita} disabled={createDisabled} onZoomIn={() => updateHourHeight(hourHeight + 15)} onZoomOut={() => updateHourHeight(hourHeight - 15)} />}
       {/* ── BARRA DE CONFIRMACIÓN PROVISIONAL ────────────────────────────────── */}
       {provisionalSlot && (
         <div

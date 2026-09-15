@@ -1,13 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { loadEnvConfig } from '@next/env';
 import { SignJWT } from 'jose';
-import { getBusinessTodayString } from '../lib/timezone';
+
 
 loadEnvConfig(process.cwd());
 const jwtSecret = process.env.JWT_SECRET || 'visual-test-secret-with-at-least-32-characters';
-const today = getBusinessTodayString();
+const today = '2026-09-15';
 
 test.beforeEach(async ({ page, baseURL }) => {
+  await page.clock.install({ time: new Date('2026-09-15T16:42:00Z') });
+  await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
   const token = await new SignJWT({ id: 'visual-admin', email: 'visual@sistema.test', rol: 'ADMIN' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -15,6 +17,7 @@ test.beforeEach(async ({ page, baseURL }) => {
     .sign(new TextEncoder().encode(jwtSecret));
 
   await page.context().addCookies([{ name: 'access_token', value: token, url: baseURL!, httpOnly: true, sameSite: 'Lax' }]);
+  await page.route('**/api/empleados/*/disponibilidad**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ slots: [], descansos: [], bloqueos: [] }) }));
   await page.route('**/api/auth/me', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -72,7 +75,13 @@ test('Agenda es la vista inicial y conserva la cuadrícula horaria responsive', 
   await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
   await expect(page.getByRole('main').getByRole('button', { name: 'Agenda', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('main').getByRole('button', { name: 'Lista', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hoy', exact: true })).toBeVisible();
+  await expect(page.locator('.agenda-week-strip [aria-current=date]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Libro de citas')).toHaveCount(0);
+  const controls = await page.locator('.agenda-calendar-controls').boundingBox();
+  expect(controls!.height).toBeLessThanOrEqual(124);
+  const workspace = await page.locator('.agenda-time-workspace').boundingBox();
+  expect(workspace!.height).toBeGreaterThanOrEqual(page.viewportSize()!.height * 0.65);
+  await expect(page.locator('[data-current-time-indicator]')).toContainText('10:42');
   await expect(page.getByRole('button', { name: /Nueva cita/i }).first()).toBeVisible();
   await expect(page.locator('.booking-card').filter({ hasText: 'José Pérez' })).toBeVisible();
   await expect(page.locator('.booking-card').filter({ hasText: 'Corte y barba' })).toBeVisible();
@@ -83,7 +92,7 @@ test('Agenda es la vista inicial y conserva la cuadrícula horaria responsive', 
 
   if (process.env.CAPTURE_VISUALS === 'true') {
     const suffix = testInfo.project.name.includes('Mobile') ? 'mobile' : 'desktop';
-    await page.screenshot({ path: `audit-screenshots/internal/13-agenda-reference-${suffix}.png`, fullPage: true });
+    await page.screenshot({ path: `audit-screenshots/internal/14-agenda-compact-${suffix}.png`, fullPage: true });
   }
 
   const dayView = page.getByRole('button', { name: 'Día', exact: true });
@@ -91,4 +100,120 @@ test('Agenda es la vista inicial y conserva la cuadrícula horaria responsive', 
   await expect(dayView).toHaveAttribute('aria-pressed', 'true');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Día', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
+
+test('La barra cambia vistas, fechas y abre el formulario', async ({ page }, testInfo) => {
+  await page.goto('/citas');
+  const bar = page.getByRole('button', { name: /Cambiar vista:/ });
+  await bar.click();
+  const sheet = page.getByRole('dialog', { name: 'Vista y fecha de la agenda' });
+  await expect(sheet).toBeVisible();
+  await expect.poll(async () => { const box = await sheet.boundingBox(); return Math.round(box!.y + box!.height); }).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await expect(sheet.locator('.agenda-mini-grid button')).toHaveCount(35);
+  await sheet.getByRole('button', { name: 'Mes anterior', exact: true }).click();
+  await expect(sheet.locator('.agenda-mini-grid button')).toHaveCount(42);
+  await sheet.getByRole('button', { name: 'Mes siguiente', exact: true }).click();
+  if (process.env.CAPTURE_VISUALS === 'true') await page.screenshot({ path: `audit-screenshots/internal/14-agenda-sheet-${testInfo.project.name.includes('Mobile') ? 'mobile' : 'desktop'}.png` });
+  await sheet.getByRole('button', { name: 'Mes', exact: true }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Citas del mes' })).toBeVisible();
+  await expect(page.locator('.agenda-month-booking').filter({ hasText: 'José Pérez' })).toBeVisible();
+  await bar.click();
+  await sheet.getByRole('button', { name: 'Calendario', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Calendario mensual' })).toBeVisible();
+  await bar.click();
+  await sheet.getByRole('button', { name: 'Mes siguiente', exact: true }).click();
+  await expect(sheet.locator('.agenda-month-heading')).toContainText('octubre de 2026');
+  await sheet.locator('[data-date="2026-10-01"]').click();
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-10-01');
+  await bar.click();
+  await sheet.getByRole('button', { name: 'Hoy', exact: true }).click();
+  await bar.click();
+  await sheet.getByRole('button', { name: 'Día', exact: true }).click();
+  await expect(page.locator('[data-calendar-scroll]')).toBeVisible();
+  await bar.click();
+  await sheet.getByRole('button', { name: 'Cerrar selector de vista' }).click();
+  await expect(bar).toBeFocused();
+  await page.getByRole('button', { name: 'Nueva cita', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Nueva cita', exact: true })).toBeVisible();
+});
+
+test('Navegación, filtros y hora actual permanecen sincronizados', async ({ page }) => {
+  await page.goto('/citas');
+  await expect(page.locator('.booking-card').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Periodo siguiente' }).click();
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-18');
+  await expect(page.locator('[data-current-time-indicator]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Periodo anterior' }).click();
+  await page.getByRole('button', { name: 'Semana siguiente' }).click();
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-22');
+  await page.getByRole('button', { name: 'Semana anterior' }).click();
+  await page.getByRole('main').getByRole('button', { name: 'Todos', exact: true }).click();
+  await page.getByRole('group', { name: 'Filtrar profesionales' }).getByRole('button', { name: 'Kevin' }).click();
+  await expect(page.locator('.booking-card').filter({ hasText: 'José Pérez' })).toHaveCount(0);
+  await expect(page.locator('.booking-card[title*="María López"]')).toBeVisible();
+  await page.getByRole('group', { name: 'Filtrar profesionales' }).getByRole('button', { name: 'Todos(2)' }).click();
+  await expect(page.locator('.booking-card').filter({ hasText: 'José Pérez' })).toBeVisible();
+  await page.clock.fastForward(60_000);
+  await expect(page.locator('[data-current-time-indicator]')).toContainText('10:43');
+  await page.getByRole('main').getByRole('button', { name: 'Lista', exact: true }).click();
+  await expect(page.locator('.agenda-floating-bar')).toHaveCount(0);
+  await page.getByRole('main').getByRole('button', { name: 'Agenda', exact: true }).click();
+  await expect(page.locator('.agenda-floating-bar')).toBeVisible();
+});
+
+
+test('Gestos táctiles cambian periodos sin abrir ni mover citas', async ({ page, context }, testInfo) => {
+  test.skip(!testInfo.project.name.includes('Mobile'), 'Gestos táctiles en móvil');
+  await page.goto('/citas');
+  await expect(page.locator('.booking-card').first()).toBeVisible();
+  const cdp = await context.newCDPSession(page);
+  const swipe = async (x: number, y: number, dx: number, dy = 0) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let step = 1; step <= 5; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * step / 5, y: y + dy * step / 5 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  await swipe(300, 500, -150);
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-18');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.agenda-floating-bar')).toBeVisible();
+  await page.getByRole('button', { name: 'Día', exact: true }).click();
+  await swipe(100, 500, 150);
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-17');
+  await page.getByRole('button', { name: 'Sem', exact: true }).click();
+  await swipe(300, 500, -150);
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-24');
+  await swipe(300, 75, -150);
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-10-01');
+  await swipe(200, 550, 0, -120);
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-10-01');
+  await page.getByRole('button', { name: /Cambiar vista:/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Vista y fecha de la agenda' });
+  await expect(sheet).toBeVisible();
+  await expect.poll(async () => { const box = await sheet.boundingBox(); return Math.round(box!.y + box!.height); }).toBeLessThanOrEqual(844);
+  const box = await sheet.boundingBox();
+  await swipe(160, box!.y + 15, 0, 300);
+  await expect(sheet).toBeHidden();
+});
+
+
+test('El mes carga páginas adicionales y Nueva cita usa la fecha elegida', async ({ page }) => {
+  const cursors: Array<string | null> = [];
+  await page.route('**/api/citas?**', route => {
+    const cursor = new URL(route.request().url()).searchParams.get('cursor');
+    cursors.push(cursor);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      citas: cursor ? [{ id: 'last-page', fecha: today, hora: '09:00', duracion: 60, estado: 'PENDIENTE', cliente_nombre: 'Última página', empleado_id: 'visual-admin' }] : [],
+      nextCursor: cursor ? null : 'page-two',
+    }) });
+  });
+  await page.goto('/citas');
+  await expect(page.locator('.booking-card').filter({ hasText: 'Última página' })).toBeVisible();
+  expect(cursors).toContain('page-two');
+  await page.getByRole('button', { name: /Cambiar vista:/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Vista y fecha de la agenda' });
+  await sheet.locator('[data-date="2026-09-20"]').click();
+  await page.getByRole('button', { name: 'Nueva cita', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Nueva cita', exact: true }).locator('input[type=date]')).toHaveValue('2026-09-20');
 });

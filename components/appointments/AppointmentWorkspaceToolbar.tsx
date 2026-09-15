@@ -33,6 +33,13 @@ export function AppointmentWorkspaceToolbar({
   onViewChange,
   onScopeChange,
 }: AppointmentWorkspaceToolbarProps) {
+  if (compact) return (
+    <div className="agenda-workspace-tabs" aria-label="Controles de la agenda">
+      {viewOptions.map(({ id, compactLabel }) => <button type="button" key={id} aria-pressed={view === id} onClick={() => onViewChange(id)}>{compactLabel}</button>)}
+      {canSeeAll && scopeOptions.map(({ id, compactLabel }) => <button type="button" key={id} aria-pressed={scope === id} onClick={() => onScopeChange(id)}>{compactLabel}</button>)}
+    </div>
+  );
+
   return (
     <div
       className={cn(

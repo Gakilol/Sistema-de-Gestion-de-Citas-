@@ -270,7 +270,7 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
   const pathname = usePathname();
 
   return (
-    <header className="pt-safe fixed inset-x-0 top-0 z-40 flex h-16 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar/94 px-3 backdrop-blur-xl lg:hidden">
+    <header data-agenda-header={pathname === '/citas' ? true : undefined} className="pt-safe fixed inset-x-0 top-0 z-40 flex h-16 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar/94 px-3 backdrop-blur-xl lg:hidden">
       <button
         type="button"
         onClick={onOpen}
@@ -280,8 +280,8 @@ function MobileHeader({ onOpen }: { onOpen: () => void }) {
         <Menu className="size-5" strokeWidth={1.8} />
       </button>
       <div className="min-w-0 flex-1">
-        <span className="block text-[10px] font-bold uppercase tracking-[0.15em] text-primary">{BRAND.productName}</span>
-        <span className="block truncate text-sm font-bold text-sidebar-foreground">{getPageName(pathname)}</span>
+        {pathname !== '/citas' && <span className="block text-[10px] font-bold uppercase tracking-[0.15em] text-primary">{BRAND.productName}</span>}
+        {pathname === '/citas' ? <h1 className="text-xl font-bold text-center">Agenda</h1> : <span className="block truncate text-sm font-bold text-sidebar-foreground">{getPageName(pathname)}</span>}
       </div>
       <Link
         href="/configuracion"

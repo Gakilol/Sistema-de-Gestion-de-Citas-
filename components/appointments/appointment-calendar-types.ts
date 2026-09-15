@@ -52,6 +52,8 @@ export interface AppointmentCalendarProps {
   citas: CalendarAppointment[];
   empleados: CalendarEmployee[];
   filtroEmpleado: string;
+  onEmployeeChange?: (id: string) => void;
+  createDisabled?: boolean;
   scope: string;
   user: CalendarUser | null;
   onEditCita: (cita: CalendarAppointment) => void;

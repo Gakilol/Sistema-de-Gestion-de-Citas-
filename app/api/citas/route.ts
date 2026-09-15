@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
     const to = req.nextUrl.searchParams.get('to');
     const limit = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '100') || 100));
 
+    const cursor = req.nextUrl.searchParams.get('cursor');
     const scopeWhere = getScopedAppointmentWhere(userId, userRole, scope, filterEmp);
 
     const citas = await prisma.cita.findMany({
@@ -95,11 +96,14 @@ export async function GET(req: NextRequest) {
           orderBy: { orden: 'asc' }
         }
       },
-      orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
-      take: limit,
+      orderBy: [{ fecha: 'desc' }, { hora: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    return NextResponse.json({ citas, limit }, { status: 200 });
+    const hasMore = citas.length > limit;
+    const results = citas.slice(0, limit);
+    return NextResponse.json({ citas: results, limit, nextCursor: hasMore ? results.at(-1)?.id : null }, { status: 200 });
   } catch (error: any) {
     console.error('[CITAS_GET_ERROR]', error);
     return NextResponse.json({ error: 'Error al consultar las citas' }, { status: 500 });
