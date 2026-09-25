@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkAuditAuth } from '@/lib/audit/audit-auth';
 import { logAudit, mapLegacyAuditLogs } from '@/lib/audit/audit-logger';
-import { differenceInDays, isValid, startOfDay, endOfDay } from 'date-fns';
+import { parseAuditDateRange } from '@/lib/audit/audit-date-range';
 
 export async function GET(req: NextRequest) {
   const auth = checkAuditAuth(req);
@@ -15,30 +15,15 @@ export async function GET(req: NextRequest) {
   const rawFrom = sp.get('from') || '';
   const rawTo = sp.get('to') || '';
 
-  const defaultTo = new Date();
-  const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-  const fromDate = rawFrom ? new Date(rawFrom + 'T00:00:00Z') : defaultFrom;
-  const toDate = rawTo ? new Date(rawTo + 'T23:59:59Z') : defaultTo;
-
-  if (!isValid(fromDate) || !isValid(toDate)) {
-    return NextResponse.json({ error: 'Fechas inválidas. Formato YYYY-MM-DD.' }, { status: 400 });
-  }
-
-  if (fromDate > toDate) {
-    return NextResponse.json({ error: 'La fecha de inicio no puede ser mayor que la de fin.' }, { status: 400 });
-  }
-
-  if (differenceInDays(toDate, fromDate) > 365) {
-    return NextResponse.json({ error: 'El rango de fechas no puede exceder los 365 días.' }, { status: 400 });
-  }
+  const dateRange = parseAuditDateRange(rawFrom, rawTo);
+  if ('error' in dateRange) return NextResponse.json({ error: dateRange.error }, { status: 400 });
 
   // Filtros
   const andConditions: any[] = [
     {
       createdAt: {
-        gte: startOfDay(fromDate),
-        lte: endOfDay(toDate)
+        gte: dateRange.start,
+        lt: dateRange.endExclusive
       }
     }
   ];

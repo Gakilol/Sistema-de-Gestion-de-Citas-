@@ -1,11 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserContext } from '@/lib/auth-helpers';
-
-function parseYYYYMMDD(fechaYYYYMMDD: string): Date {
-  const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
+import { isValidTimeOffInput } from '@/lib/appointments/schedule-input';
+import { parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -41,6 +38,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { vacaciones } = await req.json();
+    if (!isValidTimeOffInput(vacaciones)) {
+      return NextResponse.json({ error: 'Revise las fechas y estados de las vacaciones' }, { status: 400 });
+    }
 
     // Re-sync by deleting existing ones and inserting new ones
     await prisma.$transaction([
@@ -48,8 +48,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       prisma.vacacionesEmpleado.createMany({
         data: vacaciones.map((v: any) => ({
           empleado_id: id,
-          fecha_inicio: parseYYYYMMDD(v.fecha_inicio),
-          fecha_fin: parseYYYYMMDD(v.fecha_fin),
+          fecha_inicio: parseLocalDateToUTC(v.fecha_inicio),
+          fecha_fin: parseLocalDateToUTC(v.fecha_fin),
           estado: v.estado || 'APROBADO',
         }))
       })

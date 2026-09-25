@@ -73,6 +73,7 @@ test.beforeEach(async ({ page, baseURL }) => {
 test('Agenda es la vista inicial y conserva la cuadrícula horaria responsive', async ({ page }, testInfo) => {
   await page.goto('/citas');
   await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('button', { name: 'Todos', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('main').getByRole('button', { name: 'Agenda', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('main').getByRole('button', { name: 'Lista', exact: true })).toBeVisible();
   await expect(page.locator('.agenda-week-strip [aria-current=date]')).toHaveAttribute('aria-pressed', 'true');
@@ -198,8 +199,19 @@ test('Gestos táctiles cambian periodos sin abrir ni mover citas', async ({ page
 });
 
 
-test('El mes carga páginas adicionales y Nueva cita usa la fecha elegida', async ({ page }) => {
+test('El mes carga páginas adicionales y Nueva cita inicia con la fecha predeterminada', async ({ page }) => {
   const cursors: Array<string | null> = [];
+  let submittedDate = '';
+  await page.route('**/api/empleados/*/disponibilidad**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    disponible: true, bloques: [], jornada: { inicio: '08:00', fin: '18:00' }, intervalosOcupados: [],
+  }) }));
+  await page.route('**/api/citas', async route => {
+    const payload = route.request().postDataJSON();
+    submittedDate = payload.fecha;
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+      cita: { id: 'new-appointment', ...payload, duracion: 60, estado: 'PENDIENTE' },
+    }) });
+  });
   await page.route('**/api/citas?**', route => {
     const cursor = new URL(route.request().url()).searchParams.get('cursor');
     cursors.push(cursor);
@@ -213,7 +225,14 @@ test('El mes carga páginas adicionales y Nueva cita usa la fecha elegida', asyn
   expect(cursors).toContain('page-two');
   await page.getByRole('button', { name: /Cambiar vista:/ }).click();
   const sheet = page.getByRole('dialog', { name: 'Vista y fecha de la agenda' });
-  await sheet.locator('[data-date="2026-09-20"]').click();
+  await sheet.locator('[data-date="2026-09-11"]').click();
   await page.getByRole('button', { name: 'Nueva cita', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Nueva cita', exact: true }).locator('input[type=date]')).toHaveValue('2026-09-20');
+  const form = page.getByRole('dialog', { name: 'Nueva cita', exact: true });
+  await expect(form.locator('input[type=date]')).toHaveValue(today);
+  await form.getByPlaceholder('Buscar por nombre, teléfono o correo...').fill('José');
+  await form.getByRole('button', { name: /José Pérez/ }).click();
+  await form.locator('select').first().selectOption('22222222-2222-4222-8222-222222222222');
+  await form.getByRole('button', { name: 'Crear Cita' }).click();
+  await expect.poll(() => submittedDate).toBe(today);
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', today);
 });

@@ -91,8 +91,36 @@ export function getBusinessNowTime(): string {
  * Esto coincide exactamente con cómo Prisma espera recibir y guardar las fechas.
  */
 export function parseLocalDateToUTC(fechaYYYYMMDD: string): Date {
+  if (!isValidBusinessDateString(fechaYYYYMMDD)) {
+    throw new RangeError('Fecha inválida: use YYYY-MM-DD y un día existente');
+  }
   const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day));
+}
+
+export function isValidBusinessDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Inicio de un día de calendario del negocio como instante UTC real. */
+export function getBusinessDayStartUTC(dateString: string): Date {
+  const wallTime = parseLocalDateToUTC(dateString).getTime();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  let candidate = wallTime;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const parts = formatter.formatToParts(new Date(candidate));
+    const value = (type: string) => Number(parts.find(part => part.type === type)?.value);
+    const actualWallTime = Date.UTC(value('year'), value('month') - 1, value('day'), value('hour'), value('minute'), value('second'));
+    candidate += wallTime - actualWallTime;
+  }
+  return new Date(candidate);
 }
 
 /**

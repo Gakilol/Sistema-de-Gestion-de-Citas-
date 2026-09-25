@@ -5,10 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { startOfDay, endOfDay, isValid, differenceInDays } from 'date-fns';
+import { getBusinessTodayString, isValidBusinessDateString, parseLocalDateToUTC } from '@/lib/timezone';
 
 export const ALLOWED_ROLES = ['ADMIN', 'TECH_SUPPORT'] as const;
 export const MAX_DATE_RANGE_DAYS = 366;
+const DAY_MS = 86_400_000;
+
+function parseReportDate(value: string): Date | null {
+  return isValidBusinessDateString(value) ? parseLocalDateToUTC(value) : null;
+}
 
 export interface ReportFilters {
   from: Date;
@@ -49,30 +54,27 @@ export function parseReportFilters(req: NextRequest): { filters: ReportFilters }
   const rawFrom = sp.get('from') || sp.get('desde') || '';
   const rawTo   = sp.get('to')   || sp.get('hasta') || '';
 
-  // Default: last 30 days
-  const defaultTo   = new Date();
-  const defaultFrom = new Date(Date.now() - 29 * 86400000);
+  const today = parseReportDate(getBusinessTodayString())!;
+  const fromDay = rawFrom ? parseReportDate(rawFrom) : new Date(today.getTime() - 29 * DAY_MS);
+  const toDay = rawTo ? parseReportDate(rawTo) : today;
 
-  const fromDate = rawFrom ? new Date(rawFrom + 'T00:00:00Z') : defaultFrom;
-  const toDate   = rawTo   ? new Date(rawTo   + 'T23:59:59Z') : defaultTo;
-
-  if (!isValid(fromDate) || !isValid(toDate)) {
+  if (!fromDay || !toDay) {
     return { error: NextResponse.json({ error: 'Fechas inválidas. Use el formato YYYY-MM-DD.' }, { status: 400 }) };
   }
 
-  if (fromDate > toDate) {
+  if (fromDay > toDay) {
     return { error: NextResponse.json({ error: 'La fecha de inicio no puede ser mayor a la fecha de fin.' }, { status: 400 }) };
   }
 
-  const rangeDays = differenceInDays(toDate, fromDate);
+  const rangeDays = (toDay.getTime() - fromDay.getTime()) / DAY_MS;
   if (rangeDays > MAX_DATE_RANGE_DAYS) {
     return { error: NextResponse.json({ error: `El rango de fechas no puede superar los ${MAX_DATE_RANGE_DAYS} días.` }, { status: 400 }) };
   }
 
-  // Calculate previous period of equal length for comparison
-  const periodMs = toDate.getTime() - fromDate.getTime();
-  const toPrev   = new Date(fromDate.getTime() - 1);
-  const fromPrev = new Date(toPrev.getTime() - periodMs);
+  const fromDate = fromDay;
+  const toDate = new Date(toDay.getTime() + DAY_MS - 1);
+  const toPrev = new Date(fromDay.getTime() - 1);
+  const fromPrev = new Date(fromDay.getTime() - (rangeDays + 1) * DAY_MS);
 
   const empleadoId = sanitizeId(sp.get('empleadoId') || sp.get('professionalId') || '');
   const servicioId = sanitizeId(sp.get('servicioId')  || sp.get('serviceId')     || '');
@@ -82,10 +84,10 @@ export function parseReportFilters(req: NextRequest): { filters: ReportFilters }
 
   return {
     filters: {
-      from: startOfDay(fromDate),
-      to:   endOfDay(toDate),
-      fromPrev: startOfDay(fromPrev),
-      toPrev:   endOfDay(toPrev),
+      from: fromDate,
+      to: toDate,
+      fromPrev,
+      toPrev,
       rawFrom: rawFrom || fromDate.toISOString().split('T')[0],
       rawTo:   rawTo   || toDate.toISOString().split('T')[0],
       empleadoId:  empleadoId  || undefined,

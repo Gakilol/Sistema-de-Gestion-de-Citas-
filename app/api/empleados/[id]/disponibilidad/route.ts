@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { calculateAppointmentAvailability } from '@/lib/appointments/appointment-availability';
 import { getUserContext } from '@/lib/auth-helpers';
+import { isValidBusinessDateString } from '@/lib/timezone';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,8 +19,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const horaRequerida = searchParams.get('hora_requerida');
     const excludeCitaId = searchParams.get('exclude_cita_id');
 
-    if (!fechaParam) {
-      return NextResponse.json({ error: 'Falta el parámetro fecha' }, { status: 400 });
+    if (!fechaParam || !isValidBusinessDateString(fechaParam)) {
+      return NextResponse.json({ error: 'Fecha inválida o ausente' }, { status: 400 });
     }
 
     const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';

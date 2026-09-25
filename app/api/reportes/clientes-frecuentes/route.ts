@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireReporteRole, parseReportFilters, safeRate } from '@/lib/reportes-utils';
+import { getBusinessDayStartUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   const authError = requireReporteRole(req);
@@ -9,6 +10,9 @@ export async function GET(req: NextRequest) {
   const parsed = parseReportFilters(req);
   if ('error' in parsed) return parsed.error;
   const { filters } = parsed;
+  const clientCreatedFrom = getBusinessDayStartUTC(filters.rawFrom);
+  const nextDay = new Date(new Date(`${filters.rawTo}T00:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
+  const clientCreatedUntil = getBusinessDayStartUTC(nextDay);
 
   try {
     const where = {
@@ -44,8 +48,8 @@ export async function GET(req: NextRequest) {
     const clientesNuevosRaw: any[] = await prisma.$queryRaw`
       SELECT COUNT(DISTINCT c."id") AS total
       FROM "Cliente" c
-      WHERE c."createdAt" >= ${filters.from}
-        AND c."createdAt" <= ${filters.to}
+      WHERE c."createdAt" >= ${clientCreatedFrom}
+        AND c."createdAt" < ${clientCreatedUntil}
         AND EXISTS (
           SELECT 1 FROM "Cita" ci
           WHERE ci."cliente_id" = c."id"

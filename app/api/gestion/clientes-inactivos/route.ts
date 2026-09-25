@@ -57,18 +57,17 @@ export async function GET(req: NextRequest) {
         c."id",
         c."nombre",
         c."telefono",
-        MAX(ci."fecha") AS ultima_cita,
+        MAX(ci."fecha") FILTER (WHERE ci."estado" = 'COMPLETADA') AS ultima_cita,
         COUNT(ci."id")::INT AS total_citas,
         COUNT(ci."id") FILTER (WHERE ci."estado" = 'COMPLETADA')::INT AS completadas,
         COUNT(ci."id") FILTER (WHERE ci."estado" = 'CANCELADA')::INT AS canceladas,
         COUNT(ci."id") FILTER (WHERE ci."estado" = 'NO_SHOW')::INT AS no_shows
       FROM "Cliente" c
       INNER JOIN "Cita" ci ON ci."cliente_id" = c."id"
-      WHERE ci."estado" = 'COMPLETADA'
       GROUP BY c."id", c."nombre", c."telefono"
       HAVING
         -- Last completed appointment is before cutoff date
-        MAX(ci."fecha") < ${cutoffDate}
+        MAX(ci."fecha") FILTER (WHERE ci."estado" = 'COMPLETADA') < ${cutoffDate}
         -- No future bookings
         AND NOT EXISTS (
           SELECT 1 FROM "Cita" fc
@@ -82,7 +81,7 @@ export async function GET(req: NextRequest) {
           WHERE emp_ci."cliente_id" = c."id"
             AND emp_ci."empleado_id" = ${targetEmpleadoId}
         ))
-      ORDER BY MAX(ci."fecha") ASC
+      ORDER BY ultima_cita ASC
     `;
 
     // 2. Fetch latest completed appointments for these clients to enrich with last service/professional

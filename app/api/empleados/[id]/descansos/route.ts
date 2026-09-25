@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserContext } from '@/lib/auth-helpers';
+import { isValidBreakInput } from '@/lib/appointments/schedule-input';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,6 +30,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { descansos } = await req.json();
+    if (!isValidBreakInput(descansos)) {
+      return NextResponse.json({ error: 'Revise el día y las horas de los descansos' }, { status: 400 });
+    }
 
     // Re-sync by deleting existing ones and inserting new ones
     await prisma.$transaction([

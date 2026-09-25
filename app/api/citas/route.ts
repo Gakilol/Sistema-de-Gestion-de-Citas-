@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { parseLocalDateToUTC } from '@/lib/timezone';
+import { isValidBusinessDateString, parseLocalDateToUTC } from '@/lib/timezone';
 import {
   getDefaultAppointmentScope,
   getUserContext,
@@ -22,7 +22,7 @@ const CreateCitaSchema = z.object({
   servicio_ids:            z.array(z.string().uuid()).nullish(),
   servicios_seleccionados: z.array(ServicioSeleccionadoSchema).nullish(),
   empleado_id:             z.string().uuid().nullish(),
-  fecha:                   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (debe ser YYYY-MM-DD)'),
+  fecha:                   z.string().refine(isValidBusinessDateString, 'Fecha inválida (use un día existente en formato YYYY-MM-DD)'),
   hora:                    z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido (debe ser HH:MM)'),
   notas:                   z.string().max(2000).nullish(),
   forzar:                  z.boolean().nullish(),
@@ -51,6 +51,9 @@ export async function GET(req: NextRequest) {
     const filterEmp = req.nextUrl.searchParams.get('empleado_id') || '';
     const from = req.nextUrl.searchParams.get('from');
     const to = req.nextUrl.searchParams.get('to');
+    if ((from && !isValidBusinessDateString(from)) || (to && !isValidBusinessDateString(to))) {
+      return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 400 });
+    }
     const limit = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('limit') ?? '100') || 100));
 
     const cursor = req.nextUrl.searchParams.get('cursor');
@@ -251,14 +254,12 @@ export async function POST(req: NextRequest) {
     // ─── TRANSACCIÓN ATÓMICA: Validación + Lock + Guardar cita ─────────────
     const result = await prisma.$transaction(async (tx: any) => {
       // Bloqueo asesor de PostgreSQL para evitar carreras concurrentes en la misma fecha y estilista
-      try {
-        const lockStr = `${finalEmpleadoId}_${fecha.split('T')[0]}`;
-        let hash = BigInt(0);
-        for (let i = 0; i < lockStr.length; i++) {
-          hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
-        }
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hash})`;
-      } catch {}
+      const lockStr = `${finalEmpleadoId}_${fecha.split('T')[0]}`;
+      let hash = BigInt(0);
+      for (let i = 0; i < lockStr.length; i++) {
+        hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
+      }
+      await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(${hash})`;
 
       const disponibilidad = await calculateAppointmentAvailability(
         finalEmpleadoId,

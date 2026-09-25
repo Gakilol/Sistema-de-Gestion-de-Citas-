@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { authFetch } from '@/lib/api-client';
 import { PageHeader } from '@/components/shared/page-header';
+import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'resumen' | 'demanda' | 'asistencia' | 'cancelaciones' | 'clientes' | 'fidelizacion' | 'profesionales';
@@ -39,15 +40,15 @@ const PIE_COLORS = ['#C8A646', '#24865A', '#3976B9', '#A40022', '#525252', '#7A7
 // ─── Date Presets ─────────────────────────────────────────────────────────────
 function getPreset(key: string): [string, string] {
   const fmt = (d: Date) => d.toISOString().split('T')[0];
-  const now  = new Date();
-  const y    = now.getFullYear();
-  const m    = now.getMonth();
+  const now  = parseLocalDateToUTC(getBusinessTodayString());
+  const y    = now.getUTCFullYear();
+  const m    = now.getUTCMonth();
 
   const map: Record<string, [string, string]> = {
     hoy:    [fmt(now), fmt(now)],
-    ayer:   [fmt(new Date(Date.now() - 86400000)), fmt(new Date(Date.now() - 86400000))],
-    '7d':   [fmt(new Date(Date.now() - 6  * 86400000)), fmt(now)],
-    '30d':  [fmt(new Date(Date.now() - 29 * 86400000)), fmt(now)],
+    ayer:   [fmt(new Date(now.getTime() - 86400000)), fmt(new Date(now.getTime() - 86400000))],
+    '7d':   [fmt(new Date(now.getTime() - 6  * 86400000)), fmt(now)],
+    '30d':  [fmt(new Date(now.getTime() - 29 * 86400000)), fmt(now)],
     mes:    [fmt(new Date(Date.UTC(y, m, 1))), fmt(now)],
     mesPrev:[fmt(new Date(Date.UTC(y, m-1, 1))), fmt(new Date(Date.UTC(y, m, 0)))],
     '3m':   [fmt(new Date(Date.UTC(y, m-2, 1))), fmt(now)],
@@ -610,7 +611,7 @@ function ReportesContent() {
                         <td className="px-4 py-3 font-medium text-foreground">{c.nombre}</td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{c.telefono || '—'}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {c.ultimaCita ? new Date(c.ultimaCita).toLocaleDateString('es-NI') : '—'}
+                          {c.ultimaCita ? new Date(c.ultimaCita).toLocaleDateString('es-NI', { timeZone: 'UTC' }) : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold">

@@ -1,8 +1,9 @@
 import { EstadoListaEspera } from '@prisma/client';
 import { z } from 'zod';
+import { isValidBusinessDateString } from '@/lib/timezone';
 
 const optionalId = z.string().uuid().optional().nullable();
-const optionalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable();
+const optionalDate = z.string().refine(isValidBusinessDateString, 'Fecha inválida').optional().nullable();
 
 export const createWaitlistSchema = z.object({
   clienteId: z.string().uuid(),

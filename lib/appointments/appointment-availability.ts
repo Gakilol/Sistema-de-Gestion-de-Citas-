@@ -260,7 +260,7 @@ export async function calculateAppointmentAvailability(
   const citasWhere: any = {
     empleado_id: empleadoId,
     fecha: fechaDate,
-    estado: { notIn: ['CANCELADA', 'REPROGRAMADA', 'COMPLETADA'] }
+    estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] }
   };
   if (excludeCitaId) {
     citasWhere.id = { not: excludeCitaId };
@@ -387,7 +387,7 @@ export async function findAppointmentConflicts(
   const citasWhere: any = {
     empleado_id: empleadoId,
     fecha: fechaDate,
-    estado: { notIn: ['CANCELADA', 'REPROGRAMADA', 'COMPLETADA'] }
+    estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] }
   };
   if (excludeCitaId) {
     citasWhere.id = { not: excludeCitaId };

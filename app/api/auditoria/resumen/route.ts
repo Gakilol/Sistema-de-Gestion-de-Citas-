@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkAuditAuth } from '@/lib/audit/audit-auth';
-import { startOfDay, startOfWeek } from 'date-fns';
+import { getBusinessDayStartUTC, getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   const auth = checkAuditAuth(req);
   if ('error' in auth) return auth.error;
 
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Lunes
+  const businessToday = getBusinessTodayString();
+  const todayStart = getBusinessDayStartUTC(businessToday);
+  const weekStartDay = parseLocalDateToUTC(businessToday);
+  weekStartDay.setUTCDate(weekStartDay.getUTCDate() - ((weekStartDay.getUTCDay() + 6) % 7));
+  const weekStart = getBusinessDayStartUTC(weekStartDay.toISOString().slice(0, 10));
 
   try {
     // Para no hacer N consultas pesadas o N+1, usamos Promise.all para paralelizar

@@ -68,7 +68,7 @@ function CitasContent() {
 
   // Modos de Vista y Scopes
   const [vistaModo, setVistaModo] = useState<AppointmentWorkspaceView>('agenda');
-  const [scope, setScope] = useState<AppointmentWorkspaceScope>('mine');
+  const [scope, setScope] = useState<AppointmentWorkspaceScope>('all');
   // La agenda siempre parte de hoy. El formulario de creación conserva por
   // separado la regla operativa que puede proponer mañana después del cierre.
   const [selectedDateStr, setSelectedDateStr] = useState(getBusinessTodayString());
@@ -328,7 +328,7 @@ function CitasContent() {
     setPage(1);
   };
 
-  const openCreate = (dateOverride?: string) => {
+  const openCreate = () => {
     if (catalogosLoading) {
       toast.info('Cargando datos para la nueva cita');
       return;
@@ -340,7 +340,7 @@ function CitasContent() {
       return;
     }
     const emptyForm = createEmptyAppointmentForm();
-    emptyForm.fecha = dateOverride || getDefaultBookingDate();
+    emptyForm.fecha = getDefaultBookingDate();
     
     // Seleccionar por defecto el colaborador logueado si es agendable (o si es Empleado, forzosamente él mismo), de lo contrario el primero disponible
     if (user?.rol === 'EMPLEADO') {
@@ -521,7 +521,13 @@ function CitasContent() {
       setShowOverlapModal(false);
       setForzar(false);
       if (!editingId && d.cita) setCitaCreada(d.cita);
-      fetchCitas();
+      const dateChanged = vistaModo === 'agenda' && form.fecha !== selectedDateStr;
+      const scopeChanged = canSeeAll && scope === 'mine' && form.empleado_id !== user?.id;
+      const employeeFilterChanged = Boolean(filtroEmpleado && filtroEmpleado !== form.empleado_id);
+      if (dateChanged) setSelectedDateStr(form.fecha);
+      if (scopeChanged) setScope('all');
+      if (employeeFilterChanged) setFiltroEmpleado('');
+      if (!dateChanged && !scopeChanged && !employeeFilterChanged) fetchCitas();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Error al guardar'));
     } finally {
@@ -1260,7 +1266,7 @@ function CitasContent() {
                 localCitaOverrides={localCitaOverrides}
                 selectedDateStr={selectedDateStr}
                 setSelectedDateStr={setSelectedDateStr}
-                onCreateCita={() => openCreate(selectedDateStr)}
+                onCreateCita={openCreate}
                 mobileToolbar={renderAgendaNavigation(true)}
                 isLoading={isLoading}
                 isModalOpen={showModal}
@@ -1291,7 +1297,7 @@ function CitasContent() {
             <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-border/40 shrink-0 bg-card/95 backdrop-blur-xl">
               <div className="min-w-0">
                 <h2 id="cita-dialog-title" className="text-lg font-bold text-foreground">{editingId ? 'Editar cita' : 'Nueva cita'}</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">Cliente, servicios y horario en un solo flujo.</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Fecha de la cita: <strong className="text-foreground">{formatAppointmentDate(form.fecha)}</strong></p>
               </div>
               <button
                 type="button"

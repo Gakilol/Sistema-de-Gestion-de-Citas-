@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatTime12Hour } from '@/lib/time-utils';
 import { authFetch } from '@/lib/api-client';
 import { PageHeader } from '@/components/shared/page-header';
+import { getBusinessTodayString } from '@/lib/timezone';
 
 const TIME_OPTIONS = Array.from({ length: 96 }).map((_, i) => {
   const h = Math.floor(i / 4);
@@ -377,7 +378,7 @@ export default function HorariosEmpleado() {
             <Card className="surface-panel p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Bloqueos en fechas específicas (reuniones, eventos, etc.)</p>
-                <Button size="sm" onClick={() => setBloqueos(b=>[...b,{fecha:new Date().toISOString().split('T')[0],hora_inicio:'09:00',hora_fin:'10:00',motivo:''}])}
+                <Button size="sm" onClick={() => setBloqueos(b=>[...b,{fecha:getBusinessTodayString(),hora_inicio:'09:00',hora_fin:'10:00',motivo:''}])}
                   className="gap-1 h-8 text-xs"><Plus className="w-3 h-3"/>Agregar</Button>
               </div>
               {bloqueos.length === 0 ? (
@@ -420,7 +421,7 @@ export default function HorariosEmpleado() {
             <Card className="surface-panel p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Períodos de vacaciones o ausencia</p>
-                <Button size="sm" onClick={()=>setVacaciones(v=>[...v,{fecha_inicio:new Date().toISOString().split('T')[0],fecha_fin:new Date().toISOString().split('T')[0],estado:'APROBADO'}])}
+                <Button size="sm" onClick={()=>setVacaciones(v=>[...v,{fecha_inicio:getBusinessTodayString(),fecha_fin:getBusinessTodayString(),estado:'APROBADO'}])}
                   className="gap-1 h-8 text-xs"><Plus className="w-3 h-3"/>Agregar</Button>
               </div>
               {vacaciones.length === 0 ? (

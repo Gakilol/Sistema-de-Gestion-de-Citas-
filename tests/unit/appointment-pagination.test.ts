@@ -10,7 +10,7 @@ vi.mock('@/lib/auth-helpers', () => ({
 }));
 vi.mock('@/lib/clients/client-search', () => ({ resolveClientDirectory: vi.fn() }));
 
-import { GET } from '../../app/api/citas/route';
+import { GET, POST } from '../../app/api/citas/route';
 
 describe('paginación de citas del calendario', () => {
   beforeEach(() => findMany.mockReset());
@@ -32,5 +32,24 @@ describe('paginación de citas del calendario', () => {
     findMany.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }]);
     const response = await GET(new NextRequest('http://localhost/api/citas?limit=2'));
     expect((await response.json()).nextCursor).toBeNull();
+  });
+
+  it('rechaza filtros con fechas inexistentes sin consultar la base', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/citas?from=2026-02-30'));
+    expect(response.status).toBe(400);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una cita con fecha inexistente antes de intentar guardarla', async () => {
+    const response = await POST(new NextRequest('http://localhost/api/citas', {
+      method: 'POST',
+      body: JSON.stringify({
+        cliente_nombre: 'Cliente de prueba',
+        empleado_id: '11111111-1111-4111-8111-111111111111',
+        servicio_id: '22222222-2222-4222-8222-222222222222',
+        fecha: '2026-02-30', hora: '10:00',
+      }),
+    }));
+    expect(response.status).toBe(400);
   });
 });

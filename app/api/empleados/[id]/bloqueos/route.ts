@@ -1,11 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserContext } from '@/lib/auth-helpers';
-
-function parseYYYYMMDD(fechaYYYYMMDD: string): Date {
-  const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
+import { isValidBlockInput } from '@/lib/appointments/schedule-input';
+import { parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -41,6 +38,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { bloqueos } = await req.json();
+    if (!isValidBlockInput(bloqueos)) {
+      return NextResponse.json({ error: 'Revise la fecha y las horas de los bloqueos' }, { status: 400 });
+    }
 
     // Re-sync by deleting existing ones and inserting new ones
     await prisma.$transaction([
@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       prisma.bloqueoHorario.createMany({
         data: bloqueos.map((b: any) => ({
           empleado_id: id,
-          fecha: parseYYYYMMDD(b.fecha),
+          fecha: parseLocalDateToUTC(b.fecha),
           hora_inicio: b.hora_inicio,
           hora_fin: b.hora_fin,
           motivo: b.motivo || '',

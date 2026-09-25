@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import { parseLocalDateToUTC } from '@/lib/timezone';
+import { isValidBusinessDateString, parseLocalDateToUTC } from '@/lib/timezone';
 import { getUserContext } from '@/lib/auth-helpers';
+import { hasAppointmentScheduleChange } from '@/lib/appointments/appointment-schedule-change';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -101,6 +102,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       clientUpdatedAt,
     } = body;
 
+    if (fecha && !isValidBusinessDateString(fecha.split('T')[0])) {
+      return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 });
+    }
+
     // ─── DETECCIÓN DE CONCURRENCIA (Drag & Drop / Resize) ────────────────────
     // Si el cliente envió la marca de tiempo de cuando cargó la cita,
     // comparamos con la versión actual del servidor para detectar ediciones concurrentes.
@@ -118,7 +123,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // ─── VALIDACIÓN DE ESTADO EDITABLE PARA CAMBIOS DE HORARIO ───────────────
     // Solo aplica cuando el PATCH incluye cambios de fecha/hora/duración/empleado
     // (movimiento visual o resize), no simplemente cambio de estado o notas.
-    const esMovimientoVisual = !!(fecha || hora || (duracion !== undefined) || empleado_id);
+    const esMovimientoVisual = hasAppointmentScheduleChange(citaOriginal, body);
     const estadosSoloNota = ['COMPLETADA', 'CANCELADA', 'NO_SHOW'];
     if (esMovimientoVisual && estadosSoloNota.includes(citaOriginal.estado)) {
       return NextResponse.json({
@@ -129,6 +134,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     let conflictos: any[] = [];
     let hasOrphanedIntercalada = false;
+    let scheduleTarget: { empleadoId: string; fecha: string; hora: string; duracion: number; horarioExtendido: boolean } | null = null;
 
     // Validar que el nuevo empleado sea agendable
     if (empleado_id) {
@@ -191,11 +197,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!finalServicioIds && servicio_id) {
       finalServicioIds = [servicio_id];
     }
+    const serviceSelectionChanged = hasAppointmentScheduleChange(citaOriginal, {
+      servicio_id, servicio_ids, servicios_seleccionados,
+    });
     // ─── VALIDACIÓN DE DISPONIBILIDAD AL EDITAR ─────────────────────────────
-    const cambiaHorario =
-      hora || fecha || empleado_id || (duracion !== undefined) ||
-      (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) ||
-      (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0);
+    const cambiaHorario = esMovimientoVisual;
 
     if (cambiaHorario) {
       const citaActual = await prisma.cita.findUnique({ where: { id } });
@@ -210,11 +216,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const horaFinal     = hora || citaActual.hora;
 
       let duracionFinal = citaActual.duracion;
-      if (duracion !== undefined) {
-        duracionFinal = Number(duracion);
-      } else if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+      if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+        const idsUnicos = [...new Set(servicios_seleccionados.map((s: any) => s.id))] as string[];
+        const serviciosDb = await prisma.servicio.findMany({ where: { id: { in: idsUnicos } } });
         duracionFinal = servicios_seleccionados.reduce(
-          (sum: number, s: any) => sum + (typeof s.duracion === 'number' && s.duracion > 0 ? s.duracion : 30),
+          (sum: number, s: any) => {
+            const servicioDb = serviciosDb.find((servicio: any) => servicio.id === s.id);
+            return sum + (typeof s.duracion === 'number' && s.duracion > 0 ? s.duracion : (servicioDb?.duracion || 30));
+          },
           0
         );
       } else if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
@@ -224,9 +233,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const sDb = serviciosDb.find((s: any) => s.id === sid);
           return sum + (sDb?.duracion || 30);
         }, 0);
+      } else if (duracion !== undefined) {
+        duracionFinal = Number(duracion);
       }
 
       const permitirHorarioExtendido = userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT';
+      scheduleTarget = {
+        empleadoId: empleadoFinal,
+        fecha: fechaFinal,
+        hora: horaFinal,
+        duracion: duracionFinal,
+        horarioExtendido: permitirHorarioExtendido,
+      };
 
       const { calculateAppointmentAvailability, validateExactAppointmentTime, findAppointmentConflicts } = await import('@/lib/appointments/appointment-availability');
       
@@ -318,7 +336,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         where: {
           empleado_id: empleadoFinal,
           fecha: parseLocalDateToUTC(originalDate),
-          estado: { notIn: ['CANCELADA', 'REPROGRAMADA', 'COMPLETADA'] },
+          estado: { notIn: ['CANCELADA', 'REPROGRAMADA'] },
           id: { not: id }
         }
       });
@@ -350,22 +368,60 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // ─── TRANSACCIÓN ────────────────────────────────────────────────────────
     const cita = await prisma.$transaction(async (tx: any) => {
-      try {
-        const targetEmp = dataToUpdate.empleado_id || citaOriginal.empleado_id;
-        const targetDate = dataToUpdate.fecha
-          ? new Date(dataToUpdate.fecha).toISOString().split('T')[0]
-          : new Date(citaOriginal.fecha).toISOString().split('T')[0];
-        const lockStr = `${targetEmp}_${targetDate}`;
-        let hash = BigInt(0);
-        for (let i = 0; i < lockStr.length; i++) {
-          hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
+      const targetEmp = dataToUpdate.empleado_id || citaOriginal.empleado_id;
+      const targetDate = dataToUpdate.fecha
+        ? new Date(dataToUpdate.fecha).toISOString().split('T')[0]
+        : new Date(citaOriginal.fecha).toISOString().split('T')[0];
+      const lockStr = `${targetEmp}_${targetDate}`;
+      let hash = BigInt(0);
+      for (let i = 0; i < lockStr.length; i++) {
+        hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
+      }
+      await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(${hash})`;
+
+      if (scheduleTarget) {
+        const target = scheduleTarget;
+        const latest = await tx.cita.findUnique({ where: { id } });
+        if (!latest) return { validationError: 'Cita no encontrada', status: 404 };
+        if (clientUpdatedAt && new Date(latest.updated_at) > new Date(clientUpdatedAt)) {
+          return { validationError: 'Esta cita fue modificada por otro usuario. Recargue la agenda.', status: 409 };
         }
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hash})`;
-      } catch {}
+        if (['COMPLETADA', 'CANCELADA', 'NO_SHOW'].includes(latest.estado)) {
+          return { validationError: 'La cita cambió de estado. Recargue la agenda antes de reprogramarla.', status: 409 };
+        }
+
+        const { calculateAppointmentAvailability, validateExactAppointmentTime, findAppointmentConflicts } = await import('@/lib/appointments/appointment-availability');
+        const freshConflicts = await findAppointmentConflicts(target.empleadoId, target.fecha, target.hora, target.duracion, id, tx);
+        const blocking = freshConflicts.filter(c => !c.allowOverlap);
+        const overlapRequested = allowOverlap === true;
+        if (blocking.length && !overlapRequested) {
+          return { validationError: 'El horario se cruza con otra cita.', status: 409, type: 'SCHEDULE_OVERLAP', conflicts: blocking };
+        }
+        const availability = await calculateAppointmentAvailability(
+          target.empleadoId, target.fecha, null, target.duracion, target.hora, id, target.horarioExtendido, tx
+        );
+        if (!availability.disponible || !availability.jornada) {
+          return { validationError: 'El empleado no está disponible este día: ' + availability.motivo, status: 400 };
+        }
+        const intervals = blocking.length && overlapRequested
+          ? availability.intervalosOcupados.filter(interval => interval.motivo !== 'Cita reservada')
+          : availability.intervalosOcupados;
+        const exact = validateExactAppointmentTime(
+          target.hora, target.duracion, availability.jornada.inicio, availability.jornada.fin,
+          intervals, target.horarioExtendido, availability.turnosEmpleado
+        );
+        if (!exact.valida) return { validationError: 'Hora no disponible: ' + exact.motivo, status: 400 };
+
+        conflictos = freshConflicts;
+        dataToUpdate.allowOverlap = blocking.length > 0 && overlapRequested;
+        dataToUpdate.overlapReason = dataToUpdate.allowOverlap ? overlapReason || null : null;
+        dataToUpdate.overlapConfirmedById = dataToUpdate.allowOverlap ? userId : null;
+        dataToUpdate.overlapConfirmedAt = dataToUpdate.allowOverlap ? new Date() : null;
+      }
       let serviciosParaActualizar: { id: string; duracion: number }[] = [];
       let flagActualizarServicios = false;
 
-      if (Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
+      if (serviceSelectionChanged && Array.isArray(servicios_seleccionados) && servicios_seleccionados.length > 0) {
         flagActualizarServicios = true;
         const ids         = servicios_seleccionados.map((s: any) => s.id);
         const idsUnicos   = [...new Set(ids)] as string[];
@@ -383,7 +439,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           };
         });
 
-      } else if (Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
+      } else if (serviceSelectionChanged && Array.isArray(finalServicioIds) && finalServicioIds.length > 0) {
         flagActualizarServicios = true;
         const idsUnicos   = [...new Set(finalServicioIds)] as string[];
         const serviciosDb = await tx.servicio.findMany({ where: { id: { in: idsUnicos } } });
@@ -404,6 +460,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (flagActualizarServicios && serviciosParaActualizar.length > 0) {
         const duracionCalculada = serviciosParaActualizar.reduce((sum, s) => sum + s.duracion, 0);
         const primerServicioId  = serviciosParaActualizar[0].id;
+
+        if (scheduleTarget && duracionCalculada !== scheduleTarget.duracion) {
+          return { validationError: 'La duración del servicio cambió. Recargue la cita antes de guardarla.', status: 409 };
+        }
 
         dataToUpdate.servicio_id = primerServicioId;
         dataToUpdate.duracion    = duracionCalculada;
@@ -449,6 +509,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return c;
     });
 
+    if ('validationError' in cita) {
+      return NextResponse.json({
+        error: cita.validationError,
+        type: cita.type,
+        message: cita.validationError,
+        conflicts: cita.conflicts,
+      }, { status: cita.status });
+    }
+
     // Detectar acción y descripción
     let finalAction = 'APPOINTMENT_UPDATED';
     let finalDesc = `Cita de ${cita.cliente_nombre} actualizada.`;
@@ -470,7 +539,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         finalAction = 'APPOINTMENT_RESCHEDULED';
         finalDesc = `Cita de ${cita.cliente_nombre} reprogramada.`;
       }
-    } else if (hora || fecha) {
+    } else if (esMovimientoVisual && (hora || fecha)) {
       finalAction = 'APPOINTMENT_RESCHEDULED';
       finalDesc = `Cita de ${cita.cliente_nombre} reprogramada a la fecha ${fecha || ''} ${hora || ''}.`;
     }

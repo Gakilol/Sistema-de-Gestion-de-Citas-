@@ -21,12 +21,13 @@ import {
 } from 'lucide-react';
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
-function fmtDate(d: string | null) {
+function fmtDate(d: string | null, dateOnly = false) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('es-NI', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    ...(dateOnly ? { timeZone: 'UTC' } : {}),
   });
 }
 
@@ -472,7 +473,7 @@ export default function ClientesInactivos() {
                       <div className="grid grid-cols-2 gap-2 text-xs border-t border-b border-border/30 py-2">
                         <div>
                           <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Última cita</span>
-                          <span className="font-medium text-foreground">{fmtDate(c.ultimaCita)}</span>
+                          <span className="font-medium text-foreground">{fmtDate(c.ultimaCita, true)}</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Último servicio</span>
@@ -553,7 +554,7 @@ export default function ClientesInactivos() {
                               {c.telefono || '—'}
                             </td>
                             <td className="px-4 py-3.5 text-muted-foreground whitespace-nowrap text-xs">
-                              {fmtDate(c.ultimaCita)}
+                              {fmtDate(c.ultimaCita, true)}
                             </td>
                             <td className="px-4 py-3.5 text-muted-foreground font-medium text-xs truncate max-w-[150px]" title={c.ultimoServicioNombre}>
                               {c.ultimoServicioNombre}

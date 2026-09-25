@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireReporteRole, parseReportFilters } from '@/lib/reportes-utils';
+import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   const authError = requireReporteRole(req);
@@ -18,8 +19,8 @@ export async function GET(req: NextRequest) {
   const skip     = (page - 1) * pageSize;
 
   try {
-    const now = new Date();
-    const cutoffDate = new Date(now.getTime() - diasInactividad * 86400000);
+    const businessToday = parseLocalDateToUTC(getBusinessTodayString());
+    const cutoffDate = new Date(businessToday.getTime() - diasInactividad * 86400000);
 
     // Find clients who had at least one completed appointment before cutoff
     // AND don't have any future confirmed/pending/scheduled appointments
@@ -29,27 +30,26 @@ export async function GET(req: NextRequest) {
         c."id",
         c."nombre",
         c."telefono",
-        MAX(ci."fecha") AS ultima_cita,
+        MAX(ci."fecha") FILTER (WHERE ci."estado" = 'COMPLETADA') AS ultima_cita,
         COUNT(ci."id")::INT AS total_citas,
         COUNT(ci."id") FILTER (WHERE ci."estado" = 'COMPLETADA')::INT AS completadas,
         COUNT(ci."id") FILTER (WHERE ci."estado" = 'CANCELADA')::INT AS canceladas,
         COUNT(ci."id") FILTER (WHERE ci."estado" = 'NO_SHOW')::INT AS no_shows,
-        EXTRACT(DAY FROM NOW() - MAX(ci."fecha"))::INT AS dias_desde_ultima
+        (${businessToday}::date - (MAX(ci."fecha") FILTER (WHERE ci."estado" = 'COMPLETADA')))::INT AS dias_desde_ultima
       FROM "Cliente" c
       INNER JOIN "Cita" ci ON ci."cliente_id" = c."id"
-      WHERE ci."estado" = 'COMPLETADA'
       GROUP BY c."id", c."nombre", c."telefono"
       HAVING
         -- Last completed appointment is before cutoff date
-        MAX(ci."fecha") < ${cutoffDate}
+        MAX(ci."fecha") FILTER (WHERE ci."estado" = 'COMPLETADA') < ${cutoffDate}
         -- No future bookings
         AND NOT EXISTS (
           SELECT 1 FROM "Cita" fc
           WHERE fc."cliente_id" = c."id"
-            AND fc."fecha" > ${now}
+            AND fc."fecha" >= ${businessToday}
             AND fc."estado" IN ('PENDIENTE', 'CONFIRMADA', 'REPROGRAMADA')
         )
-      ORDER BY MAX(ci."fecha") ASC
+      ORDER BY ultima_cita ASC
     `;
 
     const total = clientesInactivosRaw.length;

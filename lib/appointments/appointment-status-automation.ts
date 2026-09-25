@@ -21,6 +21,19 @@ export function getNowInBusinessTZ(reference = new Date()): Date {
   );
 }
 
+function businessWallTimeToInstant(wallTime: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(wallTime);
+  const value = (type: string) => Number(parts.find(part => part.type === type)?.value ?? 0);
+  const hour = value('hour') === 24 ? 0 : value('hour');
+  const localAtGuess = Date.UTC(value('year'), value('month') - 1, value('day'), hour, value('minute'), value('second'));
+  const offset = localAtGuess - wallTime.getTime();
+  return new Date(wallTime.getTime() - offset);
+}
+
 interface AppointmentStatusInput {
   fecha: Date;
   hora: string;
@@ -47,7 +60,7 @@ export function getAutomaticAppointmentStatus(
     };
   }
   if (nowLocal < end) return { status: EstadoCita.EN_PROGRESO };
-  return { status: EstadoCita.COMPLETADA, completedAt: end };
+  return { status: EstadoCita.COMPLETADA, completedAt: businessWallTimeToInstant(end) };
 }
 
 export interface AppointmentStatusSyncResult {

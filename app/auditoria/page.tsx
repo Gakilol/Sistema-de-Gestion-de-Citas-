@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api-client';
 import { PageHeader } from '@/components/shared/page-header';
 import { MetricStrip } from '@/components/shared/metric-strip';
+import { getBusinessTodayString, parseLocalDateToUTC } from '@/lib/timezone';
 
 // Tab definitions
 type AuditTab = 'resumen' | 'actividad' | 'seguridad' | 'cambios' | 'roles' | 'citas' | 'configuracion' | 'exportar';
@@ -42,11 +43,11 @@ export default function AuditoriaPage() {
   const [search, setSearch] = useState('');
   const limit = 20;
   const [desde, setDesde] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
+    const d = parseLocalDateToUTC(getBusinessTodayString());
+    d.setUTCDate(d.getUTCDate() - 29);
     return d.toISOString().split('T')[0];
   });
-  const [hasta, setHasta] = useState(() => new Date().toISOString().split('T')[0]);
+  const [hasta, setHasta] = useState(() => getBusinessTodayString());
   
   // Specific filters
   const [moduleFilter, setModuleFilter] = useState('');
