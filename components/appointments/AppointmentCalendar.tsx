@@ -1,7 +1,7 @@
 import { WeekStrip } from './WeekStrip';
 import { FloatingViewBar, type CalendarView } from './FloatingViewBar';
 import { MonthCalendar } from './MonthCalendar';
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { ChevronLeft, ChevronRight, Clock, User, Scissors, Plus, AlertTriangle, GripVertical, Undo2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ import {
   isCitaEditable,
 } from '@/lib/calendar-drag-utils';
 import { formatCalendarDate, getAppointmentDateString, parseCalendarDate } from '@/lib/calendar-date-utils';
+import { getCalendarSwipeOffset, type CalendarSwipeStart } from '@/lib/calendar-swipe';
 import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 import type {
   AppointmentCalendarProps,
@@ -108,7 +109,8 @@ export function AppointmentCalendar({
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitialScrollRef = useRef(false);
-  const dateSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const dateSwipeStartRef = useRef<CalendarSwipeStart | null>(null);
+  const swipeScrollEdgeRef = useRef<'start' | 'end' | null>(null);
   const autoScrollRafRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressPendingRef = useRef<boolean>(false);
@@ -339,7 +341,15 @@ export function AppointmentCalendar({
 
   const handleDateSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
     const touch = event.touches[0];
-    dateSwipeStartRef.current = event.touches.length === 1 && touch && !moveRef.current.active && !resizeRef.current.active && !provisionalDragRef.current.active ? { x: touch.clientX, y: touch.clientY } : null;
+    const container = event.currentTarget;
+    dateSwipeStartRef.current = event.touches.length === 1 && touch && !moveRef.current.active && !resizeRef.current.active && !provisionalDragRef.current.active
+      ? {
+        x: touch.clientX,
+        y: touch.clientY,
+        scrollLeft: container.scrollLeft,
+        maxScrollLeft: Math.max(0, container.scrollWidth - container.clientWidth),
+      }
+      : null;
   };
 
   const handleDateSwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -348,12 +358,21 @@ export function AppointmentCalendar({
     dateSwipeStartRef.current = null;
     if (!start || !touch || moveRef.current.active || resizeRef.current.active || provisionalDragRef.current.active) return;
 
-    const deltaX = touch.clientX - start.x;
-    const deltaY = touch.clientY - start.y;
-    if (Math.abs(deltaX) < 52 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.35) return;
-    cambiarFecha(deltaX < 0 ? daysInCurrentView : -daysInCurrentView);
+    const offset = getCalendarSwipeOffset(start, touch.clientX, touch.clientY, daysInCurrentView);
+    if (!offset) return;
+    swipeScrollEdgeRef.current = start.maxScrollLeft > 2 && offset > 0 ? 'end' : 'start';
+    cambiarFecha(offset);
   };
 
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollLeft = swipeScrollEdgeRef.current === 'end'
+        ? container.scrollWidth - container.clientWidth
+        : 0;
+    }
+    swipeScrollEdgeRef.current = null;
+  }, [selectedDateStr, vista]);
 
   // Generar lista de horas para la regla lateral
   const horasRegla = useMemo(() => {
@@ -807,8 +826,11 @@ export function AppointmentCalendar({
       if (origin && e.touches.length === 1) {
         const dx = e.touches[0].clientX - origin.x;
         const dy = e.touches[0].clientY - origin.y;
-        if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.35) {
-          if (e.cancelable) e.preventDefault();
+        if (Math.abs(dy) > TOUCH_MOVE_THRESHOLD && Math.abs(dy) >= Math.abs(dx)) {
+          dateSwipeStartRef.current = null;
+        } else if (Math.abs(dx) > TOUCH_MOVE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.35) {
+          // Pan through the visible days/professionals; navigate only at an edge.
+          if (getCalendarSwipeOffset(origin, e.touches[0].clientX, e.touches[0].clientY, 1, TOUCH_MOVE_THRESHOLD) && e.cancelable) e.preventDefault();
           cancelDrag();
           cancelMove();
         }

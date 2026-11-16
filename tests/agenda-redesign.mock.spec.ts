@@ -169,6 +169,7 @@ test('Gestos táctiles cambian periodos sin abrir ni mover citas', async ({ page
   test.skip(!testInfo.project.name.includes('Mobile'), 'Gestos táctiles en móvil');
   await page.goto('/citas');
   await expect(page.locator('.booking-card').first()).toBeVisible();
+  await page.getByRole('group', { name: 'Filtrar profesionales' }).getByRole('button', { name: 'Álvaro', exact: true }).click();
   const cdp = await context.newCDPSession(page);
   const swipe = async (x: number, y: number, dx: number, dy = 0) => {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
@@ -183,12 +184,13 @@ test('Gestos táctiles cambian periodos sin abrir ni mover citas', async ({ page
   await swipe(100, 500, 150);
   await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-17');
   await page.getByRole('button', { name: 'Sem', exact: true }).click();
+  await page.locator('[data-calendar-scroll]').evaluate(el => { el.scrollLeft = el.scrollWidth - el.clientWidth; });
   await swipe(300, 500, -150);
-  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-24');
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-18');
   await swipe(300, 75, -150);
-  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-10-01');
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-25');
   await swipe(200, 550, 0, -120);
-  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-10-01');
+  await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', '2026-09-25');
   await page.getByRole('button', { name: /Cambiar vista:/ }).click();
   const sheet = page.getByRole('dialog', { name: 'Vista y fecha de la agenda' });
   await expect(sheet).toBeVisible();
