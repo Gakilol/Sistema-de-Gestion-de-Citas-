@@ -238,3 +238,85 @@ test('El mes carga páginas adicionales y Nueva cita inicia con la fecha predete
   await expect.poll(() => submittedDate).toBe(today);
   await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', today);
 });
+
+test.describe('Fechas de citas en UTC-6', () => {
+  test.use({ timezoneId: 'America/Managua' });
+
+  test('Crear una cita para el 26 conserva el día en confirmación, agenda, lista y edición', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-09-26T16:42:00Z'));
+    const date = '2026-09-26';
+    let saved: Record<string, unknown> | null = null;
+    let submittedDate = '';
+    await page.route('**/api/empleados/*/disponibilidad**', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({
+        disponible: true, bloques: [], jornada: { inicio: '08:00', fin: '18:00' }, intervalosOcupados: [],
+      }),
+    }));
+    await page.route('**/api/citas', route => {
+      const payload = route.request().postDataJSON();
+      submittedDate = payload.fecha;
+      // Mismo formato que entrega Prisma para una columna DATE.
+      saved = {
+        ...payload, id: 'appointment-26', fecha: `${payload.fecha}T00:00:00.000Z`,
+        hora: '13:00', duracion: 60, estado: 'PENDIENTE', citaServicios: [],
+        empleado: { id: 'visual-admin', nombre: 'Álvaro Zeledón' },
+        servicio: { id: payload.servicio_id, nombre: 'Corte y barba' },
+        updated_at: new Date().toISOString(),
+      };
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ cita: saved }) });
+    });
+    await page.route('**/api/citas?**', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ citas: saved ? [saved] : [] }),
+    }));
+    await page.goto('/citas');
+    await page.getByRole('button', { name: 'Nueva cita', exact: true }).click();
+    const form = page.getByRole('dialog', { name: 'Nueva cita', exact: true });
+    await expect(form.locator('input[type=date]')).toHaveValue(date);
+    await form.getByPlaceholder('Buscar por nombre, teléfono o correo...').fill('José');
+    await form.getByRole('button', { name: /José Pérez/ }).click();
+    await form.locator('select').first().selectOption('22222222-2222-4222-8222-222222222222');
+    await form.getByRole('button', { name: 'Crear Cita' }).click();
+    await expect.poll(() => submittedDate).toBe(date);
+    const confirmation = page.getByRole('dialog', { name: 'Cita creada correctamente' });
+    await expect(confirmation).toContainText('26 de septiembre de 2026');
+    await confirmation.getByRole('button', { name: 'Cerrar confirmación' }).click();
+    await expect(page.locator('.agenda-week-strip [aria-pressed=true]')).toHaveAttribute('data-date', date);
+    await expect(page.locator('[data-day-str="2026-09-26"] .booking-card').filter({ hasText: 'José Pérez' })).toBeVisible();
+    await expect(page.locator('[data-day-str="2026-09-25"] .booking-card')).toHaveCount(0);
+    await page.getByRole('main').getByRole('button', { name: 'Lista', exact: true }).click();
+    await expect(page.getByRole('main')).toContainText(/26 .* 2026/);
+    await page.reload();
+    await expect(page.locator('[data-day-str="2026-09-26"] .booking-card').filter({ hasText: 'José Pérez' })).toBeVisible();
+    await page.locator('[data-day-str="2026-09-26"] .booking-card').filter({ hasText: 'José Pérez' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Editar cita' }).click();
+    await expect(page.getByRole('dialog', { name: 'Editar cita' }).locator('input[type=date]')).toHaveValue(date);
+  });
+
+  test('El historial y la última visita conservan el 26 de septiembre recibido de Prisma', async ({ page }) => {
+    await page.route('**/api/clientes**', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({
+        clientes: [{
+          id: 'client-1', nombre: 'José Pérez', telefono: '50588887777',
+          correo: null, notas: null, cedula: null, totalCitas: 1, citasCompletadas: 1,
+          ultimaCita: '2026-09-26T00:00:00.000Z', primeraCita: '2026-09-26T00:00:00.000Z',
+          esRecurrente: false, servicioFavorito: 'Corte y barba',
+          historial: [{
+            id: 'appointment-26', fecha: '2026-09-26T00:00:00.000Z', estado: 'COMPLETADA',
+            servicio: { nombre: 'Corte y barba' }, empleado: { nombre: 'Álvaro Zeledón' },
+          }],
+          preferencias: [{
+            id: 'preference-1', tipo: 'NOTA', titulo: 'Nota de prueba', detalle: 'Conservar fecha local de creación',
+            createdAt: '2026-09-26T02:00:00.000Z', createdBy: 'visual-admin', creador: { nombre: 'Administrador' },
+          }],
+        }], total: 1,
+      }),
+    }));
+    await page.goto('/clientes');
+    await expect(page.getByText(/Última visita: 26 .* 2026/)).toBeVisible();
+    await page.getByRole('button', { name: 'Ver historial de José Pérez' }).click();
+    const history = page.getByRole('dialog', { name: 'José Pérez' });
+    await expect(history.locator('section[aria-labelledby=historial-citas-title]')).toContainText(/26 .* 2026/);
+    // createdAt es un instante real: las 02:00 UTC aún son el 25 en Managua.
+    await expect(history.getByText(/25 .* 2026 · Administrador/)).toBeVisible();
+  });
+});

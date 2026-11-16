@@ -384,7 +384,11 @@ export async function POST(req: NextRequest) {
       afterData: cita,
       ipAddress: getClientIp(req.headers),
       userAgent: req.headers.get('user-agent') || undefined,
-      metadata: { allowOverlap: cita.allowOverlap, overrideSchedule: Boolean(overrideSchedule || forzar) }
+      metadata: {
+        allowOverlap: cita.allowOverlap,
+        overrideSchedule: Boolean(overrideSchedule || forzar),
+        requestedDate: fecha,
+      }
     });
 
     if (cita.allowOverlap) {
