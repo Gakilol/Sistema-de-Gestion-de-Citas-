@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { APPOINTMENT_STATUS_BADGE_CLASSES, APPOINTMENT_STATUS_LABELS } from '@/lib/appointments/appointment-status';
 import { PageHeader } from '@/components/shared/page-header';
 import { MetricStrip } from '@/components/shared/metric-strip';
+import { formatDBDate } from '@/lib/timezone';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface ClienteAppointment {
@@ -288,7 +289,7 @@ function HistorialModal({ cliente, onClose, onDelete, onEdit, onPreferencesChang
                   <p className="text-xs text-muted-foreground">con {cita.empleado.nombre}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs font-semibold text-foreground">{fmtDate(cita.fecha)}</p>
+                  <p className="text-xs font-semibold text-foreground">{formatDBDate(cita.fecha)}</p>
                   <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', APPOINTMENT_STATUS_BADGE_CLASSES[cita.estado])}>
                     {APPOINTMENT_STATUS_LABELS[cita.estado]}
                   </span>
@@ -429,7 +430,7 @@ function ClienteCard({ cliente, onSelect }: { cliente: Cliente; onSelect: () => 
         )}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Calendar className="w-3 h-3 flex-shrink-0" />
-          <span>Última visita: {fmtDate(cliente.ultimaCita)}</span>
+          <span>Última visita: {formatDBDate(cliente.ultimaCita)}</span>
         </div>
         {cliente.creador && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
