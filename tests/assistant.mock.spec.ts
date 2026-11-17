@@ -73,3 +73,22 @@ test('si no hay reconocimiento de voz, el mensaje sigue disponible por texto', a
   await page.getByRole('textbox', { name: 'Tu mensaje' }).fill('Mi agenda de hoy');
   await expect(page.getByRole('button', { name: 'Enviar mensaje' })).toBeEnabled();
 });
+
+test('un rechazo del acceso sigue visible después de desaparecer el aviso temporal', async ({ page, context }) => {
+  await context.clearCookies();
+  await page.route('**/api/auth/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: path.endsWith('/login') ? 'Credenciales inválidas' : 'No autorizado' }) });
+  });
+  await page.goto('/login');
+  await page.getByLabel('Correo electrónico', { exact: true }).fill('cuenta@example.test');
+  await page.getByLabel('Contraseña', { exact: true }).fill('invalid-test-password');
+  await page.getByRole('button', { name: 'Entrar al sistema' }).click();
+  const error = page.locator('#login-error');
+  await expect(error).toContainText('Credenciales inválidas');
+  await expect(error.getByRole('link', { name: 'Recuperar acceso' })).toHaveAttribute('href', '/olvide-contrasena');
+  await page.clock.install();
+  await page.clock.fastForward(8000);
+  await expect(error).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Entrar al sistema' })).toBeEnabled();
+});

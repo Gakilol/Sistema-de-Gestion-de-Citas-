@@ -20,6 +20,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPass, setShowPass]   = useState(false);
   const [shake,    setShake]      = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
   const [form, setForm] = useState({ email: '', password: '', rememberDevice: false });
 
@@ -54,6 +55,7 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setSubmitError('');
     try {
       const res  = await fetch('/api/auth/login', {
         method: 'POST',
@@ -67,6 +69,7 @@ export default function Login() {
       const redirectPath = searchParams.get('redirect') || '/dashboard';
       window.location.href = redirectPath;
     } catch (err: unknown) {
+      setSubmitError(getErrorMessage(err));
       setShake(true);
       setTimeout(() => setShake(false), 600);
       toast.error(getErrorMessage(err));
@@ -132,6 +135,7 @@ export default function Login() {
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   required
                   autoComplete="current-password"
+                  aria-describedby={submitError ? 'login-error' : undefined}
                 />
                 <button
                   type="button"
@@ -163,6 +167,14 @@ export default function Login() {
                 Recordar este dispositivo por 60 días
               </label>
             </div>
+
+            {submitError ? (
+              <div id="login-error" role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm leading-6">
+                <p className="font-semibold">{submitError}</p>
+                <p className="mt-1 text-muted-foreground">Comprueba tu correo y contraseña. Si no recuerdas la clave, puedes recuperar el acceso.</p>
+                <Link href="/olvide-contrasena" className="mt-2 inline-flex font-semibold text-primary underline underline-offset-4">Recuperar acceso</Link>
+              </div>
+            ) : null}
 
             <Button type="submit" className="h-12 w-full text-base font-bold" disabled={isLoading}>
               {isLoading ? (
