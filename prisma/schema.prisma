@@ -23,6 +23,7 @@ model Empleado {
   citas                        Cita[]                 @relation("EmpleadoAsignado")
   citasCreadas                 Cita[]                 @relation("CreadorCita")
   clientesCreados              Cliente[]              @relation("ClienteCreador")
+  borradoresIA                IaBorrador[]
   descansos                    DescansoEmpleado[]
   bloqueos                     BloqueoHorario[]
   vacaciones                   VacacionesEmpleado[]
@@ -78,6 +79,7 @@ model Cita {
   empleado      Empleado       @relation("EmpleadoAsignado", fields: [empleado_id], references: [id])
   creador       Empleado       @relation("CreadorCita", fields: [created_by], references: [id])
   citaServicios CitaServicio[]
+  borradorIA    IaBorrador?
 
   whatsapp_reminder_sent    Boolean   @default(false)
   whatsapp_reminder_sent_at DateTime?
@@ -334,4 +336,26 @@ model DispositivoRecordado {
   @@index([userId])
   @@index([tokenHash])
   @@index([expiresAt])
+}
+
+model IaBorrador {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  userId    String
+  revision  Int      @default(1)
+  estado    String   @default("BORRADOR")
+  payload   Json
+  expiresAt DateTime
+  citaId    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  usuario   Empleado @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cita      Cita?    @relation(fields: [citaId], references: [id], onDelete: SetNull)
+
+  @@index([userId, estado, expiresAt])
+}
+
+model IaLimite {
+  clave   String   @id
+  ventana DateTime
+  cantidad Int
 }

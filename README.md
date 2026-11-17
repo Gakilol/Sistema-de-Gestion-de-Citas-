@@ -86,3 +86,24 @@ npm run dev
 ```
 
 La aplicación se desplegará localmente en `http://localhost:3000`.
+
+
+## Asistente interno (rama desarrollo)
+
+La sección /asistente permite consultar agenda, disponibilidad y resúmenes por rol, y preparar citas multiservicio por texto o dictado. Se selecciona el cliente en pantalla y cada cita se guarda únicamente al pulsar Confirmar cita. El dictado depende de SpeechRecognition del navegador (Chrome de escritorio y Android como destinos de verificación); puede utilizar un servicio externo de reconocimiento. No se almacena audio ni se envía audio a Gemini.
+
+Variables solo del servidor: NOVACITA_IA_ENABLED=true, GEMINI_API_KEY y GEMINI_MODEL=gemini-3.5-flash-lite. En desarrollo local se guardan en .env.local; en Vercel se configuran como secretos de Preview asociados a desarrollo. La API oficial se llama una vez por mensaje con un máximo de 600 tokens y timeout de 20 segundos. El cliente, teléfonos, notas y resultados internos nunca se envían al proveedor: se construye un comando con vocabulario permitido y referencias opacas del catálogo. Lo que no se puede filtrar se rechaza antes de llamar al modelo.
+
+Los borradores duran 15 minutos, pertenecen al usuario y tienen control de revisión. La confirmación bloquea el borrador y usa el escritor transaccional compartido con /api/citas. Reintentar la confirmación devuelve la cita ya creada. Servicios modificados requieren revisar la duración nuevamente. No se habilitan traslapes ni excepciones de horario desde el asistente.
+
+La migración 20261117090000_internal_assistant añade IaBorrador e IaLimite. Se aplica explícitamente con una conexión directa; nunca desde el build. Los límites distribuidos son 3 solicitudes/minuto y 30/día por usuario, y 5/minuto y 50/día globales (ventana diaria UTC); las cuotas propias del proveedor también pueden ser menores. Al agotarse o fallar Gemini se usa el intérprete local sin activar facturación ni cambiar de proveedor.
+
+### Flujo de entrega acordado
+
+- Código, commits y pushes exclusivamente en desarrollo. main y Vercel Production requieren aprobación explícita del usuario.
+- Cada sesión con cambios termina con una Preview del último commit de desarrollo verificada en Vercel.
+- La conexión de Neon se mantiene en main del proyecto Citas, compartida con producción. Las citas confirmadas en Preview son reales.
+- Migraciones aditivas y compatibles; pruebas con dobles o una base local aislada, nunca fixtures ni seeds en la base compartida.
+- Las conversaciones solo viven en memoria del navegador. Borradores y auditoría operativa permanecen en la base; no se guarda la transcripción completa.
+
+Verificación: npm test, npm run type-check, npm run lint y npm run build. Las pruebas del asistente están en tests/unit/assistant-*.test.ts; la prueba de interfaz con APIs simuladas está en tests/assistant.mock.spec.ts.

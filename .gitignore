@@ -74,6 +74,7 @@ skills-lock.json
 tasks/
 
 # Test artifacts
+/work/
 playwright-report/
 test-results/
 *.trace.zip

@@ -1,3 +1,4 @@
+import { createAppointmentInTransaction } from '@/lib/appointments/create-appointment';
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
     const primerServicioId  = serviciosParaCita[0].id;
     // Excepción de horario: Todos los roles autenticados (ADMIN, TECH_SUPPORT, EMPLEADO)
     const permitirHorarioExtendido = Boolean(overrideSchedule || forzar || userRole === 'ADMIN' || userRole === 'EMPLEADO' || userRole === 'TECH_SUPPORT');
-    const { calculateAppointmentAvailability, validateExactAppointmentTime, findAppointmentConflicts } = await import('@/lib/appointments/appointment-availability');
+
 
     // ─── GESTIÓN DE CLIENTE ─────────────────────────────────────────────────
     let idClienteFinal: string | null = cliente_id || null;
@@ -252,113 +253,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── TRANSACCIÓN ATÓMICA: Validación + Lock + Guardar cita ─────────────
-    const result = await prisma.$transaction(async (tx: any) => {
-      // Bloqueo asesor de PostgreSQL para evitar carreras concurrentes en la misma fecha y estilista
-      const lockStr = `${finalEmpleadoId}_${fecha.split('T')[0]}`;
-      let hash = BigInt(0);
-      for (let i = 0; i < lockStr.length; i++) {
-        hash = BigInt.asIntN(64, (hash * BigInt(31)) + BigInt(lockStr.charCodeAt(i)));
-      }
-      await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(${hash})`;
-
-      const disponibilidad = await calculateAppointmentAvailability(
-        finalEmpleadoId,
-        fecha.split('T')[0],
-        primerServicioId,
-        duracionCalculada,
-        hora,
-        null,
-        permitirHorarioExtendido,
-        tx
-      );
-
-      if (!disponibilidad.disponible) {
-        return { error: 'El empleado no está disponible este día: ' + disponibilidad.motivo, status: 400 };
-      }
-
-      if (!disponibilidad.jornada) {
-        return { error: 'No se pudo determinar la jornada laboral', status: 400 };
-      }
-
-      const conflictos = await findAppointmentConflicts(
-        finalEmpleadoId,
-        fecha.split('T')[0],
-        hora,
-        duracionCalculada,
-        null,
-        tx
-      );
-
-      const isOverlapRequested = allowOverlap === true;
-      const conflictosBloqueantes = conflictos.filter(c => !c.allowOverlap);
-
-      if (conflictosBloqueantes.length > 0) {
-        if (!isOverlapRequested) {
-          return {
-            type: 'SCHEDULE_OVERLAP',
-            message: 'El horario se cruza con otra cita.',
-            conflicts: conflictosBloqueantes,
-            status: 409
-          };
-        }
-
-        if (userRole === 'EMPLEADO' && finalEmpleadoId !== userId) {
-          return { error: 'No tienes permiso para crear traslapes en la agenda de otros empleados.', status: 403 };
-        }
-        if (userRole !== 'ADMIN' && userRole !== 'TECH_SUPPORT' && userRole !== 'EMPLEADO') {
-          return { error: 'No tienes permiso para confirmar traslapes.', status: 403 };
-        }
-      }
-
-      const intervalosFiltrados = (conflictosBloqueantes.length > 0 && isOverlapRequested)
-        ? disponibilidad.intervalosOcupados.filter(int => int.motivo !== 'Cita reservada')
-        : disponibilidad.intervalosOcupados;
-
-      const validacion = validateExactAppointmentTime(
-        hora,
-        duracionCalculada,
-        disponibilidad.jornada.inicio,
-        disponibilidad.jornada.fin,
-        intervalosFiltrados,
-        permitirHorarioExtendido,
-        disponibilidad.turnosEmpleado
-      );
-
-      if (!validacion.valida) {
-        return { error: 'Hora no disponible: ' + validacion.motivo, status: 400 };
-      }
-
-      const hasConflict = conflictosBloqueantes.length > 0;
-      const c = await tx.cita.create({
-        data: {
-          cliente_id:       idClienteFinal,
-          cliente_nombre:   finalClienteNombre.trim(),
-          cliente_telefono: finalClienteTelefono?.trim() || null,
-          servicio_id:      primerServicioId,
-          empleado_id:      finalEmpleadoId,
-          fecha:            parseLocalDateToUTC(fecha.split('T')[0]),
-          hora,
-          duracion:         duracionCalculada,
-          notas,
-          created_by:       userId,
-          allowOverlap:     hasConflict && isOverlapRequested,
-          overlapReason:    hasConflict && isOverlapRequested ? overlapReason : null,
-          overlapConfirmedById: hasConflict && isOverlapRequested ? userId : null,
-          overlapConfirmedAt:   hasConflict && isOverlapRequested ? new Date() : null,
-        },
-      });
-
-      await tx.citaServicio.createMany({
-        data: serviciosParaCita.map((s, index) => ({
-          cita_id:     c.id,
-          servicio_id: s.id,
-          duracion:    s.duracion,
-          orden:       index,
-        }))
-      });
-
-      return { cita: c, conflictos, status: 201 };
-    });
+    const result = await prisma.$transaction((tx: any) => createAppointmentInTransaction(tx, {
+      finalEmpleadoId, fecha, primerServicioId, duracionCalculada, hora, permitirHorarioExtendido, allowOverlap, userRole, userId, serviciosParaCita, idClienteFinal, finalClienteNombre, finalClienteTelefono, notas, overlapReason
+    }));
 
     if ('error' in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
