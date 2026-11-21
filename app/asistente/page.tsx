@@ -7,19 +7,16 @@ import {
   CalendarCheck2,
   CalendarClock,
   Check,
-  ChevronDown,
   ChevronRight,
   Clock3,
   Download,
   Loader2,
   Mic,
   Plus,
-  Search,
   Send,
   ShieldCheck,
   Sparkles,
   Square,
-  UserRound,
   Volume2,
   VolumeX,
   X,
@@ -37,8 +34,6 @@ import type {
   ClientOption,
   DraftOperation,
   DraftView,
-  EmployeeOption,
-  ServiceOption,
 } from '@/lib/ia/domain';
 
 interface Message {
@@ -58,9 +53,6 @@ const welcome: Message = {
   spokenText:
     'Hola. Puedes hablarme o escribirme para gestionar citas y consultar horarios. Dime qué necesitas.',
 };
-
-const fieldClass =
-  'h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-60';
 
 function shortDateLabel(fechaYYYYMMDD: string): string {
   return formatDBDateLong(`${fechaYYYYMMDD}T00:00:00Z`)
@@ -88,13 +80,6 @@ function confirmedHeading(operacion: DraftOperation): string {
 
 export default function AssistantPage() {
   const { user, isLoading } = useAuth();
-  const [services, setServices] = useState<ServiceOption[]>([]);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [employeeId, setEmployeeId] = useState('');
-  const [client, setClient] = useState<ClientOption | null>(null);
-  const [clientQuery, setClientQuery] = useState('');
-  const [matches, setMatches] = useState<ClientOption[]>([]);
-  const [searching, setSearching] = useState(false);
   const [input, setInput] = useState('');
   const [transcriptFromVoice, setTranscriptFromVoice] = useState(false);
   const [voiceSessionActive, setVoiceSessionActive] = useState(false);
@@ -135,9 +120,6 @@ export default function AssistantPage() {
       .then(async response => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'No se pudo cargar el asistente.');
-        setServices(data.servicios);
-        setEmployees(data.empleados);
-        if (user.rol === 'EMPLEADO') setEmployeeId(user.id);
       })
       .catch(err => {
         if (err.name !== 'AbortError') setUnavailable(err.message);
@@ -147,36 +129,6 @@ export default function AssistantPage() {
       });
     return () => controller.abort();
   }, [user]);
-
-  useEffect(() => {
-    if (client || clientQuery.trim().length < 2) {
-      setMatches([]);
-      setSearching(false);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const response = await authFetch(`/api/ia/clientes?q=${encodeURIComponent(clientQuery.trim())}`, {
-          signal: controller.signal,
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'No se pudo buscar el cliente.');
-        setMatches(data.clientes);
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : 'Error de búsqueda.');
-        }
-      } finally {
-        if (!controller.signal.aborted) setSearching(false);
-      }
-    }, 300);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [clientQuery, client]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -201,13 +153,12 @@ export default function AssistantPage() {
     text = input,
     options?: {
       client?: ClientOption | null;
-      employeeId?: string;
       viaVoice?: boolean;
       overrideClient?: boolean;
     },
   ) {
     const trimmed = text.trim();
-    if (!trimmed || busy || unavailable) return;
+    if (!trimmed || busy || unavailable || voice.listening) return;
 
     const turnUsedVoice = Boolean(options?.viaVoice ?? transcriptFromVoice);
     const shouldSpeakReply = turnUsedVoice || voiceSessionActive;
@@ -234,14 +185,8 @@ export default function AssistantPage() {
     };
     if (options?.overrideClient) {
       payloadBody.clienteId = options.client?.id ?? null;
-    } else if (client) {
-      payloadBody.clienteId = client.id;
     }
-    if (options?.employeeId !== undefined) {
-      payloadBody.empleadoId = options.employeeId || null;
-    } else if (employeeId) {
-      payloadBody.empleadoId = employeeId;
-    }
+
 
     try {
       const response = await authFetch('/api/ia/chat', {
@@ -265,16 +210,6 @@ export default function AssistantPage() {
         setHighlightSummary(false);
       } else if (result.draft) {
         setDraft(result.draft);
-        if (result.draft.empleadoId && user?.rol !== 'EMPLEADO') {
-          setEmployeeId(result.draft.empleadoId);
-        }
-        if (result.draft.clienteId && result.draft.clienteNombre) {
-          setClient(current =>
-            current?.id === result.draft?.clienteId
-              ? current
-              : { id: result.draft!.clienteId!, nombre: result.draft!.clienteNombre!, telefono: null },
-          );
-        }
       } else if (draft) {
         setDraft({ ...draft, listo: options?.overrideClient ? false : draft.listo });
       }
@@ -363,20 +298,11 @@ export default function AssistantPage() {
     }
   }
 
-  function selectClientManual(next: ClientOption | null) {
-    setClient(next);
-    setClientQuery('');
-    setMatches([]);
-    if (draft) void send('Prepara la cita', { client: next, overrideClient: true });
-  }
-
   function newChat() {
     voice.cancel();
     tts.stop();
     setMessages([welcome]);
     setDraft(null);
-    setClient(null);
-    if (user?.rol !== 'EMPLEADO') setEmployeeId('');
     setCompletedAction(null);
     setHighlightSummary(false);
     setInput('');
@@ -444,7 +370,7 @@ export default function AssistantPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="flex min-h-0 flex-1 flex-col">
               <section
                 aria-label="Conversación con el asistente"
                 className="flex min-h-[540px] min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card lg:min-h-0"
@@ -660,6 +586,142 @@ export default function AssistantPage() {
                     </div>
                   ))}
 
+                  {draft ? (
+                    <section
+                      ref={summarySectionRef}
+                      aria-label="Resumen de la cita"
+                      className={cn(
+                        'rounded-2xl border bg-card p-5 transition-shadow',
+                        highlightSummary
+                          ? 'border-primary ring-2 ring-primary/60 shadow-lg'
+                          : 'border-primary/25',
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h2 className="flex items-center gap-2 font-semibold">
+                            {activeOp === 'reprogramar' ? (
+                              <CalendarClock className="size-5 text-primary" />
+                            ) : (
+                              <CalendarCheck2 className="size-5 text-primary" />
+                            )}
+                            {summaryHeading(activeOp)}
+                          </h2>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {activeOp === 'cancelar'
+                              ? 'Pendiente · todavía no se ha cancelado'
+                              : activeOp === 'reprogramar'
+                                ? 'Pendiente · el cambio se aplica al confirmar'
+                                : 'Borrador · todavía no está registrada'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void send('Descarta el borrador')}
+                          disabled={disabled}
+                          aria-label="Descartar borrador"
+                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+
+                      {highlightSummary && draft.listo ? (
+                        <div
+                          role="status"
+                          className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-medium text-foreground"
+                        >
+                          Confirmación en pantalla requerida: pulsa el botón de abajo para completar la operación.
+                        </div>
+                      ) : null}
+
+                      {draft.citaObjetivoResumen && activeOp !== 'crear' ? (
+                        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-xs">
+                          <p className="font-semibold text-muted-foreground">Cita actual</p>
+                          <p className="mt-1 font-medium text-foreground">
+                            {draft.citaObjetivoResumen.clienteNombre} · {draft.citaObjetivoResumen.servicios}
+                          </p>
+                          <p className="mt-0.5 text-muted-foreground">
+                            {shortDateLabel(draft.citaObjetivoResumen.fecha)} ·{' '}
+                            {formatTime12Hour(draft.citaObjetivoResumen.hora)} ·{' '}
+                            {draft.citaObjetivoResumen.profesionalNombre}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      <dl className="mt-4 space-y-2.5 text-sm">
+                        {(activeOp === 'cancelar'
+                          ? [
+                              ['Cliente', draft.clienteNombre || 'Pendiente'],
+                              ['Profesional', draft.profesionalNombre || 'Pendiente'],
+                              ['Servicios', draft.citaObjetivoResumen?.servicios || draft.servicios.map(s => s.nombre).join(' + ') || 'Pendiente'],
+                              ['Fecha', draft.citaObjetivoResumen?.fecha ? formatDBDateLong(`${draft.citaObjetivoResumen.fecha}T00:00:00Z`) : 'Pendiente'],
+                              ['Hora', draft.citaObjetivoResumen?.hora ? formatTime12Hour(draft.citaObjetivoResumen.hora) : 'Pendiente'],
+                            ]
+                          : [
+                              ['Cliente', draft.clienteNombre || 'Pendiente'],
+                              ['Servicios', draft.servicios.map(service => service.nombre).join(' + ') || 'Pendiente'],
+                              ['Duración', draft.servicios.length ? `${draft.servicios.reduce((sum, service) => sum + service.duracion, 0)} minutos` : 'Pendiente'],
+                              [activeOp === 'reprogramar' ? 'Nueva fecha' : 'Fecha', draft.fecha ? formatDBDateLong(`${draft.fecha}T00:00:00Z`) : 'Pendiente'],
+                              [activeOp === 'reprogramar' ? 'Nueva hora' : 'Hora', draft.hora ? formatTime12Hour(draft.hora) : 'Pendiente'],
+                              ['Personal asignado', draft.profesionalNombre || 'Se asignará según disponibilidad'],
+                            ]
+                        ).map(([label, value]) => (
+                          <div key={label}>
+                            <dt className="text-xs text-muted-foreground">{label}</dt>
+                            <dd className="mt-0.5 font-medium">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+
+                      {draft.faltantes.length ? (
+                        <ul className="mt-4 space-y-1 rounded-xl bg-muted p-3 text-xs text-muted-foreground">
+                          {draft.faltantes.map(item => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+
+                      {expired ? (
+                        <p role="status" className="mt-3 text-xs text-destructive">
+                          El borrador venció. Inicia una nueva solicitud.
+                        </p>
+                      ) : (
+                        <p className="mt-4 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Clock3 className="size-3" /> Válido por 15 minutos desde el último cambio.
+                        </p>
+                      )}
+
+                      <button
+                        ref={confirmButtonRef}
+                        type="button"
+                        onClick={() => void confirm()}
+                        disabled={disabled || !draft.listo || expired}
+                        className={cn(
+                          'mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold disabled:opacity-40',
+                          activeOp === 'cancelar'
+                            ? 'bg-destructive text-white'
+                            : 'bg-primary text-primary-foreground',
+                        )}
+                      >
+                        <Check className="size-4" /> {confirmButtonLabel(activeOp)}
+                      </button>
+                    </section>
+                  ) : null}
+
+                  {completedAction ? (
+                    <section role="status" className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
+                      <CalendarCheck2 className="mb-3 size-7 text-primary" />
+                      <h2 className="font-semibold">{confirmedHeading(completedAction.operacion)}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        El cambio ya está reflejado en la agenda de NovaCita.
+                      </p>
+                      <Link href="/citas" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                        Ver agenda <ChevronRight className="size-4" />
+                      </Link>
+                    </section>
+                  ) : null}
+
                   {busy ? (
                     <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
                       <Loader2 className="size-4 animate-spin" /> Consultando NovaCita…
@@ -703,7 +765,7 @@ export default function AssistantPage() {
                           </p>
                           <p className="mt-1 text-muted-foreground">
                             El dictado del navegador puede enviar audio al servicio de voz del navegador (nunca a Gemini).
-                            Para mantener nombres de clientes 100% dentro de NovaCita, puedes escribir tu mensaje o activar el dictado bajo tu consentimiento.
+                            Dicta solo el servicio y el horario. Escribe el nombre del cliente en el chat.
                           </p>
                           <div className="mt-2.5 flex flex-wrap gap-2">
                             {voice.privacyMode === 'downloadable' ? (
@@ -827,7 +889,7 @@ export default function AssistantPage() {
                       : voice.privacyMode === 'local'
                         ? 'Reconocimiento de voz local activo. Revisa o corrige la transcripción antes de enviar.'
                         : voice.allowExternalDictation
-                          ? 'Dictado del navegador activo (el audio se procesa en el navegador, nunca en Gemini). Revisa el texto antes de enviar.'
+                          ? 'Dicta el servicio y el horario. Escribe el nombre del cliente y revisa el texto antes de enviarlo.'
                           : 'Pulsa el micrófono para dictar o escribe directamente. Las respuestas habladas solo usan voces locales del dispositivo.'}
                     {tts.blockedRemoteOnly
                       ? ' · Sin voz local en español disponible en este navegador; respuestas mostradas solo en texto.'
@@ -847,283 +909,6 @@ export default function AssistantPage() {
                 </div>
               </section>
 
-              {/* Right Column: Pending Confirmation Summary + Optional Manual Override */}
-              <aside className="space-y-4 lg:overflow-y-auto lg:pb-2">
-                {draft ? (
-                  <section
-                    ref={summarySectionRef}
-                    aria-label="Resumen de la cita"
-                    className={cn(
-                      'rounded-2xl border bg-card p-5 transition-shadow',
-                      highlightSummary
-                        ? 'border-primary ring-2 ring-primary/60 shadow-lg'
-                        : 'border-primary/25',
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h2 className="flex items-center gap-2 font-semibold">
-                          {activeOp === 'reprogramar' ? (
-                            <CalendarClock className="size-5 text-primary" />
-                          ) : (
-                            <CalendarCheck2 className="size-5 text-primary" />
-                          )}
-                          {summaryHeading(activeOp)}
-                        </h2>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {activeOp === 'cancelar'
-                            ? 'Pendiente · todavía no se ha cancelado'
-                            : activeOp === 'reprogramar'
-                              ? 'Pendiente · el cambio se aplica al confirmar'
-                              : 'Borrador · todavía no está registrada'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void send('Descarta el borrador')}
-                        disabled={disabled}
-                        aria-label="Descartar borrador"
-                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
-
-                    {highlightSummary && draft.listo ? (
-                      <div
-                        role="status"
-                        className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-medium text-foreground"
-                      >
-                        Confirmación en pantalla requerida: pulsa el botón de abajo para completar la operación.
-                      </div>
-                    ) : null}
-
-                    {draft.citaObjetivoResumen && activeOp !== 'crear' ? (
-                      <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-xs">
-                        <p className="font-semibold text-muted-foreground">Cita actual</p>
-                        <p className="mt-1 font-medium text-foreground">
-                          {draft.citaObjetivoResumen.clienteNombre} · {draft.citaObjetivoResumen.servicios}
-                        </p>
-                        <p className="mt-0.5 text-muted-foreground">
-                          {shortDateLabel(draft.citaObjetivoResumen.fecha)} ·{' '}
-                          {formatTime12Hour(draft.citaObjetivoResumen.hora)} ·{' '}
-                          {draft.citaObjetivoResumen.profesionalNombre}
-                        </p>
-                      </div>
-                    ) : null}
-
-                    <dl className="mt-4 space-y-2.5 text-sm">
-                      {(activeOp === 'cancelar'
-                        ? [
-                            ['Cliente', draft.clienteNombre || 'Pendiente'],
-                            ['Profesional', draft.profesionalNombre || 'Pendiente'],
-                            ['Servicios', draft.citaObjetivoResumen?.servicios || draft.servicios.map(s => s.nombre).join(' + ') || 'Pendiente'],
-                            ['Fecha', draft.citaObjetivoResumen?.fecha ? formatDBDateLong(`${draft.citaObjetivoResumen.fecha}T00:00:00Z`) : 'Pendiente'],
-                            ['Hora', draft.citaObjetivoResumen?.hora ? formatTime12Hour(draft.citaObjetivoResumen.hora) : 'Pendiente'],
-                          ]
-                        : [
-                            ['Cliente', draft.clienteNombre || 'Pendiente'],
-                            ['Servicios', draft.servicios.map(service => service.nombre).join(' + ') || 'Pendiente'],
-                            ['Duración', draft.servicios.length ? `${draft.servicios.reduce((sum, service) => sum + service.duracion, 0)} minutos` : 'Pendiente'],
-                            [activeOp === 'reprogramar' ? 'Nueva fecha' : 'Fecha', draft.fecha ? formatDBDateLong(`${draft.fecha}T00:00:00Z`) : 'Pendiente'],
-                            [activeOp === 'reprogramar' ? 'Nueva hora' : 'Hora', draft.hora ? formatTime12Hour(draft.hora) : 'Pendiente'],
-                            ['Personal asignado', draft.profesionalNombre || 'Se asignará según disponibilidad'],
-                          ]
-                      ).map(([label, value]) => (
-                        <div key={label}>
-                          <dt className="text-xs text-muted-foreground">{label}</dt>
-                          <dd className="mt-0.5 font-medium">{value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-
-                    {draft.faltantes.length ? (
-                      <ul className="mt-4 space-y-1 rounded-xl bg-muted p-3 text-xs text-muted-foreground">
-                        {draft.faltantes.map(item => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-
-                    {expired ? (
-                      <p role="status" className="mt-3 text-xs text-destructive">
-                        El borrador venció. Inicia una nueva solicitud.
-                      </p>
-                    ) : (
-                      <p className="mt-4 flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Clock3 className="size-3" /> Válido por 15 minutos desde el último cambio.
-                      </p>
-                    )}
-
-                    <button
-                      ref={confirmButtonRef}
-                      type="button"
-                      onClick={() => void confirm()}
-                      disabled={disabled || !draft.listo || expired}
-                      className={cn(
-                        'mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold disabled:opacity-40',
-                        activeOp === 'cancelar'
-                          ? 'bg-destructive text-white'
-                          : 'bg-primary text-primary-foreground',
-                      )}
-                    >
-                      <Check className="size-4" /> {confirmButtonLabel(activeOp)}
-                    </button>
-                  </section>
-                ) : (
-                  <section className="rounded-2xl border border-border bg-card p-5">
-                    <h2 className="flex items-center gap-2 text-sm font-semibold">
-                      <CalendarCheck2 className="size-4 text-primary" /> Resumen pendiente
-                    </h2>
-                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                      Cuando pidas agendar, reprogramar o cancelar una cita, aquí aparecerá el resumen completo con el botón de confirmación en pantalla.
-                    </p>
-                  </section>
-                )}
-
-                {completedAction ? (
-                  <section role="status" className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
-                    <CalendarCheck2 className="mb-3 size-7 text-primary" />
-                    <h2 className="font-semibold">{confirmedHeading(completedAction.operacion)}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      El cambio ya está reflejado en la agenda de NovaCita.
-                    </p>
-                    <Link href="/citas" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                      Ver agenda <ChevronRight className="size-4" />
-                    </Link>
-                  </section>
-                ) : null}
-
-                {/* Optional progressive-disclosure manual context controls */}
-                <details className="group rounded-2xl border border-border bg-card p-4">
-                  <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
-                    <span className="flex items-center gap-2">
-                      <UserRound className="size-4 text-primary" /> Selección manual opcional
-                    </span>
-                    <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
-                  </summary>
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <label htmlFor="assistant-client" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                        Cliente
-                      </label>
-                      {client ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 p-2.5">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">{client.nombre}</p>
-                            <p className="text-xs text-muted-foreground">{client.telefono || 'Cliente seleccionado'}</p>
-                          </div>
-                          <button
-                            type="button"
-                            aria-label="Cambiar cliente"
-                            disabled={disabled}
-                            onClick={() => selectClientManual(null)}
-                            className="p-1"
-                          >
-                            <X className="size-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" />
-                            <input
-                              id="assistant-client"
-                              value={clientQuery}
-                              disabled={disabled}
-                              onChange={event => setClientQuery(event.target.value)}
-                              className={cn(fieldClass, 'pl-9')}
-                              placeholder="Buscar nombre o teléfono"
-                              autoComplete="off"
-                            />
-                          </div>
-                          {searching ? (
-                            <p className="mt-1.5 text-xs text-muted-foreground" role="status">
-                              Buscando…
-                            </p>
-                          ) : null}
-                          {matches.length ? (
-                            <ul aria-label="Clientes encontrados" className="mt-2 overflow-hidden rounded-xl border border-border">
-                              {matches.map(match => (
-                                <li key={match.id}>
-                                  <button
-                                    type="button"
-                                    disabled={disabled}
-                                    onClick={() => selectClientManual(match)}
-                                    className="w-full px-3 py-2.5 text-left text-sm hover:bg-muted"
-                                  >
-                                    <span className="block font-medium">{match.nombre}</span>
-                                    <span className="text-xs text-muted-foreground">{match.telefono || 'Sin teléfono'}</span>
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-
-                    <div>
-                      <label htmlFor="assistant-employee" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                        Profesional
-                      </label>
-                      <select
-                        id="assistant-employee"
-                        value={employeeId}
-                        disabled={disabled || user?.rol === 'EMPLEADO'}
-                        onChange={event => {
-                          const next = event.target.value;
-                          setEmployeeId(next);
-                          if (draft) void send(next ? 'Prepara la cita' : 'Cualquier profesional', { employeeId: next });
-                        }}
-                        className={fieldClass}
-                      >
-                        <option value="">Cualquier profesional disponible</option>
-                        {employees.map(employee => (
-                          <option key={employee.id} value={employee.id}>
-                            {employee.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label htmlFor="assistant-service" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                        Añadir servicio al mensaje
-                      </label>
-                      <select
-                        id="assistant-service"
-                        value=""
-                        disabled={disabled || voice.listening}
-                        onChange={event => {
-                          const service = services.find(item => item.id === event.target.value);
-                          if (service) {
-                            setInput(current => (current ? `${current} y ${service.nombre}` : `Agenda ${service.nombre}`));
-                          }
-                        }}
-                        className={fieldClass}
-                      >
-                        <option value="">Ver servicios</option>
-                        {services.map(service => (
-                          <option key={service.id} value={service.id}>
-                            {service.nombre} · {service.duracion} min
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </details>
-
-                <div className="rounded-2xl border border-border bg-muted/30 p-4 text-xs leading-relaxed text-muted-foreground">
-                  <ShieldCheck className="mb-2 size-4 text-primary" />
-                  <p>
-                    Las identidades de clientes, las consultas internas y las respuestas se procesan dentro de NovaCita. Gemini recibe únicamente comandos operativos filtrados y referencias temporales de catálogo.
-                  </p>
-                  <p className="mt-2 font-medium">
-                    Esta versión comparte la base de datos del negocio: las citas que confirmes en pantalla serán reales.
-                  </p>
-                </div>
-              </aside>
             </div>
           )}
         </div>

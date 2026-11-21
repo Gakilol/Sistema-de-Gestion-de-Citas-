@@ -45,7 +45,6 @@ test.beforeEach(async ({ page, baseURL }) => {
           || 'Agenda a Ana Lopes para corte el viernes por la tarde';
         setTimeout(() => {
           this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: text } }] });
-          this.onend?.();
         }, 25);
       }
       stop() {
@@ -227,12 +226,17 @@ test('conversación completa por voz y texto sin tabla, con corrección de trans
   await page.goto('/asistente');
   await expect(page.getByRole('heading', { name: 'Asistente NovaCita' })).toBeVisible();
   await expect(page.getByText('Voz local en el dispositivo')).toBeVisible();
+  await expect(page.getByText('Selección manual opcional')).toHaveCount(0);
 
   // 1. Dictado con error de transcripción ("Ana Lopes") -> se corrige manualmente a "Ana López" antes de enviar
   await page.getByRole('button', { name: 'Iniciar dictado' }).click();
   const textbox = page.getByRole('textbox', { name: 'Tu mensaje' });
   await expect(textbox).toHaveValue('Agenda a Ana Lopes para corte el viernes por la tarde');
   expect(await page.evaluate(() => (window as unknown as { __lastProcessLocally?: boolean }).__lastProcessLocally)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Enviar mensaje' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Detener dictado' }).click();
+  await expect(textbox).toBeEditable();
+  expect(chatMessages).toEqual([]);
 
   await textbox.fill('Agenda a Ana López para corte el viernes por la tarde');
   await page.getByRole('button', { name: 'Enviar mensaje' }).click();
