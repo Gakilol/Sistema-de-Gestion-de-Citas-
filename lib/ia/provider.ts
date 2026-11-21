@@ -49,7 +49,7 @@ export async function reserveProviderRequest(userId: string, now = new Date()): 
     { clave: `${userId}:day`, ventana: day, max: 30 },
   ];
   return prisma.$transaction(async (tx: import('@prisma/client').Prisma.TransactionClient) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('novacita-ia-quota'))`;
+    await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtext('novacita-ia-quota'))`;
     const current = await tx.iaLimite.findMany({ where: { clave: { in: windows.map(window => window.clave) } } });
     if (windows.some(window => {
       const row = current.find(item => item.clave === window.clave);
@@ -77,7 +77,11 @@ export async function interpretCommand(
 ): Promise<{ intent: AssistantIntent; mode: AssistantMode; fallbackReason?: string }> {
   const fallback = (reason: string) => ({ intent: local, mode: 'local' as AssistantMode, fallbackReason: reason });
   if (!process.env.GEMINI_API_KEY) return fallback('not_configured');
-  if (!await reserveProviderRequest(userId)) return fallback('quota');
+  try {
+    if (!await reserveProviderRequest(userId)) return fallback('quota');
+  } catch {
+    return fallback('quota_unavailable');
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {

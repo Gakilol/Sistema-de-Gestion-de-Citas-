@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ generate: vi.fn(), counters: vi.fn(), upsert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ generate: vi.fn(), counters: vi.fn(), upsert: vi.fn(), lock: vi.fn() }));
 vi.mock('@google/genai', () => ({ GoogleGenAI: class { models = { generateContent: mocks.generate }; } }));
 vi.mock('@/lib/db', () => ({
   prisma: {
     $transaction: (callback: (tx: unknown) => unknown) =>
       callback({
-        $queryRaw: vi.fn(),
+        $queryRaw: mocks.lock,
         iaLimite: { findMany: mocks.counters, upsert: mocks.upsert },
       }),
   },
@@ -42,6 +42,7 @@ describe('integración de Gemini y respaldo', () => {
     });
     expect(args.config.responseMimeType).toBe('application/json');
     expect(args.config.maxOutputTokens).toBe(600);
+    expect(mocks.lock.mock.calls[0][0][0]).toContain('SELECT 1 FROM pg_advisory_xact_lock');
   });
 
   it('envía contexto conversacional opaco sin identidades ni resultados de base de datos', async () => {
@@ -106,6 +107,17 @@ describe('integración de Gemini y respaldo', () => {
       mode: 'local',
       fallbackReason: 'quota',
     });
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it('un fallo al bloquear la cuota mantiene el motor local y evita llamar a Gemini', async () => {
+    mocks.lock.mockRejectedValueOnce(new Error('No se pudo adquirir el bloqueo'));
+    expect(await interpretCommand('agenda s0', '2026-11-17', local, 'user-1')).toEqual({
+      mode: 'local',
+      intent: local,
+      fallbackReason: 'quota_unavailable',
+    });
+    expect(mocks.counters).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
   });
 });
